@@ -2585,6 +2585,158 @@ function apiGetTeamFantasyHeadToHead(payload) {
 }
 
 /* TEAM_FANTASY_WEEKLY_SELECTION_HELP_BACKEND_v1218v1 */
+function teamFantasyWeekBrowseContext_(payload) {
+  payload = payload || {};
+  let raw = payload.browseContext || payload.context || {};
+  if (typeof raw === "string") {
+    try { raw = JSON.parse(raw); } catch (err) { raw = {}; }
+  }
+  raw = raw && typeof raw === "object" ? raw : {};
+  const settings = raw.settings && typeof raw.settings === "object" ? raw.settings : {};
+  return {
+    settings: {
+      gameId: teamFantasyString_(settings.gameId || payload.gameId),
+      seasonYear: Math.max(2000, Math.floor(teamFantasyNumber_(settings.seasonYear, 0))),
+      currentWeek: Math.max(1, Math.floor(teamFantasyNumber_(settings.currentWeek || raw.currentWeek, 1))),
+      teamUseLimit: Math.max(1, Math.floor(teamFantasyNumber_(settings.teamUseLimit, 1))),
+      regularSeasonEndWeek: Math.max(1, Math.floor(teamFantasyNumber_(settings.regularSeasonEndWeek, 18))),
+      playoffUsageMode: teamFantasyKey_(settings.playoffUsageMode) === "carry" ? "carry" : "reset"
+    },
+    currentWeek: Math.max(1, Math.floor(teamFantasyNumber_(raw.currentWeek || settings.currentWeek, 1))),
+    availableWeeks: Array.isArray(raw.availableWeeks) ? raw.availableWeeks.map(function(w){ return Math.max(1, Math.floor(teamFantasyNumber_(w, 0))); }).filter(Boolean) : []
+  };
+}
+
+function teamFantasyWeekSnapshotFromRows_(rows, gameId, week, seasonYear) {
+  rows = Array.isArray(rows) ? rows : [];
+  const rankingRows = rows.filter(function(row) {
+    return teamFantasyIsRankingSourceRow_(row) &&
+      teamFantasyString_(row.GameId) === gameId &&
+      Number(row.SeasonYear) === Number(seasonYear) &&
+      Number(row.Week) === Number(week);
+  });
+  const snapshotsByEvent = {};
+  rankingRows.forEach(function(row) {
+    const eventId = teamFantasyString_(row.ESPNEventId).replace(/^nfl_/, "");
+    if (!eventId) return;
+    let stats = {};
+    try { stats = row.StatsJSON ? JSON.parse(String(row.StatsJSON)) : {}; } catch (err) { stats = {}; }
+    const meta = stats && stats.__game && typeof stats.__game === "object" ? stats.__game : {};
+    if (!snapshotsByEvent[eventId]) {
+      snapshotsByEvent[eventId] = {
+        eventId:eventId,
+        gameDateTime:teamFantasyString_(meta.gameDateTime),
+        homeAbbr:teamFantasyNormalizeTeam_(meta.homeAbbr),
+        awayAbbr:teamFantasyNormalizeTeam_(meta.awayAbbr),
+        homeScore:meta.homeScore !== undefined ? meta.homeScore : null,
+        awayScore:meta.awayScore !== undefined ? meta.awayScore : null,
+        status:teamFantasyString_(meta.status),
+        statusDetail:teamFantasyString_(meta.statusDetail),
+        period:Math.max(0,Math.floor(teamFantasyNumber_(meta.period,0))),
+        displayClock:teamFantasyString_(meta.displayClock),
+        state:teamFantasyString_(meta.state),
+        completed:teamFantasyBool_(row.Final,false),
+        homePositionScores:{},
+        awayPositionScores:{}
+      };
+    }
+    const snap = snapshotsByEvent[eventId];
+    const team = teamFantasyNormalizeTeam_(row.TeamAbbr);
+    const position = teamFantasyNormalizePosition_(row.Position);
+    const score = { points:teamFantasyNumber_(row.FantasyPoints,0), final:teamFantasyBool_(row.Final,false), updatedAt:teamFantasyString_(row.UpdatedAt) };
+    if (team && team === snap.homeAbbr) snap.homePositionScores[position] = score;
+    if (team && team === snap.awayAbbr) snap.awayPositionScores[position] = score;
+  });
+  const positionRankings = {};
+  TEAM_FANTASY_POSITIONS.forEach(function(position) {
+    const map = teamFantasyRankingsFromRows_(rows, gameId, position, week, seasonYear);
+    const ranked = Object.keys(map).map(function(team) {
+      return { team:team, rank:Number(map[team].rank||0), average:Number(map[team].average||0), games:Number(map[team].games||0) };
+    }).filter(function(item){ return item.games > 0; });
+    positionRankings[position] = {
+      top: ranked.slice().sort(function(a,b){ if (b.average !== a.average) return b.average-a.average; return a.team.localeCompare(b.team); }).slice(0,10),
+      bottom: ranked.slice().sort(function(a,b){ if (a.average !== b.average) return a.average-b.average; return a.team.localeCompare(b.team); }).slice(0,10)
+    };
+  });
+  return {
+    nflGameSnapshots:Object.keys(snapshotsByEvent).map(function(eventId){ return snapshotsByEvent[eventId]; }),
+    positionRankings:positionRankings
+  };
+}
+
+function apiGetTeamFantasyWeekState(payload) {
+  payload = payload || {};
+  const username = teamFantasyNormalizeUsername_(payload.username);
+  const gameId = teamFantasyString_(payload.gameId);
+  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, 1)));
+  if (!username || !gameId) throw new Error("User and game are required.");
+  teamFantasyRequireGameAccess_(username, gameId, "viewGame", payload.token);
+  if (!teamFantasyIsGame_(gameId)) return { success:false, error:"This game is not configured as Team Fantasy Football." };
+
+  const browse = teamFantasyWeekBrowseContext_(payload);
+  const settings = browse.settings;
+  if (settings.gameId !== gameId || !settings.seasonYear) throw new Error("Team Fantasy week browse context is missing.");
+
+  // Security invariant: entry ownership is always resolved server-side.
+  // Static settings/current-week context is reused from the already-loaded page.
+  const entries = teamFantasyEntriesForUser_(gameId, username);
+  const schedule = teamFantasyFetchWeekSchedule_(gameId, week, settings);
+
+  let postseasonEligibility = {};
+  entries.forEach(function(entry) { postseasonEligibility[entry.entryId] = Number(week) <= settings.regularSeasonEndWeek; });
+  if (Number(week) > settings.regularSeasonEndWeek && payload.postseasonEligibleEntryIds) {
+    let ids = payload.postseasonEligibleEntryIds;
+    if (typeof ids === "string") {
+      try { ids = JSON.parse(ids); } catch (err) { ids = []; }
+    }
+    ids = Array.isArray(ids) ? ids.map(teamFantasyString_) : [];
+    const allowed = {};
+    ids.forEach(function(id){ allowed[id] = true; });
+    entries.forEach(function(entry){ postseasonEligibility[entry.entryId] = !!allowed[entry.entryId]; });
+  }
+
+  const pickRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS);
+  const unitScoreRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
+  const readContext = { pickRows:pickRows, unitScoreRows:unitScoreRows };
+  const lineups = entries.map(function(entry) {
+    const lineup = teamFantasyLineupState_(
+      gameId, settings, entry, week, schedule,
+      postseasonEligibility[entry.entryId] !== false,
+      readContext
+    );
+    const entryId = teamFantasyString_(entry.entryId);
+    lineup.weekPoints = teamFantasyRound_(unitScoreRows.filter(function(row){
+      return !teamFantasyIsRankingSourceRow_(row) &&
+        teamFantasyString_(row.GameId) === gameId &&
+        Number(row.SeasonYear) === Number(settings.seasonYear) &&
+        Number(row.Week) === Number(week) &&
+        teamFantasyString_(row.EntryId) === entryId;
+    }).reduce(function(sum,row){ return sum + teamFantasyNumber_(row.FantasyPoints,0); },0));
+    return lineup;
+  });
+
+  const snapshot = teamFantasyWeekSnapshotFromRows_(unitScoreRows, gameId, week, settings.seasonYear);
+  const availableWeeks = browse.availableWeeks.slice();
+  if (availableWeeks.indexOf(week) === -1 && schedule && Array.isArray(schedule.games) && schedule.games.length) availableWeeks.push(week);
+
+  return {
+    success:true,
+    lightweight:true,
+    gameId:gameId,
+    username:username,
+    week:week,
+    currentWeek:browse.currentWeek,
+    historicalWeekRequested:week !== browse.currentWeek,
+    phase:teamFantasyPhaseForWeek_(settings,week),
+    lineups:lineups,
+    scheduleGames:schedule.games,
+    availableWeeks:availableWeeks.sort(function(a,b){ return a-b; }),
+    rankingCoverage:teamFantasyRankingCoverage_(unitScoreRows, gameId, week, settings.seasonYear),
+    nflGameSnapshots:snapshot.nflGameSnapshots,
+    positionRankings:snapshot.positionRankings
+  };
+}
+
 function apiGetTeamFantasyState(payload) {
   payload = payload || {};
   // Hot player read: each downstream table accessor already lazily ensures its
