@@ -33,7 +33,7 @@ const SPORTS_ODDS_API_KEY_PROPERTY =
   "THE_ODDS_API_KEY";
 
 const SPORTS_ODDS_MARKETS =
-  "h2h";
+  "h2h,spreads,totals";
 
 const SPORTS_ODDS_REGIONS =
   "us";
@@ -1602,21 +1602,22 @@ function getSportsOddsForGame(payload) {
 
   }
 
-  const hasFresh =
-    rows.some(function(row) {
-      return isSportsOddsFresh_(row);
-    });
-
   let picked =
     pickBestRow_();
 
+  /*
+    Refresh freshness must be evaluated for the matched event, not for the
+    league as a whole. A fresh row for another NFL game must not prevent this
+    matchup from replacing stale cached odds.
+  */
+  const matchedFresh =
+    picked.best &&
+    picked.bestScore >= 120 &&
+    isSportsOddsFresh_(picked.best);
+
   if (
     refreshIfStale &&
-    (
-      !hasFresh ||
-      !picked.best ||
-      picked.bestScore < 120
-    )
+    !matchedFresh
   ) {
 
     refreshSportsOddsForLeague(
