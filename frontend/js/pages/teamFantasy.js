@@ -703,11 +703,95 @@ function teamFantasyMainWeekBrowser_(state) {
   return '<section class="tf-main-week-browser"><label for="tfMainWeekSelect">Week</label><select id="tfMainWeekSelect" onchange="teamFantasyChangeMainWeek_(this.value)">'+options+'</select>'+future+'</section>';
 }
 
+function teamFantasyWeekBrowseContext_(state) {
+  state = state || {};
+  const settings = state.settings || {};
+  return {
+    settings: {
+      gameId: state.gameId || settings.gameId || "",
+      seasonYear: Number(settings.seasonYear || 0),
+      currentWeek: Number(state.currentWeek || settings.currentWeek || state.week || 1),
+      teamUseLimit: Number(settings.teamUseLimit || 1),
+      regularSeasonEndWeek: Number(settings.regularSeasonEndWeek || 18),
+      playoffUsageMode: String(settings.playoffUsageMode || "reset")
+    },
+    currentWeek: Number(state.currentWeek || state.week || 1),
+    availableWeeks: Array.isArray(state.availableWeeks) ? state.availableWeeks.slice() : []
+  };
+}
+
+function teamFantasyPostseasonEligibleEntryIds_(state) {
+  return (state && state.lineups || []).filter(function(lineup){
+    return lineup && lineup.postseasonEligible !== false && lineup.entry && lineup.entry.entryId;
+  }).map(function(lineup){ return String(lineup.entry.entryId); });
+}
+
+function teamFantasyLoadWeekState_(state, week) {
+  state = state || {};
+  return api("getTeamFantasyWeekState", {
+    gameId: state.gameId,
+    username: state.username || teamFantasyCurrentUser_(),
+    week: Number(week),
+    browseContext: JSON.stringify(teamFantasyWeekBrowseContext_(state)),
+    postseasonEligibleEntryIds: JSON.stringify(teamFantasyPostseasonEligibleEntryIds_(state))
+  });
+}
+
+function teamFantasyReplaceHtml_(selector, html) {
+  const old = document.querySelector(selector);
+  if (!old) return;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = String(html || "").trim();
+  if (wrap.firstElementChild) old.replaceWith(wrap.firstElementChild);
+}
+
+function teamFantasyApplyWeekState_(res) {
+  const state = window.TEAM_FANTASY_STATE || {};
+  state.week = Number(res.week || state.week || 1);
+  state.historicalWeekRequested = res.historicalWeekRequested === true;
+  state.phase = res.phase || state.phase;
+  state.lineups = Array.isArray(res.lineups) ? res.lineups : [];
+  state.scheduleGames = Array.isArray(res.scheduleGames) ? res.scheduleGames : [];
+  state.rankingCoverage = res.rankingCoverage || {};
+  if (Array.isArray(res.availableWeeks) && res.availableWeeks.length) state.availableWeeks = res.availableWeeks.slice();
+  window.TEAM_FANTASY_STATE = state;
+  window.TEAM_FANTASY_SELECTED_WEEK = state.week === Number(state.currentWeek || 0) ? null : state.week;
+  window.TEAM_FANTASY_GAME_DAY_WEEK = state.week;
+  window.TEAM_FANTASY_SCOREBOARD_EVENT_ID = "";
+  window.TEAM_FANTASY_CURRENT_GAME_DAY = {
+    success:true,
+    lightweight:true,
+    gameId:state.gameId,
+    week:state.week,
+    leagueId:state.selectedLeagueId,
+    selectedLeagueId:state.selectedLeagueId,
+    nflGameSnapshots:Array.isArray(res.nflGameSnapshots)?res.nflGameSnapshots:[],
+    positionRankings:res.positionRankings||{}
+  };
+
+  teamFantasyReplaceHtml_(".sports-team-fantasy .tf-main-week-browser", teamFantasyMainWeekBrowser_(state));
+  teamFantasyReplaceHtml_(".sports-team-fantasy .tf-week-summary", teamFantasyWeekSummary_(state,teamFantasyPrimaryLineup_(state)));
+  const lineupZone=document.getElementById("teamFantasyLineupZone");
+  if(lineupZone) lineupZone.innerHTML=(state.lineups||[]).map(function(lineup){return teamFantasyRenderLineup_(state,lineup);}).join("");
+  teamFantasyRefreshFeatured_();
+}
+
 async function teamFantasyChangeMainWeek_(week) {
   const state = window.TEAM_FANTASY_STATE || {};
   const selected = Math.max(1, Number(week || state.currentWeek || state.week || 1));
-  window.TEAM_FANTASY_SELECTED_WEEK = selected === Number(state.currentWeek || 0) ? null : selected;
-  await teamFantasyReload_();
+  if (!state.gameId || selected === Number(state.week || 0)) return;
+  const requestId = (Number(window.TEAM_FANTASY_WEEK_SWITCH_REQUEST_ID || 0) + 1);
+  window.TEAM_FANTASY_WEEK_SWITCH_REQUEST_ID = requestId;
+  try {
+    const res = await teamFantasyLoadWeekState_(state, selected);
+    if (requestId !== Number(window.TEAM_FANTASY_WEEK_SWITCH_REQUEST_ID || 0)) return;
+    if (!res || res.success === false) throw new Error(res && (res.message || res.error) || "Could not load Team Fantasy week.");
+    teamFantasyApplyWeekState_(res);
+  } catch (err) {
+    if (requestId !== Number(window.TEAM_FANTASY_WEEK_SWITCH_REQUEST_ID || 0)) return;
+    teamFantasySetStatus_(err && err.message ? err.message : "Could not switch Team Fantasy week.", true);
+    teamFantasyReplaceHtml_(".sports-team-fantasy .tf-main-week-browser", teamFantasyMainWeekBrowser_(state));
+  }
 }
 
 async function renderTeamFantasyPage(){
