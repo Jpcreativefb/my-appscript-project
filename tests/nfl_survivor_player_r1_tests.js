@@ -12,7 +12,7 @@ assert(final.includes('survivorRecoveryR3VisibleMatchupIndex_'),'1. carousel vis
 assert(final.includes('restoreIndex(keep)'),'2. R3 refresh restores the same matchup index');
 assert(final.includes('round.pickNomineeId=ids[0]'),'3. finalized pick updates in place instead of forcing a page reload');
 assert(final.includes('USED WEEK $1'),'5. used-team overlay states the used week');
-assert(final.includes('GAME TOTAL / O-U')&&final.includes('"N/A"'),'7. missing odds/total have explicit N/A rendering');
+assert(final.includes('GAME TOTAL / O-U')&&final.includes('"NA"'),'7. missing odds/total have explicit NA rendering');
 assert(final.includes('Use Random Pick on the Survivor page when you want an immediate random choice.'),'8. Random is documented as the immediate action');
 const autoOpen=final.slice(final.indexOf('root.survivorRecoveryR3OpenAutoPick_='),final.indexOf('function compareKey()'));
 assert(!autoOpen.includes('survivorRecoveryR3AutoPickNow_'),'9. AutoPick settings cannot immediately invoke Random/Select Team Now');
