@@ -892,6 +892,7 @@ function doPost(e) {
     if (action === "adminCreateTeamFantasyLeague") return json(apiAdminCreateTeamFantasyLeague(body));
     if (action === "adminAssignTeamFantasyLeagueMember") return json(apiAdminAssignTeamFantasyLeagueMember(body));
     if (action === "adminRunTeamFantasySync") return json(apiAdminRunTeamFantasySync(body));
+    if (action === "adminBackfillTeamFantasyRecentRanking") return json(apiAdminBackfillTeamFantasyRecentRanking(body));
     if (action === "adminInstallTeamFantasySyncTrigger") return json(apiAdminInstallTeamFantasySyncTrigger(body));
     if (action === "adminSendTeamFantasyReminder") return json(apiAdminSendTeamFantasyReminder(body));
 
