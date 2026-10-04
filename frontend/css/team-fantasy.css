@@ -1418,3 +1418,130 @@ body:has(.sports-team-fantasy) #app{max-width:none;margin:0;padding:0;background
     object-fit:contain;
   }
 }
+
+
+/* TEAM FANTASY LIVE SCOREBOARD R2 — WEEK + RANKING PRESENTATION */
+.sports-team-fantasy .tf-main-week-browser{
+  margin:6px 0;
+  padding:6px 8px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  border:1px solid rgba(71,137,180,.28);
+  border-radius:9px;
+  background:#021426;
+}
+.sports-team-fantasy .tf-main-week-browser label{
+  flex:0 0 auto;
+  color:#bfe8ff;
+  font-size:.54rem;
+  font-weight:1000;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.sports-team-fantasy .tf-main-week-browser select{
+  min-width:0;
+  flex:0 1 150px;
+  height:30px;
+  padding:3px 26px 3px 8px;
+  border:1px solid rgba(78,153,201,.42);
+  border-radius:7px;
+  background:#03182a;
+  color:#fff;
+  font:inherit;
+  font-size:.56rem;
+  font-weight:900;
+}
+.sports-team-fantasy .tf-week-future-note{
+  min-width:0;
+  color:#9fb8c7;
+  font-size:.49rem;
+  line-height:1.15;
+}
+.sports-team-fantasy .tf-season-position-rankings{
+  border:1px solid rgba(71,137,180,.26);
+  border-radius:8px;
+  background:#021426;
+  padding:0;
+  overflow:hidden;
+}
+.sports-team-fantasy .tf-season-position-rankings>summary{
+  padding:6px 8px;
+  list-style-position:inside;
+  color:#dff3ff;
+  font-size:.56rem;
+  font-weight:900;
+  line-height:1.1;
+}
+.sports-team-fantasy .tf-season-position-rankings-body{
+  margin:0;
+  padding:0 7px 7px;
+}
+.sports-team-fantasy .tf-season-position-ranking{
+  margin-top:5px;
+  border:1px solid rgba(71,137,180,.22);
+  border-radius:7px;
+  background:#03182a;
+  overflow:hidden;
+}
+.sports-team-fantasy .tf-season-position-ranking>summary{
+  padding:5px 7px;
+  cursor:pointer;
+  color:#fff;
+  font-size:.54rem;
+  font-weight:1000;
+}
+.sports-team-fantasy .tf-rank-two-col{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:8px;
+  padding:5px 7px 7px;
+}
+.sports-team-fantasy .tf-rank-two-col>div{
+  min-width:0;
+}
+.sports-team-fantasy .tf-rank-two-col h4{
+  margin:0 0 4px;
+  color:#8fb5c9;
+  font-size:.48rem;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.sports-team-fantasy .tf-rank-two-col>div>div{
+  min-height:20px;
+  display:flex;
+  justify-content:space-between;
+  gap:4px;
+  align-items:center;
+  border-top:1px solid rgba(71,137,180,.12);
+  font-size:.48rem;
+}
+.sports-team-fantasy .tf-rank-two-col span,
+.sports-team-fantasy .tf-rank-two-col strong{
+  min-width:0;
+  white-space:nowrap;
+}
+.sports-team-fantasy .tf-rank-value.is-top{color:#65d889}
+.sports-team-fantasy .tf-rank-value.is-bottom{color:#ff8e8e}
+@media(max-width:640px){
+  .sports-team-fantasy .tf-main-week-browser{
+    margin:5px 0;
+    padding:5px 7px;
+  }
+  .sports-team-fantasy .tf-main-week-browser select{
+    flex-basis:136px;
+    height:28px;
+    font-size:.54rem;
+  }
+  .sports-team-fantasy .tf-week-future-note{
+    font-size:.47rem;
+  }
+  .sports-team-fantasy .tf-rank-two-col{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:6px;
+    padding:4px 5px 6px;
+  }
+  .sports-team-fantasy .tf-rank-two-col>div>div{
+    font-size:.45rem;
+  }
+}
