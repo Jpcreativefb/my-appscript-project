@@ -42,7 +42,7 @@ const SPORTS_SURVIVOR_PICK_META_HEADERS = [
 
 const SPORTS_SURVIVOR_RESULTS_HEADERS = [
   "GameId", "CategoryId", "Week", "SportsGameId", "ESPNEventId", "HomeTeam", "AwayTeam",
-  "HomeScore", "AwayScore", "Status", "State", "Completed", "Cancelled", "GameDateTime",
+  "HomeScore", "AwayScore", "Status", "State", "Period", "Clock", "Completed", "Cancelled", "GameDateTime",
   "UpdatedAt"
 ];
 
@@ -64,6 +64,23 @@ function sportsSurvivorBool_(value, fallback) {
 function sportsSurvivorNumber_(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? number : (fallback === undefined ? 0 : fallback);
+}
+
+function sportsSurvivorOptionalNumber_(value) {
+  if (value === undefined || value === null || sportsSurvivorString_(value) === "") return "";
+  const number = Number(value);
+  return Number.isFinite(number) ? number : "";
+}
+
+function sportsSurvivorNormalizeOddsValue_(value, kind, companionPrice) {
+  const number = sportsSurvivorOptionalNumber_(value);
+  if (number === "") return "";
+  if (kind === "spread" && number === 0) {
+    const price = sportsSurvivorOptionalNumber_(companionPrice);
+    return price !== "" && price !== 0 ? 0 : "";
+  }
+  if ((kind === "moneyline" || kind === "total") && number === 0) return "";
+  return number;
 }
 
 function sportsSurvivorSlug_(value) {
@@ -452,36 +469,46 @@ function sportsSurvivorFetchOdds_(score) {
       market: "spread",
       refreshIfStale: "true"
     }, "Sports Survivor odds");
-    if (!result || result.success === false || result.found === false) return null;
+    if (!result) return null;
     const odds = result.odds || result.data || result;
-    return {
-      homeOdds: odds.homeOdds !== undefined ? odds.homeOdds : odds.HomeOdds,
-      awayOdds: odds.awayOdds !== undefined ? odds.awayOdds : odds.AwayOdds,
-      homeSpread: odds.homeSpread !== undefined ? odds.homeSpread : odds.HomeSpread,
-      awaySpread: odds.awaySpread !== undefined ? odds.awaySpread : odds.AwaySpread,
-      homeSpreadOdds: odds.homeSpreadOdds !== undefined ? odds.homeSpreadOdds : odds.HomeSpreadOdds,
-      awaySpreadOdds: odds.awaySpreadOdds !== undefined ? odds.awaySpreadOdds : odds.AwaySpreadOdds,
+    const homeSpreadOdds = odds.homeSpreadOdds !== undefined ? odds.homeSpreadOdds : odds.HomeSpreadOdds;
+    const awaySpreadOdds = odds.awaySpreadOdds !== undefined ? odds.awaySpreadOdds : odds.AwaySpreadOdds;
+    const normalized = {
+      homeOdds: sportsSurvivorNormalizeOddsValue_(odds.homeOdds !== undefined ? odds.homeOdds : odds.HomeOdds, "moneyline"),
+      awayOdds: sportsSurvivorNormalizeOddsValue_(odds.awayOdds !== undefined ? odds.awayOdds : odds.AwayOdds, "moneyline"),
+      homeSpread: sportsSurvivorNormalizeOddsValue_(odds.homeSpread !== undefined ? odds.homeSpread : odds.HomeSpread, "spread", homeSpreadOdds),
+      awaySpread: sportsSurvivorNormalizeOddsValue_(odds.awaySpread !== undefined ? odds.awaySpread : odds.AwaySpread, "spread", awaySpreadOdds),
+      homeSpreadOdds: sportsSurvivorOptionalNumber_(homeSpreadOdds),
+      awaySpreadOdds: sportsSurvivorOptionalNumber_(awaySpreadOdds),
+      totalPoints: sportsSurvivorNormalizeOddsValue_(odds.totalPoints !== undefined ? odds.totalPoints : odds.TotalPoints, "total"),
       source: sportsSurvivorString_(result.source || odds.source || odds.bookmaker || "sports-odds"),
       lastUpdated: sportsSurvivorString_(odds.lastUpdated || odds.LastUpdated || result.lastUpdated || new Date().toISOString())
     };
+    const hasMarket = [normalized.homeOdds, normalized.awayOdds, normalized.homeSpread, normalized.awaySpread, normalized.totalPoints].some(function(value) { return value !== ""; });
+    return hasMarket ? normalized : null;
   } catch (err) {
     return null;
   }
 }
 
 function sportsSurvivorOddsFromResult_(result) {
-  if (!result || result.success === false || result.found === false) return null;
+  if (!result) return null;
   const odds = result.odds || result.data || result;
-  return {
-    homeOdds: odds.homeOdds !== undefined ? odds.homeOdds : odds.HomeOdds,
-    awayOdds: odds.awayOdds !== undefined ? odds.awayOdds : odds.AwayOdds,
-    homeSpread: odds.homeSpread !== undefined ? odds.homeSpread : odds.HomeSpread,
-    awaySpread: odds.awaySpread !== undefined ? odds.awaySpread : odds.AwaySpread,
-    homeSpreadOdds: odds.homeSpreadOdds !== undefined ? odds.homeSpreadOdds : odds.HomeSpreadOdds,
-    awaySpreadOdds: odds.awaySpreadOdds !== undefined ? odds.awaySpreadOdds : odds.AwaySpreadOdds,
+  const homeSpreadOdds = odds.homeSpreadOdds !== undefined ? odds.homeSpreadOdds : odds.HomeSpreadOdds;
+  const awaySpreadOdds = odds.awaySpreadOdds !== undefined ? odds.awaySpreadOdds : odds.AwaySpreadOdds;
+  const normalized = {
+    homeOdds: sportsSurvivorNormalizeOddsValue_(odds.homeOdds !== undefined ? odds.homeOdds : odds.HomeOdds, "moneyline"),
+    awayOdds: sportsSurvivorNormalizeOddsValue_(odds.awayOdds !== undefined ? odds.awayOdds : odds.AwayOdds, "moneyline"),
+    homeSpread: sportsSurvivorNormalizeOddsValue_(odds.homeSpread !== undefined ? odds.homeSpread : odds.HomeSpread, "spread", homeSpreadOdds),
+    awaySpread: sportsSurvivorNormalizeOddsValue_(odds.awaySpread !== undefined ? odds.awaySpread : odds.AwaySpread, "spread", awaySpreadOdds),
+    homeSpreadOdds: sportsSurvivorOptionalNumber_(homeSpreadOdds),
+    awaySpreadOdds: sportsSurvivorOptionalNumber_(awaySpreadOdds),
+    totalPoints: sportsSurvivorNormalizeOddsValue_(odds.totalPoints !== undefined ? odds.totalPoints : odds.TotalPoints, "total"),
     source: sportsSurvivorString_(result.source || odds.source || odds.bookmaker || "sports-odds"),
     lastUpdated: sportsSurvivorString_(odds.lastUpdated || odds.LastUpdated || result.lastUpdated || new Date().toISOString())
   };
+  const hasMarket = [normalized.homeOdds, normalized.awayOdds, normalized.homeSpread, normalized.awaySpread, normalized.totalPoints].some(function(value) { return value !== ""; });
+  return hasMarket ? normalized : null;
 }
 
 function sportsSurvivorFetchOddsBulk_(scores) {
@@ -645,8 +672,9 @@ function sportsSurvivorBuildWeek_(gameId, requestedWeek, options) {
       const opponent = sportsSurvivorString_(isHome ? score.AwayTeam : score.HomeTeam);
       if (!team) return;
       const teamId = sportsSurvivorSlug_(team);
-      const spread = odds ? sportsSurvivorNumber_(isHome ? odds.homeSpread : odds.awaySpread, NaN) : NaN;
-      const moneyline = odds ? (isHome ? odds.homeOdds : odds.awayOdds) : "";
+      const spread = odds ? sportsSurvivorNormalizeOddsValue_(isHome ? odds.homeSpread : odds.awaySpread, "spread", isHome ? odds.homeSpreadOdds : odds.awaySpreadOdds) : "";
+      const moneyline = odds ? sportsSurvivorNormalizeOddsValue_(isHome ? odds.homeOdds : odds.awayOdds, "moneyline") : "";
+      const total = odds ? sportsSurvivorNormalizeOddsValue_(odds.totalPoints, "total") : "";
       teams.push({
         nomineeId: teamId,
         nominee: team,
@@ -671,9 +699,10 @@ function sportsSurvivorBuildWeek_(gameId, requestedWeek, options) {
           homeTeam: sportsSurvivorString_(score.HomeTeam),
           awayTeam: sportsSurvivorString_(score.AwayTeam),
           kickoff: sportsSurvivorString_(score.GameDateTime),
-          spread: Number.isFinite(spread) ? spread : "",
-          moneyline: moneyline === undefined || moneyline === null ? "" : moneyline,
-          spreadOdds: odds ? (isHome ? odds.homeSpreadOdds : odds.awaySpreadOdds) : "",
+          spread: spread,
+          moneyline: moneyline,
+          spreadOdds: odds ? sportsSurvivorOptionalNumber_(isHome ? odds.homeSpreadOdds : odds.awaySpreadOdds) : "",
+          total: total,
           oddsSource: odds && odds.source || "",
           oddsLastUpdated: odds && odds.lastUpdated || "",
           divisionGame: sportsSurvivorDivisionGame_(settings, score)
@@ -765,6 +794,7 @@ function sportsSurvivorUpsertResults_(gameId, categoryId, week, scores) {
       ESPNEventId: sportsSurvivorString_(score.ESPNEventId), HomeTeam: sportsSurvivorString_(score.HomeTeam),
       AwayTeam: sportsSurvivorString_(score.AwayTeam), HomeScore: score.HomeScore, AwayScore: score.AwayScore,
       Status: sportsSurvivorString_(score.Status), State: sportsSurvivorString_(score.State),
+      Period: sportsSurvivorString_(score.Period), Clock: sportsSurvivorString_(score.Clock),
       Completed: sportsSurvivorResultComplete_(score), Cancelled: sportsSurvivorResultCancelled_(score),
       GameDateTime: sportsSurvivorString_(score.GameDateTime), UpdatedAt: new Date()
     });
@@ -818,9 +848,10 @@ function sportsSurvivorRefreshOddsForWeek_(gameId, categoryId, scores) {
       const meta = categoryMeta[optionId];
       if (sportsSurvivorString_(meta.sportsGameId) !== sportsSurvivorString_(score.GameId)) return;
       const home = sportsSurvivorKey_(meta.side) === "home";
-      meta.spread = home ? odds.homeSpread : odds.awaySpread;
-      meta.moneyline = home ? odds.homeOdds : odds.awayOdds;
-      meta.spreadOdds = home ? odds.homeSpreadOdds : odds.awaySpreadOdds;
+      meta.spread = sportsSurvivorNormalizeOddsValue_(home ? odds.homeSpread : odds.awaySpread, "spread", home ? odds.homeSpreadOdds : odds.awaySpreadOdds);
+      meta.moneyline = sportsSurvivorNormalizeOddsValue_(home ? odds.homeOdds : odds.awayOdds, "moneyline");
+      meta.spreadOdds = sportsSurvivorOptionalNumber_(home ? odds.homeSpreadOdds : odds.awaySpreadOdds);
+      meta.total = sportsSurvivorNormalizeOddsValue_(odds.totalPoints, "total");
       meta.oddsSource = odds.source || "";
       meta.oddsLastUpdated = odds.lastUpdated || new Date().toISOString();
       update.push({

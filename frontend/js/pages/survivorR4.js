@@ -232,17 +232,17 @@
   const statBase=root.survivorRecoveryR3StatValue_;
   root.survivorRecoveryR3StatValue_=function(team,key,favoriteId){
     team=team||{};
-    if(key==="Spread")return finite(team.spread)?(root.survivorFormatLine_(team.spread)||String(team.spread)):"N/A";
+    if(key==="Spread")return typeof root.survivorRecoveryR2Spread_==="function"?root.survivorRecoveryR2Spread_(team.spread):(finite(team.spread)?(root.survivorFormatLine_(team.spread)||String(team.spread)):"NA");
     if(key==="Moneyline"){
-      if(!finite(team.moneyline)||Number(team.moneyline)===0)return "N/A";
-      const out=root.survivorRecoveryR2Moneyline_(team.moneyline);return out&&out!=="—"?out:"N/A";
+      if(!finite(team.moneyline)||Number(team.moneyline)===0)return "NA";
+      const out=root.survivorRecoveryR2Moneyline_(team.moneyline);return out&&out!=="—"?out:"NA";
     }
     return statBase.apply(this,arguments);
   };
   root.survivorRecoveryR3Details_=function(matchup,favoriteId){
     matchup=matchup||{};const away=matchup.away||{},home=matchup.home||{},base=["Record","Market","Spread","Moneyline","Side","Opp. Record"];
     ["Streak","Division","Conference","Power Rank","Win %"].forEach(function(label){const av=root.survivorRecoveryR3StatValue_(away,label,favoriteId),hv=root.survivorRecoveryR3StatValue_(home,label,favoriteId);if(av!=="—"||hv!=="—")base.push(label);});
-    const rawTotal=!empty(matchup.total)?matchup.total:!empty(away.total)?away.total:home.total,total=finite(rawTotal)?rawTotal:"N/A";
+    const rawTotal=!empty(matchup.total)?matchup.total:!empty(away.total)?away.total:home.total,total=typeof root.survivorRecoveryR2Total_==="function"?root.survivorRecoveryR2Total_(rawTotal):(finite(rawTotal)&&Number(rawTotal)!==0?rawTotal:"NA");
     return `<div class="survivor-r3-detail-matrix"><div class="survivor-r3-detail-head"><strong>${esc(away.name||away.id||"Away")}</strong><span>STAT</span><strong>${esc(home.name||home.id||"Home")}</strong></div>${base.map(label=>`<div class="survivor-r3-detail-row"><strong>${esc(root.survivorRecoveryR3StatValue_(away,label,favoriteId))}</strong><span>${esc(label)}</span><strong>${esc(root.survivorRecoveryR3StatValue_(home,label,favoriteId))}</strong></div>`).join("")}<div class="survivor-r3-detail-foot"><span>GAME TOTAL / O-U <strong>${esc(total)}</strong></span>${matchup.weather?`<span>WEATHER <strong>${esc(matchup.weather)}</strong></span>`:""}</div></div>`;
   };
 
