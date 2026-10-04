@@ -308,7 +308,9 @@ function teamFantasyWeekSettingsCachePut_(gameId, settings) {
 function teamFantasyWeekSettingsCacheClear_(gameId) {
   try {
     if (typeof CacheService === "undefined" || !CacheService.getScriptCache) return;
-    CacheService.getScriptCache().remove(teamFantasyWeekSettingsCacheKey_(gameId));
+    const cache = CacheService.getScriptCache();
+    cache.remove(teamFantasyWeekSettingsCacheKey_(gameId));
+    cache.remove(teamFantasyWeekTimingCacheKey_(gameId));
   } catch (err) {}
 }
 
