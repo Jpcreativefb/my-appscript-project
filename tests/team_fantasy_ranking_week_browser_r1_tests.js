@@ -85,6 +85,9 @@ const rules = context.teamFantasyDefaultRules_().map((r,i)=>({
 }));
 const persisted = context.teamFantasyRankingRowsFromSummary_('g',{seasonYear:2026},1,'401000001',['BUF','KC'],summary,rules);
 assert.strictEqual(persisted.length,16,'completed NFL game persists 2 teams x 8 position-unit rows');
+['BUF','KC'].forEach(team=>{
+  assert.strictEqual(persisted.filter(r=>r.TeamAbbr===team).length,8,'completed prior NFL game must persist all 8 position scores for '+team);
+});
 function persistedRow(team,position){ return persisted.find(r=>r.TeamAbbr===team&&r.Position===position); }
 const qb = persistedRow('BUF','QB');
 const k = persistedRow('BUF','K');
@@ -115,6 +118,74 @@ assert.strictEqual(lb.FantasyPoints,8,'LB: 10 tackles(5)+1 sack(2)+1 TFL(1)=8');
   assert.strictEqual(result.generated,16,'all-zero completed-game ranking set must be recomputed');
   assert(rewritten.some(r=>r.Position==='QB'&&r.FantasyPoints===23),'recomputed QB row must carry real scoring points');
   assert(rewritten.some(r=>r.Position==='K'&&r.FantasyPoints===9),'recomputed K row must carry real scoring points');
+}
+
+
+// A complete-looking final game with nonzero OL but empty source stats elsewhere is still poisoned and must be repaired.
+{
+  const poisoned = persisted.map(r=>({
+    ...r,
+    FantasyPoints:r.Position==='OL'?3.5:0,
+    StatsJSON:r.Position==='OL'?JSON.stringify({rushingYards:100,netPassingYards:150}):'{}',
+    ScoreDetailJSON:r.Position==='OL'?'[{"points":3.5}]':'[]',
+    Final:true
+  }));
+  let rewritten=[];
+  context.teamFantasyFetchEspnSummary_=()=>summary;
+  context.teamFantasyUpsertRankingRowsBatch_=batch=>{ rewritten=batch.slice(); return {inserted:0,updated:batch.length,unchanged:0}; };
+  const result=context.teamFantasyRefreshRankingUniverseWeek_(
+    'g',1,{seasonYear:2026},
+    {games:[{eventId:'401000001',homeAbbr:'BUF',awayAbbr:'KC',completed:true,state:'post',status:'Final'}],byTeam:{}},
+    rules,{},poisoned
+  );
+  assert.strictEqual(result.gamesProcessed,1,'invalid complete-looking final game must be reprocessed');
+  assert.strictEqual(rewritten.length,16,'repair must rewrite the full 16-row game universe');
+  assert(rewritten.every(r=>JSON.parse(r.StatsJSON)&&Object.keys(JSON.parse(r.StatsJSON)).filter(k=>k!=='__game').length>0),'repaired final rows must contain real unit source stats');
+}
+
+// Live ranking rows are provisional: every active sync refetches the summary even when all 16 rows already exist.
+{
+  const liveSummary=JSON.parse(JSON.stringify(summary));
+  liveSummary.header.competitions[0].status={type:{completed:false,state:'in',name:'STATUS_IN_PROGRESS'},period:3,displayClock:'8:42'};
+  let summaryCalls=0, writes=[];
+  context.teamFantasyFetchEspnSummary_=()=>{summaryCalls++;return liveSummary;};
+  context.teamFantasyUpsertRankingRowsBatch_=batch=>{writes.push(batch.map(r=>({...r})));return{inserted:writes.length===1?batch.length:0,updated:writes.length===1?0:batch.length,unchanged:0};};
+  const schedule={games:[{eventId:'401live',homeAbbr:'BUF',awayAbbr:'KC',completed:false,state:'in',status:'STATUS_IN_PROGRESS',period:3,displayClock:'8:42'}],byTeam:{}};
+  const first=context.teamFantasyRefreshRankingUniverseWeek_('g',4,{seasonYear:2026},schedule,rules,{},[],{includeLive:true});
+  const existing=writes[0].map(r=>({...r,ESPNEventId:'401live',Final:false}));
+  liveSummary.boxscore.players[0].statistics[0].athletes[0].stats[0]='350';
+  const second=context.teamFantasyRefreshRankingUniverseWeek_('g',4,{seasonYear:2026},schedule,rules,{},existing,{includeLive:true});
+  assert.strictEqual(summaryCalls,2,'live game must refetch on each 5-minute sync pass');
+  assert.strictEqual(first.gamesProcessed,1);
+  assert.strictEqual(second.gamesProcessed,1,'existing live 16-row set must not suppress refresh');
+  assert.strictEqual(writes[1].length,16,'second live sync rewrites all exposed team-position rows');
+  const q1=writes[0].find(r=>r.TeamAbbr==='BUF'&&r.Position==='QB');
+  const q2=writes[1].find(r=>r.TeamAbbr==='BUF'&&r.Position==='QB');
+  assert.notStrictEqual(q1.FantasyPoints,q2.FantasyPoints,'live position points must change when ESPN stats change');
+  assert(writes[1].every(r=>r.Final===false),'live rows remain provisional until Final');
+}
+
+// Recent historical repair targets exactly the last three completed weeks and becomes marker-cached.
+{
+  const repairContext={ console, Date, JSON, String, Number, Array, Object, Boolean, RegExp, Set, Map, isNaN, isFinite, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, Math };
+  vm.createContext(repairContext);
+  vm.runInContext(engineSource, repairContext, {filename:'SportsTeamFantasyEngine-recent-repair.js'});
+  const markerStore={};
+  repairContext.PropertiesService={getScriptProperties:()=>({getProperty:k=>markerStore[k]||'',setProperty:(k,v)=>{markerStore[k]=String(v);}})};
+  repairContext.teamFantasyRules_=()=>rules;
+  repairContext.teamFantasyReadRows_=()=>[];
+  repairContext.teamFantasyFetchWeekSchedule_=(gameId,week)=>({
+    games:[{eventId:'w'+week,homeAbbr:'BUF',awayAbbr:'KC',completed:true,state:'post',status:'Final'}],byTeam:{}
+  });
+  const touched=[];
+  repairContext.teamFantasyRefreshRankingUniverseWeek_=(gameId,week)=>{touched.push(week);return{success:true,week,gamesProcessed:1,expectedRows:16,inserted:16,updated:0,unchanged:0,errors:[]};};
+  const settings={gameId:'g',seasonYear:2026,currentWeek:5};
+  const first=repairContext.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,5,{completedWeeks:3});
+  assert.deepStrictEqual(Array.from(first.completedWeeks),[2,3,4],'Week 5 repair must target last three completed Weeks 2-4');
+  assert.deepStrictEqual(touched,[2,3,4]);
+  const second=repairContext.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,5,{completedWeeks:3});
+  assert.strictEqual(second.cached,true,'successful recent repair must be idempotent via v2 marker');
+  assert.deepStrictEqual(touched,[2,3,4],'cached rerun must not reprocess historical weeks');
 }
 
 // Main state week browser: default current Week 4, explicit Week 2, and scheduled future Week 5.
@@ -276,6 +347,8 @@ const lightStart=gameDaySource.indexOf('function apiGetTeamFantasyGameDayState')
 const lightEnd=gameDaySource.indexOf('function teamFantasyBuildSyntheticGameDayLab_',lightStart);
 const lightApi=gameDaySource.slice(lightStart,lightEnd);
 assert(!lightApi.includes('teamFantasyFetchWeekSchedule_')&&!lightApi.includes('UrlFetchApp'),'Game Day polling must remain cached-row only');
+assert(engineSource.includes('function apiAdminBackfillTeamFantasyRecentRanking'),'admin recent backfill action must exist');
+assert(engineSource.includes('.everyMinutes(5).create()'),'existing Team Fantasy writer remains on 5-minute cadence');
 assert(!/getTeamFantasyGameDayState[^]*api\([^)]*position/i.test(frontendSource),'frontend must not issue per-position Game Day requests');
 
 // Scoreboard source contracts.
@@ -300,6 +373,45 @@ const compactOrder = ['QB','RB','WRTE','OL','K','DL','LB','DB'];
 compactOrder.forEach(function(position){
   assert(frontendSource.includes('"'+position+'"'),'compact scoreboard must retain '+position);
 });
+
+
+// Player-safe scoreboard status and week selector presentation.
+{
+  const ui={
+    console,
+    window:{TEAM_FANTASY_STATE:{},TEAM_FANTASY_CURRENT_GAME_DAY:{}},
+    teamFantasyFormatKickoff_:()=> 'Sun 12:00 PM',
+    teamFantasyEscape_:v=>String(v),
+    teamFantasyScore_:v=>String(v)
+  };
+  vm.createContext(ui);
+  const statusStart=frontendSource.lastIndexOf('function teamFantasyScoreboardStatusText_');
+  const statusEnd=frontendSource.indexOf('teamFantasyFeaturedHtml_=function',statusStart);
+  vm.runInContext(frontendSource.slice(statusStart,statusEnd),ui);
+  assert.strictEqual(ui.teamFantasyScoreboardStatusText_({state:'pre',status:'STATUS_SCHEDULED'}),'Sun 12:00 PM','upcoming shows kickoff only');
+  assert.strictEqual(ui.teamFantasyScoreboardStatusText_({state:'in',status:'STATUS_IN_PROGRESS',period:3,displayClock:'8:42'}),'Q3 8:42','live shows period + game clock');
+  assert.strictEqual(ui.teamFantasyScoreboardStatusText_({state:'post',status:'STATUS_FINAL',completed:true}),'FINAL','final shows FINAL only');
+  ['STATUS_SCHEDULED','STATUS_IN_PROGRESS'].forEach(raw=>{
+    assert(!ui.teamFantasyScoreboardStatusText_({state:raw.includes('IN_PROGRESS')?'in':'pre',status:raw,period:2,displayClock:'3:21'}).includes(raw),'raw ESPN status must never reach player scoreboard');
+  });
+
+  const weekStart=frontendSource.indexOf('function teamFantasyMainWeekBrowser_');
+  const weekEnd=frontendSource.indexOf('async function teamFantasyChangeMainWeek_',weekStart);
+  const weekUi={};
+  vm.createContext(weekUi);
+  vm.runInContext(frontendSource.slice(weekStart,weekEnd),weekUi);
+  const currentHtml=weekUi.teamFantasyMainWeekBrowser_({week:5,currentWeek:5,availableWeeks:[2,3,4,5,6]});
+  assert(currentHtml.includes('<select id="tfMainWeekSelect"'),'main week control must be compact dropdown');
+  assert(currentHtml.includes('value="5" selected'),'week dropdown defaults to current week');
+  assert(!currentHtml.includes('has not started yet'),'current week has no future note');
+  const futureHtml=weekUi.teamFantasyMainWeekBrowser_({week:6,currentWeek:5,availableWeeks:[2,3,4,5,6]});
+  assert(futureHtml.includes('Week 6 has not started yet.'),'future selection gets minimal note');
+}
+
+const cssSourceR2 = fs.readFileSync(path.join(root,'frontend/css/team-fantasy.css'),'utf8');
+assert(cssSourceR2.includes('.tf-rank-two-col') && cssSourceR2.includes('grid-template-columns:minmax(0,1fr) minmax(0,1fr)'),'Top 10 and Bottom 10 must stay side-by-side');
+assert(frontendSource.includes('<h4>Top 10</h4>') && frontendSource.includes('<h4>Bottom 10</h4>'),'ranking columns must retain Top 10 / Bottom 10 labels');
+assert(frontendSource.indexOf('<h4>Top 10</h4>') < frontendSource.indexOf('<h4>Bottom 10</h4>'),'Top 10 must render left before Bottom 10');
 
 // Pure scoreboard selection proof: exact team+position highlights; adjacent position does not.
 {
