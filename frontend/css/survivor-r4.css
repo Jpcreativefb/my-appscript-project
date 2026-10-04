@@ -130,3 +130,15 @@
 .survivor-r6-protection-switch input{position:absolute;opacity:0;pointer-events:none}.survivor-r6-protection-switch span{width:42px;height:23px;border-radius:999px;background:#273a49;display:block;position:relative;cursor:pointer}.survivor-r6-protection-switch span:after{content:"";position:absolute;width:19px;height:19px;left:2px;top:2px;border-radius:50%;background:#d6e3eb;transition:.15s}.survivor-r6-protection-switch input:checked+span{background:#087cff}.survivor-r6-protection-switch input:checked+span:after{left:21px}.survivor-r6-protection-switch input:disabled+span{opacity:.48;cursor:not-allowed}
 .survivor-r6-auto-option.is-unavailable{opacity:.52}.survivor-r6-auto-option.is-unavailable input{cursor:not-allowed}
 @media(max-width:620px){.survivor-r3-slider-nav>div>strong{font-size:1rem!important}.survivor-r3-game-index{font-size:1.22em!important}.survivor-r6-protection-row{gap:7px;padding:9px}.survivor-r6-protection-row small{font-size:.53rem}}
+
+
+/* NFL_SURVIVOR_LIVE_PRESENTATION_R2
+   Confidence-style team-color depth without changing card geometry/state behavior. */
+.survivor-recovery-r3 .survivor-r3-team-side{
+  background:
+    radial-gradient(circle at 28% 18%,var(--survivor-team-primary-a),transparent 52%),
+    radial-gradient(circle at 82% 78%,var(--survivor-team-secondary-a),transparent 62%),
+    linear-gradient(145deg,rgba(5,31,50,.86),rgba(2,14,25,.91) 62%,rgba(5,24,39,.90))!important;
+  color:#fff!important;
+  text-shadow:0 2px 7px rgba(0,0,0,.78);
+}
