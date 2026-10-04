@@ -696,7 +696,11 @@ function teamFantasyMainWeekBrowser_(state) {
   if (weeks.indexOf(selected) === -1) weeks.push(selected);
   if (weeks.indexOf(current) === -1) weeks.push(current);
   weeks.sort(function(a,b){ return Number(a)-Number(b); });
-  return `<section class="card tf-main-week-browser"><div class="tf-card-heading"><div><h2>Week</h2><div class="tf-muted">Week ${current} is current. Past weeks are review-only after kickoff; future weeks use the existing eligibility and kickoff rules.</div></div></div>${teamFantasyWeekChips_(weeks,selected,'teamFantasyChangeMainWeek_',false)}</section>`;
+  const options=weeks.map(function(week){
+    return '<option value="'+Number(week)+'" '+(Number(week)===selected?'selected':'')+'>Week '+Number(week)+(Number(week)===current?' · Current':'')+'</option>';
+  }).join('');
+  const future=selected>current?'<span class="tf-week-future-note">Week '+selected+' has not started yet.</span>':'';
+  return '<section class="tf-main-week-browser"><label for="tfMainWeekSelect">Week</label><select id="tfMainWeekSelect" onchange="teamFantasyChangeMainWeek_(this.value)">'+options+'</select>'+future+'</section>';
 }
 
 async function teamFantasyChangeMainWeek_(week) {
@@ -2952,7 +2956,8 @@ renderTeamFantasyPage=async function(){
   let html=String(await TF_RC24M_RENDER_BASE_.apply(this,arguments)||'');
   const state=window.TEAM_FANTASY_STATE||{};
   const lineup=teamFantasyPrimaryLineup_(state);
-  const addon=teamFantasyRc24mLeaguePanel_(state)+teamFantasyFeaturedHtml_(state,lineup);
+  html=html.replace(/<section class="tf-main-week-browser">[\s\S]*?<\/section>/,'');
+  const addon=teamFantasyRc24mLeaguePanel_(state)+teamFantasyMainWeekBrowser_(state)+teamFantasyFeaturedHtml_(state,lineup);
   const hero=/(<section\b[^>]*class=["'][^"']*pattc-sports-hero[^"']*["'][\s\S]*?<\/section>)/i;
   if(hero.test(html))return html.replace(hero,'$1'+addon);
   const shell=/(<section\b[^>]*class=["'][^"']*sports-shell[^"']*["'][\s\S]*?<\/section>)/i;
@@ -3053,6 +3058,21 @@ function teamFantasySeasonRankingContextHtml_(data) {
   }).join('');
   return '<details class="tf-season-position-rankings"><summary>Season Position Rankings</summary><div class="tf-season-position-rankings-body"><div class="tf-muted">Season average through completed NFL games before Week '+Number(data&&data.week||0)+'.</div>'+body+'</div></details>';
 }
+function teamFantasyScoreboardStatusText_(game) {
+  game=game||{};
+  const stateKey=String(game.state||"").toLowerCase();
+  const raw=String(game.status||"").toLowerCase();
+  const final=game.completed===true||stateKey==="post"||raw.indexOf("final")!==-1;
+  const live=stateKey==="in"||raw.indexOf("progress")!==-1||raw.indexOf("halftime")!==-1;
+  if(final)return "FINAL";
+  if(live){
+    const period=Math.max(0,Number(game.period||0));
+    const clock=String(game.displayClock||"").trim();
+    const q=period>0?("Q"+period):"LIVE";
+    return clock?(q+" "+clock):q;
+  }
+  return teamFantasyFormatKickoff_(game);
+}
 teamFantasyFeaturedHtml_=function(state,lineup){
   const data=window.TEAM_FANTASY_CURRENT_GAME_DAY||window.TEAM_FANTASY_GAME_DAY||{};
   const games=teamFantasyScoreboardGames_();
@@ -3064,18 +3084,17 @@ teamFantasyFeaturedHtml_=function(state,lineup){
   const live=stateKey==="in"||/progress|halftime/i.test(statusText);
   const final=game.completed===true||stateKey==="post"||/final/i.test(statusText);
   const scoreReady=game.awayScore!==null&&game.awayScore!==undefined&&game.homeScore!==null&&game.homeScore!==undefined;
-  const center=live||final
-    ? (scoreReady?teamFantasyEscape_(away)+' '+teamFantasyEscape_(game.awayScore)+' – '+teamFantasyEscape_(game.homeScore)+' '+teamFantasyEscape_(home):teamFantasyEscape_(statusText|| (final?'FINAL':'LIVE')))
-    : teamFantasyEscape_(teamFantasyFormatKickoff_(game));
+  const playerStatus=teamFantasyScoreboardStatusText_(game);
+  const liveScore=live&&scoreReady?(' · '+teamFantasyEscape_(away)+' '+teamFantasyEscape_(game.awayScore)+' – '+teamFantasyEscape_(game.homeScore)+' '+teamFantasyEscape_(home)):'';
   const gameIndex=Math.max(0,games.findIndex(function(item){return String(item.eventId||"")===String(game.eventId||"");}));
   return '<div class="tf-feature tf-live-scoreboard">'+
     '<div class="tf-scoreboard-header">'+
       '<div class="tf-scoreboard-nav"><button type="button" onclick="teamFantasyScoreboardMove_(-1)" aria-label="Previous NFL game">←</button><strong>NFL GAME '+(gameIndex+1)+'/'+games.length+'</strong><button type="button" onclick="teamFantasyScoreboardMove_(1)" aria-label="Next NFL game">→</button></div>'+
-      '<div class="tf-scoreboard-status">'+teamFantasyEscape_(statusText||(final?'FINAL':live?'LIVE':'UPCOMING'))+' · '+center+'</div>'+
+      '<div class="tf-scoreboard-status">'+teamFantasyEscape_(playerStatus)+liveScore+'</div>'+
     '</div>'+
     '<div class="tf-scoreboard-matchup">'+
-      '<div class="tf-scoreboard-team is-away"><div class="tf-scoreboard-team-head"><img src="'+teamFantasyEscape_(teamFantasyTeamLogoUrl_(away))+'" alt=""><strong>'+teamFantasyEscape_(away)+'</strong><span class="tf-scoreboard-nfl-score">'+(scoreReady?teamFantasyEscape_(game.awayScore):'—')+'</span></div>'+teamFantasyScoreboardTeamUnits_(away,game.awayPositionScores,selections)+'</div>'+
-      '<div class="tf-scoreboard-team is-home"><div class="tf-scoreboard-team-head"><span class="tf-scoreboard-nfl-score">'+(scoreReady?teamFantasyEscape_(game.homeScore):'—')+'</span><strong>'+teamFantasyEscape_(home)+'</strong><img src="'+teamFantasyEscape_(teamFantasyTeamLogoUrl_(home))+'" alt=""></div>'+teamFantasyScoreboardTeamUnits_(home,game.homePositionScores,selections)+'</div>'+
+      '<div class="tf-scoreboard-team is-away"><div class="tf-scoreboard-team-head"><img src="'+teamFantasyEscape_(teamFantasyTeamLogoUrl_(away))+'" alt=""><strong>'+teamFantasyEscape_(away)+'</strong><span class="tf-scoreboard-nfl-score">'+((live||final)&&scoreReady?teamFantasyEscape_(game.awayScore):'')+'</span></div>'+teamFantasyScoreboardTeamUnits_(away,game.awayPositionScores,selections)+'</div>'+
+      '<div class="tf-scoreboard-team is-home"><div class="tf-scoreboard-team-head"><span class="tf-scoreboard-nfl-score">'+((live||final)&&scoreReady?teamFantasyEscape_(game.homeScore):'')+'</span><strong>'+teamFantasyEscape_(home)+'</strong><img src="'+teamFantasyEscape_(teamFantasyTeamLogoUrl_(home))+'" alt=""></div>'+teamFantasyScoreboardTeamUnits_(home,game.homePositionScores,selections)+'</div>'+
     '</div>'+
     teamFantasySeasonRankingContextHtml_(data)+
   '</div>';
