@@ -2109,8 +2109,15 @@ function teamFantasyStableHash_(value) {
   return hash.toString(36);
 }
 
-function teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules) {
-  return ["tf-ranking-repair-v1", teamFantasySlug_(gameId), Number(settings && settings.seasonYear || 0), Number(beforeWeek || 0), teamFantasyStableHash_(teamFantasyRankingRulesSignature_(rules || []))].join("|");
+function teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules, count) {
+  return [
+    "tf-ranking-repair-v2",
+    teamFantasySlug_(gameId),
+    Number(settings && settings.seasonYear || 0),
+    Number(beforeWeek || 0),
+    Math.max(1, Number(count || 3)),
+    teamFantasyStableHash_(teamFantasyRankingRulesSignature_(rules || []))
+  ].join("|");
 }
 
 function teamFantasyRankingRepairMarkerGet_(key) {
@@ -2120,35 +2127,109 @@ function teamFantasyRankingRepairMarkerGet_(key) {
   } catch (err) { return ""; }
 }
 
-function teamFantasyRankingRepairMarkerPut_(key) {
+function teamFantasyRankingRepairMarkerPut_(key, value) {
   try {
     if (typeof PropertiesService === "undefined" || !PropertiesService.getScriptProperties) return;
-    PropertiesService.getScriptProperties().setProperty(key, teamFantasyNowIso_());
+    PropertiesService.getScriptProperties().setProperty(key, teamFantasyString_(value) || teamFantasyNowIso_());
   } catch (err) {}
 }
 
-function teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, beforeWeek) {
-  settings = settings || teamFantasyGetSettings_(gameId);
+function teamFantasyRecentCompletedWeeks_(gameId, settings, beforeWeek, count) {
   beforeWeek = Math.max(1, Math.floor(teamFantasyNumber_(beforeWeek, settings.currentWeek)));
-  if (beforeWeek <= 1) return { success:true, weeks:[], errors:[] };
+  count = Math.max(1, Math.min(6, Math.floor(teamFantasyNumber_(count, 3))));
+  const found = [];
+  const schedules = {};
+  for (let week = beforeWeek - 1; week >= 1 && found.length < count; week--) {
+    const schedule = teamFantasyFetchWeekSchedule_(gameId, week, settings);
+    schedules[week] = schedule;
+    const games = schedule && Array.isArray(schedule.games) ? schedule.games : [];
+    if (!games.length) continue;
+    const complete = games.every(function(game) {
+      return game.completed === true ||
+        teamFantasyKey_(game.state) === "post" ||
+        teamFantasyKey_(game.status).indexOf("final") !== -1;
+    });
+    if (complete) found.push(week);
+  }
+  found.sort(function(a,b){ return a-b; });
+  return { weeks:found, schedules:schedules };
+}
+
+function teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, beforeWeek, options) {
+  settings = settings || teamFantasyGetSettings_(gameId);
+  options = options || {};
+  beforeWeek = Math.max(1, Math.floor(teamFantasyNumber_(beforeWeek, settings.currentWeek)));
+  const count = Math.max(1, Math.min(6, Math.floor(teamFantasyNumber_(options.completedWeeks, 3))));
+  if (beforeWeek <= 1) return { success:true, cached:false, completedWeeks:[], weeks:[], errors:[] };
+
   const rules = teamFantasyRules_(gameId);
-  const markerKey = teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules);
-  const marker = teamFantasyRankingRepairMarkerGet_(markerKey);
-  if (marker) return { success:true, cached:true, marker:marker, weeks:[], errors:[] };
+  const markerKey = teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules, count);
+  const marker = options.force === true ? "" : teamFantasyRankingRepairMarkerGet_(markerKey);
+  if (marker) {
+    let parsed = null;
+    try { parsed = JSON.parse(marker); } catch (err) {}
+    return {
+      success:true,
+      cached:true,
+      marker:marker,
+      completedWeeks:parsed && Array.isArray(parsed.completedWeeks) ? parsed.completedWeeks : [],
+      weeks:[],
+      totals:parsed && parsed.totals || {},
+      errors:[]
+    };
+  }
+
+  const recent = teamFantasyRecentCompletedWeeks_(gameId, settings, beforeWeek, count);
+  const targetWeeks = recent.weeks;
   const byEvent = {};
   let knownRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   const results = [];
   const errors = [];
-  for (let week=1; week<beforeWeek; week++) {
-    const schedule = teamFantasyFetchWeekSchedule_(gameId, week, settings);
-    const result = teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule, rules, byEvent, knownRows);
+  const totals = { gamesProcessed:0, expectedRows:0, inserted:0, updated:0, unchanged:0 };
+
+  targetWeeks.forEach(function(week) {
+    const schedule = recent.schedules[week] || teamFantasyFetchWeekSchedule_(gameId, week, settings);
+    const result = teamFantasyRefreshRankingUniverseWeek_(
+      gameId, week, settings, schedule, rules, byEvent, knownRows, { force:options.force === true }
+    );
     results.push(result);
+    totals.gamesProcessed += Number(result.gamesProcessed || 0);
+    totals.expectedRows += Number(result.expectedRows || 0);
+    totals.inserted += Number(result.inserted || 0);
+    totals.updated += Number(result.updated || 0);
+    totals.unchanged += Number(result.unchanged || 0);
     if (result.errors && result.errors.length) errors.push.apply(errors, result.errors);
     if (result.inserted || result.updated) knownRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
+  });
+
+  if (targetWeeks.length < Math.min(count, Math.max(0, beforeWeek - 1))) {
+    errors.push({ error:"Could not resolve all requested completed NFL weeks before Week " + beforeWeek + "." });
   }
+
   const success = errors.length === 0;
-  if (success) teamFantasyRankingRepairMarkerPut_(markerKey);
-  return { success:success, cached:false, marker:success ? teamFantasyNowIso_() : "", weeks:results, errors:errors };
+  const markerValue = JSON.stringify({
+    completedAt:teamFantasyNowIso_(),
+    completedWeeks:targetWeeks,
+    totals:totals
+  });
+  if (success) teamFantasyRankingRepairMarkerPut_(markerKey, markerValue);
+
+  return {
+    success:success,
+    cached:false,
+    marker:success ? markerValue : "",
+    completedWeeks:targetWeeks,
+    weeks:results,
+    totals:totals,
+    errors:errors
+  };
+}
+
+function teamFantasyBackfillRecentCompletedWeeks_(gameId, suppliedSettings, suppliedTiming, options) {
+  const settings = suppliedSettings || teamFantasyGetSettings_(gameId);
+  const timing = suppliedTiming || teamFantasyNflWeekTiming_(gameId, settings);
+  const beforeWeek = Math.max(1, Number(timing && timing.week || settings.currentWeek || 1));
+  return teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, beforeWeek, Object.assign({ completedWeeks:3 }, options || {}));
 }
 
 function teamFantasyUpsertUnitScore_(values) {
