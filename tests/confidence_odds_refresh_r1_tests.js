@@ -45,7 +45,7 @@ const checks = [
   [
     'partial/no-market event is tracked as unavailable rather than throwing away the week',
     odds.includes('unavailable.push({') &&
-      /unavailable:\\s*normalized\\.unavailable/.test(odds)
+      /unavailable:\s*normalized\.unavailable/.test(odds)
   ],
   [
     'normal and windowed refresh both use the isolated event normalizer',
