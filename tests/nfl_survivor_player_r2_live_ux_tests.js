@@ -10,7 +10,7 @@ const worker=read('functions/api/app.js');
 
 assert(app.includes('NFL_SURVIVOR_PLAYER_R2_MODULE_CACHE'));
 assert(app.includes('name === "survivor" || name === "survivorR4"'));
-assert(app.includes('url.searchParams.set("survivorPlayer", "v1230-nfl-survivor-player-r2")'));
+assert(app.includes('url.searchParams.set("survivorPlayer", "v1231-nfl-survivor-live-presentation-r2")'));
 
 assert(worker.includes('SURVIVOR_R3_PREVIEW_READ_ACTIONS'));
 const previewReadSet=worker.slice(worker.indexOf('const SURVIVOR_R3_PREVIEW_READ_ACTIONS'),worker.indexOf(']);',worker.indexOf('const SURVIVOR_R3_PREVIEW_READ_ACTIONS'))+3);
