@@ -705,25 +705,9 @@ function teamFantasyMainWeekBrowser_(state) {
 
 function teamFantasyWeekBrowseContext_(state) {
   state = state || {};
-  const settings = state.settings || {};
   return {
-    settings: {
-      gameId: state.gameId || settings.gameId || "",
-      seasonYear: Number(settings.seasonYear || 0),
-      currentWeek: Number(state.currentWeek || settings.currentWeek || state.week || 1),
-      teamUseLimit: Number(settings.teamUseLimit || 1),
-      regularSeasonEndWeek: Number(settings.regularSeasonEndWeek || 18),
-      playoffUsageMode: String(settings.playoffUsageMode || "reset")
-    },
-    currentWeek: Number(state.currentWeek || state.week || 1),
     availableWeeks: Array.isArray(state.availableWeeks) ? state.availableWeeks.slice() : []
   };
-}
-
-function teamFantasyPostseasonEligibleEntryIds_(state) {
-  return (state && state.lineups || []).filter(function(lineup){
-    return lineup && lineup.postseasonEligible !== false && lineup.entry && lineup.entry.entryId;
-  }).map(function(lineup){ return String(lineup.entry.entryId); });
 }
 
 function teamFantasyLoadWeekState_(state, week) {
@@ -732,8 +716,7 @@ function teamFantasyLoadWeekState_(state, week) {
     gameId: state.gameId,
     username: state.username || teamFantasyCurrentUser_(),
     week: Number(week),
-    browseContext: JSON.stringify(teamFantasyWeekBrowseContext_(state)),
-    postseasonEligibleEntryIds: JSON.stringify(teamFantasyPostseasonEligibleEntryIds_(state))
+    browseContext: JSON.stringify(teamFantasyWeekBrowseContext_(state))
   });
 }
 
