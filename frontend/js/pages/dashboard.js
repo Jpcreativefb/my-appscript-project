@@ -280,6 +280,12 @@ function dashboardApplyCurrentHomeProfile_(profile, username) {
   const avatarHtml = renderDashboardProfileAvatar_(profile, displayName);
   const sticky = home.querySelector("#dashboardPlayerSticky");
   const card = home.querySelector("#dashboardPlayerCard");
+  const authoritativeAppearance = String(profile.scope || profile.Scope || "").trim().toLowerCase() === "general";
+
+  [sticky, card].filter(Boolean).forEach(function(node) {
+    if (authoritativeAppearance) node.setAttribute("data-runtime-color-authority", "profile");
+    else node.removeAttribute("data-runtime-color-authority");
+  });
 
   if (sticky) {
     sticky.style.setProperty("--profile-theme-color", profileStyle.color);
@@ -404,6 +410,9 @@ async function renderDashboardPage(options) {
 
   const profileStyle = dashboardProfileColorSpec_(profile);
   const themeColor = profileStyle.color;
+  const profileAppearanceAuthorityAttr = String(profile.scope || profile.Scope || "").trim().toLowerCase() === "general"
+    ? ' data-runtime-color-authority="profile"'
+    : "";
 
   const bio = String(profile.bio || profile.Bio || "").trim();
   const homeClassification = dashboardClassifyHomeGames_(payload);
@@ -434,12 +443,12 @@ async function renderDashboardPage(options) {
   return `
     <div class="page dashboard-page dashboard-games-hub-page dashboard-home-v1218c">
 
-      <div id="dashboardPlayerSticky" class="dashboard-player-sticky" aria-hidden="true" style="--profile-theme-color:${escapeAttr(profileStyle.color)};--profile-theme-fill:${escapeAttr(profileStyle.fill)};">
+      <div id="dashboardPlayerSticky" class="dashboard-player-sticky"${profileAppearanceAuthorityAttr} aria-hidden="true" style="--profile-theme-color:${escapeAttr(profileStyle.color)};--profile-theme-fill:${escapeAttr(profileStyle.fill)};">
         ${renderDashboardProfileAvatar_(profile, displayName)}
         <strong>${escapeHtml(displayName)}</strong>
       </div>
 
-      <section id="dashboardPlayerCard" class="dashboard-player-card" style="--profile-theme-color:${escapeAttr(themeColor)};--profile-theme-color2:${escapeAttr(profileStyle.color2)};--profile-theme-angle:${escapeAttr(String(profileStyle.angle))}deg;--profile-theme-fill:${escapeAttr(profileStyle.fill)};">
+      <section id="dashboardPlayerCard" class="dashboard-player-card"${profileAppearanceAuthorityAttr} style="--profile-theme-color:${escapeAttr(themeColor)};--profile-theme-color2:${escapeAttr(profileStyle.color2)};--profile-theme-angle:${escapeAttr(String(profileStyle.angle))}deg;--profile-theme-fill:${escapeAttr(profileStyle.fill)};">
         <div class="dashboard-snark-line">${escapeHtml(snark)}</div>
 
         <div class="dashboard-player-main">
@@ -738,6 +747,7 @@ function dashboardApplyCurrentHomeAppearance_() {
     const category = String(card.getAttribute("data-dashboard-hub-category") || "general");
     const row = dashboardHubSetting_(category, "");
     if (!row || !Object.keys(row).length) return;
+    card.setAttribute("data-runtime-color-authority", "appearance");
     const colors = dashboardHubColorSpec_(row, "#354785");
     const tone = dashboardHubImageTone_(row);
     card.style.setProperty("--dashboard-hub-color", colors.color);
@@ -1105,8 +1115,9 @@ function renderDashboardHubLauncher_(activeGames, pastGames) {
           const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-hub-image" }) : "";
           const colors = dashboardHubColorSpec_(setting, "#354785");
           const tone = dashboardHubImageTone_(setting);
+          const appearanceAuthorityAttr = setting && Object.keys(setting).length ? ' data-runtime-color-authority="appearance"' : '';
           return `
-            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" data-dashboard-hub-category="${escapeAttr(category)}" ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;--dashboard-hub-image-opacity:${tone.opacity};--dashboard-hub-image-darken:${tone.darken};">
+            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" data-dashboard-hub-category="${escapeAttr(category)}"${appearanceAuthorityAttr} ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;--dashboard-hub-image-opacity:${tone.opacity};--dashboard-hub-image-darken:${tone.darken};">
               <summary>
                 <span class="dashboard-hub-icon">${dashboardHubIconHtml_(category, "", "dashboard-hub-icon-custom")}</span>
                 <span><strong>${escapeHtml(dashboardHubDisplayName_(category))}</strong><small>${playing.length} playing · ${offered.length} available</small></span>
@@ -1197,10 +1208,11 @@ async function renderDashboardHubPage_(category) {
   const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-domain-image" }) : "";
   const colors = dashboardHubColorSpec_(setting, "#354785");
   const tone = dashboardHubImageTone_(setting);
+  const appearanceAuthorityAttr = setting && Object.keys(setting).length ? ' data-runtime-color-authority="appearance"' : '';
 
   return `
     <div class="page dashboard-domain-hub dashboard-domain-${escapeAttr(category)}">
-      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}" ${attrs} style="--dashboard-domain-color:${escapeAttr(colors.color)};--dashboard-domain-fill:${escapeAttr(colors.fill)};--dashboard-domain-image:none;--dashboard-domain-image-opacity:${tone.opacity};--dashboard-domain-image-darken:${tone.darken};">
+      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}"${appearanceAuthorityAttr} ${attrs} style="--dashboard-domain-color:${escapeAttr(colors.color)};--dashboard-domain-fill:${escapeAttr(colors.fill)};--dashboard-domain-image:none;--dashboard-domain-image-opacity:${tone.opacity};--dashboard-domain-image-darken:${tone.darken};">
         <button type="button" class="dashboard-hub-back" onclick="navigate('dashboard')">← Home</button>
         <div class="dashboard-domain-title-row">
           <span>${dashboardHubIconHtml_(category, "", "dashboard-domain-custom-icon")}</span>
@@ -1238,6 +1250,9 @@ function renderDashboardSubHub_(category, group, activeGames, pastGames, options
   const parentSetting = dashboardHubSetting_(category, "");
   const colors = dashboardHubColorSpec_(setting, String(parentSetting.Color || "#354785"));
   const tone = dashboardHubImageTone_(setting);
+  const appearanceAuthorityAttr = (setting && Object.keys(setting).length) || (parentSetting && Object.keys(parentSetting).length)
+    ? ' data-runtime-color-authority="appearance"'
+    : '';
   const panelTint = dashboardSubHubPanelTint_(setting);
   const display = String(setting.DisplayName || group);
   const bodyFill = dashboardSubHubBodyFill_(colors);
@@ -1259,7 +1274,7 @@ function renderDashboardSubHub_(category, group, activeGames, pastGames, options
           : archived.length + " archived";
 
   return `
-    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}${runningNow ? ' is-running' : ' is-offseason'}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-body-fill:${escapeAttr(bodyFill)};--dashboard-subhub-panel-tint:${panelTint}%;--dashboard-subhub-image:none;--dashboard-subhub-image-opacity:${tone.opacity};--dashboard-subhub-image-darken:${tone.darken};" ${openSubhub ? 'open' : ''}>
+    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}${runningNow ? ' is-running' : ' is-offseason'}"${appearanceAuthorityAttr} ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-body-fill:${escapeAttr(bodyFill)};--dashboard-subhub-panel-tint:${panelTint}%;--dashboard-subhub-image:none;--dashboard-subhub-image-opacity:${tone.opacity};--dashboard-subhub-image-darken:${tone.darken};" ${openSubhub ? 'open' : ''}>
       <summary>
         <span class="dashboard-subhub-heading-icon">${dashboardHubIconHtml_(category, group, "dashboard-subhub-custom-icon")}</span>
         <span><strong>${escapeHtml(display)}</strong><small>${escapeHtml(activityLabel)}${archived.length && runningNow ? " · " + archived.length + " archived" : ""}</small></span>

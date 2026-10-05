@@ -104,7 +104,10 @@
   function render(rows) {
     var nav = document.querySelector('.bottom-nav');
     if (!nav) return false;
+    var authoritativeRows = Array.isArray(rows) && rows.length > 0;
     rows = normalizedRows(rows);
+    if (authoritativeRows) nav.setAttribute('data-runtime-color-authority', 'appearance');
+    else nav.removeAttribute('data-runtime-color-authority');
     var active = rows.filter(function(row){ return row.Active === true; });
     if (!active.length) active = defaultRows().filter(function(row){return row.Active;});
     nav.innerHTML = '';

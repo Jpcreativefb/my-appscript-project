@@ -387,6 +387,23 @@
     }
     function index() { [root, ...root.querySelectorAll('*')].forEach(key); }
     function find(id) { return Array.from(keys).find(([node, value]) => value === id && root.contains(node))?.[0] || (aliases.get(id) && root.contains(aliases.get(id)) ? aliases.get(id) : null) || (key(root) === id ? root : null); }
+    function runtimeAppearanceAuthority(node) {
+      return !!(node && node.nodeType === 1 && (
+        (node.matches && node.matches('[data-runtime-color-authority]')) ||
+        (node.closest && node.closest('[data-runtime-color-authority]'))
+      ));
+    }
+    const runtimeAppearancePrefixes = ['--profile-theme-', '--dashboard-hub-', '--dashboard-domain-', '--dashboard-subhub-', '--bottom-nav-'];
+    function runtimeAppearanceVars(node) {
+      const vars = [];
+      if (!runtimeAppearanceAuthority(node) || !node.style) return vars;
+      for (let i = 0; i < node.style.length; i++) {
+        const property = node.style[i];
+        if (!runtimeAppearancePrefixes.some(prefix => property.indexOf(prefix) === 0)) continue;
+        vars.push([property, node.style.getPropertyValue(property), node.style.getPropertyPriority(property)]);
+      }
+      return vars;
+    }
     function remember(node) {
       if (!originals.has(node)) originals.set(node, { style: node.getAttribute('style'), open: node.open, parent: node.parentNode, index: Array.from(node.parentNode?.children || []).indexOf(node) });
     }
@@ -400,7 +417,9 @@
           const siblings = Array.from(saved.parent.children).filter(n => n !== node);
           if (node.parentNode !== saved.parent || Array.from(saved.parent.children).indexOf(node) !== saved.index) saved.parent.insertBefore(node, siblings[saved.index] || null);
         }
+        const runtimeVars = runtimeAppearanceVars(node);
         if (saved.style == null) node.removeAttribute('style'); else node.setAttribute('style', saved.style);
+        runtimeVars.forEach(([property, value, priority]) => node.style.setProperty(property, value, priority));
         if (node.tagName === 'DETAILS') node.open = saved.open;
       }
       generated.forEach(n => { keys.delete(n); n.remove(); }); generated = []; originals.clear();
@@ -408,29 +427,31 @@
     function style(node, value) {
       remember(node);
       const set = (k, v) => node.style.setProperty(k, String(v), 'important');
+      const runtimeColorOwned = runtimeAppearanceAuthority(node);
       function original(properties){
         const probe=document.createElement('div');probe.setAttribute('style',originals.get(node).style || '');
         properties.forEach(property=>{const value=probe.style.getPropertyValue(property);if(value)node.style.setProperty(property,value,probe.style.getPropertyPriority(property));else node.style.removeProperty(property);});
       }
-      if(value.backgroundMode==='original') original(['background','background-color','background-image','background-position','background-size','background-repeat','background-origin','background-clip','background-attachment']);
+      if(!runtimeColorOwned && value.backgroundMode==='original') original(['background','background-color','background-image','background-position','background-size','background-repeat','background-origin','background-clip','background-attachment']);
       if(value.heightMode==='original') original(['height','min-height','max-height','overflow-y']);
       if(value.widthMode==='original') original(['width','max-width','margin-left','margin-right']);
-      if (value.backgroundMode === 'transparent') { set('background-color', 'transparent'); set('background-image', 'none'); }
-      else if (value.backgroundMode === 'color' || (!value.backgroundMode && value.backgroundColor)) {
+      if (!runtimeColorOwned && value.backgroundMode === 'transparent') { set('background-color', 'transparent'); set('background-image', 'none'); }
+      else if (!runtimeColorOwned && (value.backgroundMode === 'color' || (!value.backgroundMode && value.backgroundColor))) {
         set('background-color', value.backgroundColor || 'transparent'); if (value.backgroundMode === 'color') set('background-image', 'none');
       }
-      // Original mode deliberately leaves the reset runtime declarations intact.
-      ['color', 'textAlign'].forEach(k => { if (value[k]) set(k === 'textAlign' ? 'text-align' : k, value[k]); });
+      // Runtime Profile / Appearance Manager colors outrank Studio. Layout remains Studio-owned.
+      if (!runtimeColorOwned && value.color) set('color', value.color);
+      if (value.textAlign) set('text-align', value.textAlign);
       ['margin', 'padding', 'gap', 'fontSize', 'borderWidth', 'borderRadius'].forEach(k => {
         if (value[k] != null && value[k] !== '') set(k.replace(/[A-Z]/g, c => '-' + c.toLowerCase()), Math.max(0, Number(value[k]) || 0) + 'px');
       });
       if(value.scale != null && value.scale !== '') set('zoom',Math.max(50,Math.min(150,Number(value.scale)||100))/100);
       if(value.headerFontSize != null && value.headerFontSize !== '') [sectionHeader(node)].filter(Boolean).forEach(header=>{remember(header);header.style.setProperty('font-size',Math.max(8,Number(value.headerFontSize)||16)+'px','important');});
-      if (value.headerColor || value.headerBackground) [sectionHeader(node)].filter(Boolean).forEach(header => { remember(header); if (value.headerColor) header.style.setProperty('color', value.headerColor, 'important'); if (value.headerBackground) header.style.setProperty('background-color', value.headerBackground, 'important'); });
+      if (!runtimeColorOwned && (value.headerColor || value.headerBackground)) [sectionHeader(node)].filter(Boolean).forEach(header => { remember(header); if (value.headerColor) header.style.setProperty('color', value.headerColor, 'important'); if (value.headerBackground) header.style.setProperty('background-color', value.headerBackground, 'important'); });
       if (value.borderWidth > 0) set('border-style', 'solid');
       if (value.objectFit) set('object-fit', value.objectFit);
       if (value.objectPosition) { set('object-position', value.objectPosition); set('background-position', value.objectPosition); }
-      if (value.borderColor) set('border-color', value.borderColor);
+      if (!runtimeColorOwned && value.borderColor) set('border-color', value.borderColor);
       if (value.widthMode === 'full') set('width', '100%');
       else if (value.widthMode === 'auto') { set('width', 'auto'); set('max-width', 'none'); }
       else if (value.widthMode !== 'original' && value.widthPct != null && value.widthPct !== '') { set('width', Math.max(1, Math.min(100, Number(value.widthPct) || 100)) + '%'); set('max-width', '100%'); }
@@ -534,7 +555,9 @@
         function paint(animate) {
           const open = !enabled || state.open;
           const color = open ? config.expandedColor : config.collapsedColor;
-          if (color || headerColor) header.style.setProperty('background-color', color || headerColor, 'important'); else header.style.removeProperty('background-color');
+          if (!runtimeAppearanceAuthority(node)) {
+            if (color || headerColor) header.style.setProperty('background-color', color || headerColor, 'important'); else header.style.removeProperty('background-color');
+          }
           const reduced = host.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
           body.style.setProperty('overflow', 'hidden');
           body.style.setProperty('transition', animate && config.collapseStyle === 'blind' && !reduced ? 'max-height 240ms ease' : 'none');
