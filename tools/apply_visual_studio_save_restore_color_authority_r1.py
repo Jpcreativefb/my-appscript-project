@@ -13,7 +13,7 @@ def replace_once(old, new, label):
     text = text.replace(old, new, 1)
 
 
-# Explicit Save controls are the persistence boundary in the live editor.  Keep
+# Explicit Save controls are the persistence boundary in the live editor. Keep
 # controller autosave available for non-browser consumers, but disable it for
 # mountBrowser so an unsaved edit cannot silently replace Last Saved.
 replace_once(
@@ -149,9 +149,8 @@ replace_once(old_restore, new_restore, 'original selected restore')
 
 # Export the pure authority/original helpers for focused Node regression tests.
 replace_once(
-    "createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor };
-",
-    "createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor, profileHasSavedAppearance_, hubAppearanceRow_, navigationHasSavedAppearance_, runtimeAppearanceOwnsPaint_, visualStudioPaintAllowed_, restoreOriginalSelected_ };\n",
+    "createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor };",
+    "createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor, profileHasSavedAppearance_, hubAppearanceRow_, navigationHasSavedAppearance_, runtimeAppearanceOwnsPaint_, visualStudioPaintAllowed_, restoreOriginalSelected_ };",
     'testable helper exports'
 )
 
