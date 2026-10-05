@@ -2118,7 +2118,7 @@
   padding: clamp(16px, 3vw, 24px);
   color: #fff;
   background:
-    linear-gradient(145deg, rgba(2,6,23,.26), rgba(15,23,42,.58)),
+    linear-gradient(145deg, rgba(0,0,0,.08), rgba(0,0,0,.18)),
     var(--profile-theme-fill, var(--profile-theme-color, #354785));
   box-shadow: 0 18px 44px rgba(15, 23, 42, .2);
 }
@@ -2409,7 +2409,7 @@
 .dashboard-player-card {
   padding: clamp(14px, 2.4vw, 20px);
   background:
-    linear-gradient(145deg, rgba(2,6,23,.24), rgba(15,23,42,.55)),
+    linear-gradient(145deg, rgba(0,0,0,.06), rgba(0,0,0,.16)),
     var(--profile-theme-fill, var(--profile-theme-color, #354785));
 }
 

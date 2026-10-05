@@ -10,6 +10,7 @@ const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 const dashboard = read('frontend/js/pages/dashboard.js');
 const appData = read('backend/engines/AppDataEngine.js');
 const profilePage = read('frontend/js/pages/profile.js');
+const pagesCss = read('frontend/css/pages.css');
 
 function extractFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
@@ -22,7 +23,8 @@ const resolverSource = [
   'dashboardProfileCandidate_',
   'dashboardProfileHasData_',
   'dashboardProfileQuality_',
-  'dashboardResolveProfile_'
+  'dashboardResolveProfile_',
+  'dashboardProfileColorSpec_'
 ].map(name => extractFunction(dashboard, name)).join('\n');
 const context = {};
 vm.createContext(context);
@@ -56,6 +58,17 @@ assert.strictEqual(resolved.avatarEmoji, '⭐');
 assert.strictEqual(resolved.bio, 'Defending champ');
 assert.strictEqual(resolved.profileColor, '#123456');
 assert.strictEqual(resolved.profileColor2, '#654321');
+assert.strictEqual(resolved.profileColorMode, 'gradient');
+assert.strictEqual(String(resolved.profileGradientAngle), '90');
+const resolvedStyle = vm.runInContext(
+  'dashboardProfileColorSpec_(' + JSON.stringify(resolved) + ')',
+  context
+);
+assert.strictEqual(resolvedStyle.color, '#123456');
+assert.strictEqual(resolvedStyle.color2, '#654321');
+assert.strictEqual(resolvedStyle.mode, 'gradient');
+assert.strictEqual(resolvedStyle.angle, 90);
+assert.strictEqual(resolvedStyle.fill, 'linear-gradient(90deg,#123456,#654321)', 'Home must carry the saved profile gradient as one atomic resolved style');
 
 const preserved = vm.runInContext(
   'dashboardResolveProfile_(' + JSON.stringify(saved) + ',{},"alice","saved-general")',
@@ -94,6 +107,14 @@ assert(dashboard.includes('mainAvatar.outerHTML = avatarHtml'), 'visible avatar 
 assert(dashboard.includes('heading.textContent = displayName'), 'visible display name must update with authoritative profile');
 assert(dashboard.includes('note.textContent = bio'), 'visible bio must update with authoritative profile');
 assert(dashboard.includes('--profile-theme-fill'), 'profile colors must update with authoritative profile');
+assert(dashboard.includes('card.style.setProperty("--profile-theme-color", profileStyle.color)'), 'visible Home card must receive saved profile color');
+assert(dashboard.includes('card.style.setProperty("--profile-theme-color2", profileStyle.color2)'), 'visible Home card must receive saved profile secondary color');
+assert(dashboard.includes('card.style.setProperty("--profile-theme-angle", String(profileStyle.angle) + "deg")'), 'visible Home card must receive saved profile gradient angle');
+assert(dashboard.includes('card.style.setProperty("--profile-theme-fill", profileStyle.fill)'), 'visible Home card must receive saved profile gradient fill');
+assert(!pagesCss.includes('linear-gradient(145deg, rgba(2,6,23,.26), rgba(15,23,42,.58)),\n    var(--profile-theme-fill'), 'Home profile must not tint saved profile colors with the old navy overlay');
+assert(!pagesCss.includes('linear-gradient(145deg, rgba(2,6,23,.24), rgba(15,23,42,.55)),\n    var(--profile-theme-fill'), 'Home c1 profile rule must not restore the old navy overlay');
+assert(pagesCss.includes('linear-gradient(145deg, rgba(0,0,0,.06), rgba(0,0,0,.16)),\n    var(--profile-theme-fill'), 'Home profile should use only a neutral contrast overlay above the saved profile fill');
+assert(appData.includes('return readProfile();') && appData.includes('return readProfile();', appData.indexOf('return readProfile();') + 1), 'fast Home must retry one transient general-profile read inside the same browser request');
 
 assert(dashboard.includes('data-dashboard-hub-category='), 'Home Hub cards need an appearance repaint hook');
 assert(dashboard.includes('dashboardApplyCurrentHomeAppearance_();'), 'late valid Appearance must repaint visible Home UI');
