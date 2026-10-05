@@ -8,6 +8,7 @@ const root = path.join(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const dashboard = read('frontend/js/pages/dashboard.js');
+const navigationSlots = read('frontend/js/navigationSlotsR1.js');
 const pagesCss = read('frontend/css/pages.css');
 const stylesCss = read('frontend/css/styles.css');
 const appearanceCss = read('frontend/css/appearance.css');
@@ -27,8 +28,9 @@ assert(dashboard.includes('heroImageFileId'), 'Dashboard game images should fall
 assert(dashboard.includes('dashboard-player-sticky'), 'Sticky compact player identity is missing.');
 assert(dashboard.includes('dashboard-career-more'), 'Compact Career Stats more affordance is missing.');
 assert(dashboard.includes('dashboardApplyHubAppearance_'), 'Runtime hub/nav appearance application is missing.');
-assert(dashboard.includes('bottom-nav-custom-icon'), 'Bottom navigation custom icon support is missing.');
-assert(dashboard.includes('ShowNavLabel'), 'Bottom navigation label visibility support is missing.');
+assert(navigationSlots.includes('ShowNavIcon'), 'Bottom navigation icon visibility support is missing from the navigation-slot owner.');
+assert(navigationSlots.includes('ShowNavLabel'), 'Bottom navigation label visibility support is missing from the navigation-slot owner.');
+assert(navigationSlots.includes('bottom-nav-custom-icon'), 'Bottom navigation custom icon support is missing from the navigation-slot owner.');
 assert(pagesCss.includes('@keyframes dashboardSnarkFade'), 'Snark line fade behavior is missing.');
 assert(pagesCss.includes('.dashboard-compact-game.has-game-image'), 'Mobile game artwork treatment is missing.');
 assert(stylesCss.includes('--bottom-nav-accent'), 'Per-hub bottom navigation color styling is missing.');
