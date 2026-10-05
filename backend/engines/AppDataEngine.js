@@ -378,12 +378,22 @@ function validateUserSession_(
 
 function appDashboardGeneralProfile_(username) {
 
-  try {
+  const readProfile = function() {
     return typeof profileGetGeneralProfile_ === "function"
       ? (profileGetGeneralProfile_(username) || {})
       : {};
+  };
+
+  try {
+    return readProfile();
   } catch (err) {
-    return {};
+    // One request-local retry protects cold Home from a transient sheet read
+    // without adding another browser API call or changing normal fast-path cost.
+    try {
+      return readProfile();
+    } catch (retryErr) {
+      return {};
+    }
   }
 
 }
