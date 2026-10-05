@@ -43,13 +43,20 @@
   }
   function defaultRows() {
     return [
-      {SettingKey:'nav:1',HubCategory:'navigation',HubGroup:'1',DisplayName:'Home',Color:'#20284a',IconText:'⌂',ShowNavLabel:true,Active:true,NavSlot:1,NavDestination:'dashboard',NavIconSize:22,NavLocked:true},
-      {SettingKey:'nav:2',HubCategory:'navigation',HubGroup:'2',DisplayName:'Sports',Color:'#1f5f45',IconText:'🏈',ShowNavLabel:true,Active:true,NavSlot:2,NavDestination:'hub:sports',NavIconSize:22,NavLocked:false},
-      {SettingKey:'nav:3',HubCategory:'navigation',HubGroup:'3',DisplayName:'Reality',Color:'#6d3aa8',IconText:'📺',ShowNavLabel:true,Active:true,NavSlot:3,NavDestination:'hub:reality',NavIconSize:22,NavLocked:false},
-      {SettingKey:'nav:4',HubCategory:'navigation',HubGroup:'4',DisplayName:'Awards',Color:'#9a6a13',IconText:'🏆',ShowNavLabel:true,Active:true,NavSlot:4,NavDestination:'hub:awards',NavIconSize:22,NavLocked:false},
-      {SettingKey:'nav:5',HubCategory:'navigation',HubGroup:'5',DisplayName:'More',Color:'#374151',IconText:'•••',ShowNavLabel:true,Active:true,NavSlot:5,NavDestination:'more',NavIconSize:22,NavLocked:false},
-      {SettingKey:'nav:6',HubCategory:'navigation',HubGroup:'6',DisplayName:'Games',Color:'#4452a4',IconText:'🎲',ShowNavLabel:true,Active:false,NavSlot:6,NavDestination:'hub:general',NavIconSize:22,NavLocked:false}
+      {SettingKey:'nav:1',HubCategory:'navigation',HubGroup:'1',DisplayName:'Home',Color:'#20284a',IconText:'⌂',ShowNavIcon:true,ShowNavLabel:true,Active:true,NavSlot:1,NavDestination:'dashboard',NavIconSize:22,NavLocked:true},
+      {SettingKey:'nav:2',HubCategory:'navigation',HubGroup:'2',DisplayName:'Sports',Color:'#1f5f45',IconText:'🏈',ShowNavIcon:true,ShowNavLabel:true,Active:true,NavSlot:2,NavDestination:'hub:sports',NavIconSize:22,NavLocked:false},
+      {SettingKey:'nav:3',HubCategory:'navigation',HubGroup:'3',DisplayName:'Reality',Color:'#6d3aa8',IconText:'📺',ShowNavIcon:true,ShowNavLabel:true,Active:true,NavSlot:3,NavDestination:'hub:reality',NavIconSize:22,NavLocked:false},
+      {SettingKey:'nav:4',HubCategory:'navigation',HubGroup:'4',DisplayName:'Awards',Color:'#9a6a13',IconText:'🏆',ShowNavIcon:true,ShowNavLabel:true,Active:true,NavSlot:4,NavDestination:'hub:awards',NavIconSize:22,NavLocked:false},
+      {SettingKey:'nav:5',HubCategory:'navigation',HubGroup:'5',DisplayName:'More',Color:'#374151',IconText:'•••',ShowNavIcon:true,ShowNavLabel:true,Active:true,NavSlot:5,NavDestination:'more',NavIconSize:22,NavLocked:false},
+      {SettingKey:'nav:6',HubCategory:'navigation',HubGroup:'6',DisplayName:'Games',Color:'#4452a4',IconText:'🎲',ShowNavIcon:true,ShowNavLabel:true,Active:false,NavSlot:6,NavDestination:'hub:general',NavIconSize:22,NavLocked:false}
     ];
+  }
+  function hasNavigationRows(rows) {
+    return (Array.isArray(rows) ? rows : []).some(function(row) {
+      var key = str(row && row.SettingKey).toLowerCase();
+      var category = str(row && row.HubCategory).toLowerCase();
+      return category === 'navigation' || key.indexOf('nav:') === 0;
+    });
   }
   function normalizedRows(rows) {
     var bySlot = {}, hubByKey = {};
@@ -64,10 +71,13 @@
     });
     var hubKeyForDest = {'dashboard':'home','hub:general':'general','hub:sports':'sports','hub:reality':'reality','hub:awards':'awards','more':'more'};
     return defaultRows().map(function(def) {
+      var explicit = bySlot[def.NavSlot] || null;
       var fallback = hubByKey[hubKeyForDest[def.NavDestination] || ''] || {};
       var inherited = {};
-      ['DisplayName','Color','IconText','IconUrl','IconFileId','ShowNavLabel'].forEach(function(k){ if (fallback[k] !== undefined && fallback[k] !== '') inherited[k] = fallback[k]; });
-      var row = Object.assign({}, def, inherited, bySlot[def.NavSlot] || {});
+      ['DisplayName','Color','IconText','IconUrl','IconFileId','ShowNavIcon','ShowNavLabel'].forEach(function(k){
+        if (fallback[k] !== undefined && fallback[k] !== '') inherited[k] = fallback[k];
+      });
+      var row = Object.assign({}, def, inherited, explicit || {});
       var dest = str(row.NavDestination || def.NavDestination);
       if (!ALLOWED[dest]) dest = def.NavDestination;
       row.SettingKey = 'nav:' + def.NavSlot;
@@ -75,10 +85,15 @@
       row.HubGroup = String(def.NavSlot);
       row.NavSlot = def.NavSlot;
       row.NavDestination = dest;
-      row.DisplayName = str(row.DisplayName) || ALLOWED[dest].label;
-      row.IconText = str(row.IconText) || ALLOWED[dest].icon;
+      row.DisplayName = explicit && Object.prototype.hasOwnProperty.call(explicit, 'DisplayName')
+        ? str(explicit.DisplayName)
+        : (str(row.DisplayName) || ALLOWED[dest].label);
+      row.IconText = explicit && Object.prototype.hasOwnProperty.call(explicit, 'IconText')
+        ? str(explicit.IconText)
+        : str(row.IconText);
       row.Color = /^#[0-9a-f]{6}$/i.test(str(row.Color)) ? str(row.Color) : ALLOWED[dest].color;
       row.NavIconSize = clamp(row.NavIconSize, 18, 40, 22);
+      row.ShowNavIcon = bool(row.ShowNavIcon, true);
       row.ShowNavLabel = bool(row.ShowNavLabel, true);
       row.Active = bool(row.Active, def.Active === true);
       row.NavLocked = bool(row.NavLocked, def.NavLocked === true);
@@ -106,7 +121,7 @@
     if (!nav) return false;
     rows = normalizedRows(rows);
     var active = rows.filter(function(row){ return row.Active === true; });
-    if (!active.length) active = defaultRows().filter(function(row){return row.Active;});
+    if (!active.length) return false;
     nav.innerHTML = '';
     nav.setAttribute('data-slot-count', String(active.length));
     active.forEach(function(row) {
@@ -119,28 +134,48 @@
       button.style.setProperty('--bottom-nav-icon-size', row.NavIconSize + 'px');
       button.setAttribute('aria-label', row.DisplayName || ALLOWED[row.NavDestination].label);
       button.addEventListener('click', function(){ if (typeof root.navigate === 'function') root.navigate(row.NavDestination); });
+
       var icon = document.createElement('span');
       icon.className = 'bottom-nav-icon';
-      var url = iconUrl(row);
-      if (url) {
-        var img = document.createElement('img');
-        img.className = 'bottom-nav-custom-icon';
-        img.alt = '';
-        img.src = url;
-        icon.appendChild(img);
+      if (row.ShowNavIcon === false) {
+        button.dataset.navIconState = 'disabled';
+        icon.hidden = true;
       } else {
-        icon.textContent = row.IconText || ALLOWED[row.NavDestination].icon;
+        var url = iconUrl(row);
+        if (url) {
+          button.dataset.navIconState = 'remote';
+          var img = document.createElement('img');
+          img.className = 'bottom-nav-custom-icon';
+          img.alt = '';
+          img.src = url;
+          img.addEventListener('load', function() {
+            button.dataset.navIconState = 'loaded';
+          });
+          img.addEventListener('error', function() {
+            button.dataset.navIconState = 'load-failed';
+            img.hidden = true;
+          });
+          icon.appendChild(img);
+        } else {
+          button.dataset.navIconState = row.IconText ? 'text' : 'empty';
+          icon.textContent = row.IconText;
+          icon.hidden = !row.IconText;
+        }
       }
+
       var label = document.createElement('span');
       label.className = 'bottom-nav-label';
-      label.textContent = row.DisplayName || ALLOWED[row.NavDestination].label;
+      label.textContent = row.ShowNavLabel === false ? '' : row.DisplayName;
       label.hidden = row.ShowNavLabel === false;
-      button.appendChild(icon); button.appendChild(label); nav.appendChild(button);
+      button.appendChild(icon);
+      button.appendChild(label);
+      nav.appendChild(button);
     });
     if (root.PlatformImageEngine && typeof root.PlatformImageEngine.process === 'function') root.PlatformImageEngine.process(nav);
     return true;
   }
   function apply(rows) {
+    if (!hasNavigationRows(rows)) return false;
     var normalized = normalizedRows(rows);
     remember(normalized);
     return render(normalized);
@@ -191,6 +226,7 @@
       '<label><span>On / Off</span><input type="checkbox" data-nav-enabled '+(row.Active?'checked':'')+(locked?' disabled':'')+'></label>'+
       '<label><span>Destination Page</span><select class="input" data-nav-destination>'+destinationOptions(row.NavDestination)+'</select></label>'+
       '<label><span>Label</span><input class="input" data-nav-label value="'+esc(row.DisplayName)+'"></label>'+
+      '<label><span>Show Icon</span><input type="checkbox" data-nav-show-icon '+(row.ShowNavIcon?'checked':'')+'></label>'+
       '<label><span>Fallback Icon</span><input class="input" data-nav-icon-text value="'+esc(row.IconText)+'" maxlength="8"></label>'+
       '<label class="appearance-nav-wide"><span>Icon / Logo URL</span><input class="input" data-nav-icon-url value="'+esc(row.IconUrl || '')+'" placeholder="https://…"></label>'+
       '<label><span>Icon Size</span><input class="input" data-nav-icon-size type="number" min="18" max="40" value="'+row.NavIconSize+'"></label>'+
@@ -218,6 +254,7 @@
         Active: !!card.querySelector('[data-nav-enabled]').checked,
         NavDestination: card.querySelector('[data-nav-destination]').value,
         DisplayName: str(card.querySelector('[data-nav-label]').value),
+        ShowNavIcon: !!card.querySelector('[data-nav-show-icon]').checked,
         IconText: str(card.querySelector('[data-nav-icon-text]').value),
         IconUrl: str(card.querySelector('[data-nav-icon-url]').value),
         NavIconSize: clamp(card.querySelector('[data-nav-icon-size]').value,18,40,22),
@@ -253,7 +290,7 @@
       for (var i=0;i<rows.length;i++) {
         var row=rows[i];
         var payload={settingKey:'nav:'+(i+1),hubCategory:'navigation',hubGroup:String(i+1),displayName:row.DisplayName,
-          color:row.Color,iconText:row.IconText,iconUrl:row.IconUrl,iconFileId:row.IconFileId||'',showNavLabel:row.ShowNavLabel,
+          color:row.Color,iconText:row.IconText,iconUrl:row.IconUrl,iconFileId:row.IconFileId||'',showNavIcon:row.ShowNavIcon,showNavLabel:row.ShowNavLabel,
           active:row.Active,navSlot:i+1,navDestination:row.NavDestination,navIconSize:row.NavIconSize,navLocked:row.NavLocked};
         var result=await root.apiAdminSaveAppearanceHubSetting(payload);
         if(!result||result.success===false) throw new Error(result&&(result.message||result.error)||('Could not save slot '+(i+1)));
@@ -271,4 +308,118 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore);
   else setTimeout(restore,0);
+})(window);
+
+/* Bottom Nav Rescue R1: current-production compatibility + stale-route guard.
+   This layer intentionally does not wrap Home or Team Fantasy renderers. */
+(function(root) {
+  'use strict';
+
+  function str_(value) { return value == null ? '' : String(value).trim(); }
+  function routePage_() {
+    try {
+      return str_(root.location && root.location.hash).replace(/^#/, '') || 'dashboard';
+    } catch (err) {
+      return str_(root.APP_STATE && root.APP_STATE.currentPage) || 'dashboard';
+    }
+  }
+  function repairStaleRoute_(expectedPage) {
+    var current = routePage_();
+    if (current === str_(expectedPage)) return null;
+    if (root.APP_STATE) root.APP_STATE.currentPage = current;
+    var app = root.document && root.document.getElementById ? root.document.getElementById('app') : null;
+    return app ? String(app.innerHTML || '') : '';
+  }
+  function guardRenderer_(name, expectedPage) {
+    var original = root[name];
+    if (typeof original !== 'function' || original.__pattcBottomNavRescueR1) return;
+    var guarded = async function() {
+      var args = arguments;
+      var expected = typeof expectedPage === 'function' ? expectedPage.apply(null, args) : expectedPage;
+      try {
+        var html = await original.apply(this, args);
+        var staleHtml = repairStaleRoute_(expected);
+        return staleHtml === null ? html : staleHtml;
+      } catch (err) {
+        var staleHtml = repairStaleRoute_(expected);
+        if (staleHtml !== null) return staleHtml;
+        throw err;
+      }
+    };
+    guarded.__pattcBottomNavRescueR1 = true;
+    root[name] = guarded;
+  }
+  function installSnapshotGuard_() {
+    var original = root.appCapturePageSnapshot_;
+    if (typeof original !== 'function' || original.__pattcBottomNavRescueR1) return;
+    var guarded = function(page) {
+      if (str_(page) !== routePage_()) return;
+      return original.apply(this, arguments);
+    };
+    guarded.__pattcBottomNavRescueR1 = true;
+    root.appCapturePageSnapshot_ = guarded;
+  }
+  function installActiveGuard_() {
+    var original = root.appSetActiveNavigationSlot_;
+    if (typeof original !== 'function' || original.__pattcBottomNavRescueR1) return;
+    var guarded = function(page) {
+      var current = str_(root.APP_STATE && root.APP_STATE.currentPage);
+      if (str_(page) !== 'dashboard' && current && current !== str_(page)) return true;
+      return original.apply(this, arguments);
+    };
+    guarded.__pattcBottomNavRescueR1 = true;
+    root.appSetActiveNavigationSlot_ = guarded;
+    if (root.PATTC_NAVIGATION_SLOTS_R1) root.PATTC_NAVIGATION_SLOTS_R1.setActive = guarded;
+  }
+  function installForPage_(page) {
+    page = str_(page);
+    if (!page || page === 'dashboard' || page === 'team-fantasy') return;
+    installSnapshotGuard_();
+    installActiveGuard_();
+    if (page === 'picks') guardRenderer_('renderPicksPage', 'picks');
+    else if (page === 'survivor') guardRenderer_('renderSurvivorPage', 'survivor');
+    else if (page === 'voting') guardRenderer_('renderVotingPage', 'voting');
+    else if (page === 'ranking') guardRenderer_('renderRankingPage', 'ranking');
+    else if (page === 'game-hub') guardRenderer_('renderGameModeHubPage', 'game-hub');
+    else if (page === 'betting') guardRenderer_('renderBettingPage', 'betting');
+    else if (page === 'leaderboard') guardRenderer_('renderLeaderboardPage', 'leaderboard');
+    else if (page === 'season-hub') guardRenderer_('renderSeasonHubPage', 'season-hub');
+    else if (page === 'leagues') guardRenderer_('renderLeaguesPage', 'leagues');
+    else if (page === 'trophy-room') guardRenderer_('renderDashboardTrophyRoomPage_', 'trophy-room');
+    else if (page === 'more') guardRenderer_('renderDashboardMorePage_', 'more');
+    else if (page.indexOf('hub:') === 0) {
+      guardRenderer_('renderDashboardHubPage_', function(category) {
+        return 'hub:' + str_(category || 'general').toLowerCase();
+      });
+    }
+  }
+  function install_() {
+    // navigationSlotsR1 is authoritative. Neutralize the legacy rendered-DOM
+    // cache before app startup can replay stale icons/labels on a route change.
+    root.appRememberBottomNavAppearance_ = function() { return false; };
+    root.appRestoreBottomNavAppearance_ = function() { return false; };
+
+    var originalEnsure = root.ensurePageModules_;
+    if (typeof originalEnsure !== 'function' || originalEnsure.__pattcBottomNavRescueR1) return;
+    var guardedEnsure = function(page) {
+      // Preserve Home and Team Fantasy module loading exactly: no extra await,
+      // renderer wrapping, snapshot wrapping, or navigation DOM work.
+      if (str_(page) === 'dashboard' || str_(page) === 'team-fantasy') {
+        return originalEnsure.apply(this, arguments);
+      }
+      var result = originalEnsure.apply(this, arguments);
+      return Promise.resolve(result).then(function(value) {
+        installForPage_(page);
+        return value;
+      });
+    };
+    guardedEnsure.__pattcBottomNavRescueR1 = true;
+    root.ensurePageModules_ = guardedEnsure;
+  }
+
+  if (root.document && root.document.readyState === 'loading') {
+    root.document.addEventListener('DOMContentLoaded', install_);
+  } else {
+    root.setTimeout(install_, 0);
+  }
 })(window);
