@@ -1,5 +1,5 @@
 const APPS_SCRIPT_API_URL =
-  "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
+  "https://script.google.com/macros/s/AKfycbwNjBT0FUpKmxHggQZ5tDJ3fQC6lxF92Zd_-QgshFa4TGEbQdDd3wk7DppKQFIaAXs0vA/exec";
 
 const SURVIVOR_R3_PREVIEW_API_URL =
   "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
