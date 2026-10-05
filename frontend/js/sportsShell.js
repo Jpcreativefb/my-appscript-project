@@ -36,6 +36,7 @@
 
   var STORAGE_ENABLED="pattcLoadingHowToEnabled:v1";
   var STORAGE_COMPLETED_PREFIX="pattcLoadingHowToCompleted:v2:";
+  var STORAGE_SEEN_PREFIX_LEGACY="pattcLoadingHowToSeen:v1:";
   var ROTATION_MS=7000;
   var rotationTimer=null;
   var activeIndex=0;
@@ -127,7 +128,7 @@
   }
   function storageSet_(key,value){try{if(global.localStorage)global.localStorage.setItem(key,String(value));}catch(e){}}
   function enabled_(){return storageGet_(STORAGE_ENABLED,"1")!=="0";}
-  function completed_(key){return storageGet_(STORAGE_COMPLETED_PREFIX+key,"")==="1";}
+  function completed_(key){return storageGet_(STORAGE_COMPLETED_PREFIX+key,"")==="1"||storageGet_(STORAGE_SEEN_PREFIX_LEGACY+key,"")==="1";}
   function markCompleted_(key){if(key)storageSet_(STORAGE_COMPLETED_PREFIX+key,"1");}
   function completeLoadingVisit_(){if(activeKey&&activeDeck==="howto")markCompleted_(activeKey);}
   function gameId_(){
@@ -179,8 +180,52 @@
     if(!global.document||global.document.getElementById("pattcLoadingHowToStyle"))return;
     var style=global.document.createElement("style");
     style.id="pattcLoadingHowToStyle";
-    style.textContent=".pattc-loading-howto{margin-top:18px;padding:18px;border:1px solid rgba(212,175,55,.42);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.025));text-align:left;display:flex;flex-direction:column;gap:12px;min-height:340px}.pattc-loading-howto-kicker{color:#f7df86;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.pattc-loading-howto h3{margin:0;font-size:24px;line-height:1.12;color:#fff}.pattc-loading-howto-sub{margin:0;color:#cbd5e1;font-size:14px;line-height:1.45}.pattc-loading-howto-copy{margin:0;color:#f8fafc;font-size:17px;line-height:1.5}.pattc-loading-howto-example{margin:0;color:#cbd5e1;font-size:13px;line-height:1.45;padding:10px 12px;border-radius:10px;background:rgba(15,23,42,.65)}.pattc-loading-howto-spacer{flex:1}.pattc-loading-howto-controls{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-top:4px}.pattc-loading-howto-controls button,.pattc-loading-howto-actions button{min-height:40px;border:1px solid rgba(255,255,255,.2);background:rgba(15,23,42,.72);color:#f8fafc;border-radius:10px;padding:7px 12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer}.pattc-loading-howto-count{color:#94a3b8;font-size:12px;text-align:center}.pattc-loading-howto-actions{display:flex;gap:8px;justify-content:flex-end}.pattc-loading-howto-actions .finish{background:#d4af37;color:#111827;border-color:#d4af37}.pattc-howto-visual{display:flex;align-items:center;justify-content:center;gap:8px;min-height:82px;padding:12px;border-radius:14px;background:rgba(2,6,23,.52);border:1px solid rgba(148,163,184,.14);color:#e2e8f0}.pattc-howto-visual b,.pattc-howto-visual strong{color:#f7df86}.pattc-howto-visual.lineup{display:grid;grid-template-columns:repeat(4,1fr)}.pattc-howto-visual.lineup b{display:grid;place-items:center;min-height:42px;border-radius:9px;background:rgba(212,175,55,.12);font-size:12px}.pattc-howto-visual.confidence,.pattc-howto-visual.seeds{display:grid;grid-template-columns:repeat(2,1fr)}.pattc-howto-visual.confidence span,.pattc-howto-visual.seeds span{padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.05)}.pattc-howto-visual.confidence b,.pattc-howto-visual.seeds b{float:right}.pattc-howto-visual.path span{flex:1;text-align:center}.pattc-howto-visual .ok{color:#86efac}.pattc-howto-visual .no{color:#fca5a5}.pattc-howto-visual.seedscore{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.pattc-howto-visual.seedscore span{font-size:12px}.loader.pattc-howto-active:not(.is-admin){padding:12px}.loader.pattc-howto-active:not(.is-admin) .app-loader-card{width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}.loader.is-admin .pattc-loading-howto{display:none!important}.app-route-loading-shell-card .pattc-loading-howto{max-width:620px;margin-left:auto;margin-right:auto}.pattc-howto-help{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom) + 86px);z-index:8500;width:38px;height:38px;border-radius:999px;border:1px solid rgba(212,175,55,.65);background:#111827;color:#f7df86;font-weight:900;font-size:17px;box-shadow:0 4px 16px rgba(0,0,0,.24);cursor:pointer}.pattc-howto-modal{position:fixed;inset:0;z-index:10030;background:rgba(2,6,23,.82);display:flex;align-items:center;justify-content:center;padding:14px}.pattc-howto-sheet{width:min(620px,100%);max-height:92dvh;overflow:auto;border:1px solid rgba(212,175,55,.45);border-radius:20px;background:#111827;color:#fff;padding:20px}.pattc-howto-sheet h2{margin:0;font-size:28px}.pattc-howto-sheet-sub{color:#cbd5e1;margin:6px 0 16px}.pattc-howto-tip{padding:14px 0;border-top:1px solid rgba(255,255,255,.08)}.pattc-howto-tip:first-of-type{border-top:0}.pattc-howto-tip h3{margin:0 0 5px;font-size:17px}.pattc-howto-tip p{margin:0;font-size:15px;line-height:1.5}.pattc-howto-pref{display:grid;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);font-size:13px}.pattc-howto-pref label{display:flex;align-items:center;justify-content:space-between;gap:12px}.pattc-howto-close{margin-top:14px;width:100%;min-height:44px;border:0;border-radius:10px;background:#d4af37;color:#111827;font-weight:900;cursor:pointer}@media(max-width:560px){.loader.pattc-howto-active:not(.is-admin){align-items:stretch}.loader.pattc-howto-active:not(.is-admin) .app-loader-card{min-height:calc(100dvh - 24px);display:flex;flex-direction:column;padding:18px}.loader.pattc-howto-active:not(.is-admin) .pattc-loading-howto{flex:1;min-height:0}.pattc-loading-howto h3{font-size:26px}.pattc-loading-howto-copy{font-size:18px}.pattc-howto-visual{min-height:96px}.pattc-howto-sheet{max-height:94dvh;border-radius:16px;padding:18px}}";
+    style.textContent=".pattc-loading-howto{margin-top:18px;padding:18px;border:1px solid rgba(212,175,55,.42);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.025));text-align:left;display:flex;flex-direction:column;gap:12px;min-height:340px}.pattc-loading-howto-kicker{color:#f7df86;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.pattc-loading-howto h3{margin:0;font-size:24px;line-height:1.12;color:#fff}.pattc-loading-howto-sub{margin:0;color:#cbd5e1;font-size:14px;line-height:1.45}.pattc-loading-howto-copy{margin:0;color:#f8fafc;font-size:17px;line-height:1.5}.pattc-loading-howto-example{margin:0;color:#cbd5e1;font-size:13px;line-height:1.45;padding:10px 12px;border-radius:10px;background:rgba(15,23,42,.65)}.pattc-loading-howto-spacer{flex:1}.pattc-loading-howto-controls{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-top:4px}.pattc-loading-howto-controls button,.pattc-loading-howto-actions button{min-height:40px;border:1px solid rgba(255,255,255,.2);background:rgba(15,23,42,.72);color:#f8fafc;border-radius:10px;padding:7px 12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer}.pattc-loading-howto-count{color:#94a3b8;font-size:12px;text-align:center}.pattc-loading-howto-actions{display:flex;gap:8px;justify-content:flex-end}.pattc-loading-howto-actions .finish{background:#d4af37;color:#111827;border-color:#d4af37}.pattc-howto-visual{display:flex;align-items:center;justify-content:center;gap:8px;min-height:82px;padding:12px;border-radius:14px;background:rgba(2,6,23,.52);border:1px solid rgba(148,163,184,.14);color:#e2e8f0}.pattc-howto-visual b,.pattc-howto-visual strong{color:#f7df86}.pattc-howto-visual.lineup{display:grid;grid-template-columns:repeat(4,1fr)}.pattc-howto-visual.lineup b{display:grid;place-items:center;min-height:42px;border-radius:9px;background:rgba(212,175,55,.12);font-size:12px}.pattc-howto-visual.confidence,.pattc-howto-visual.seeds{display:grid;grid-template-columns:repeat(2,1fr)}.pattc-howto-visual.confidence span,.pattc-howto-visual.seeds span{padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.05)}.pattc-howto-visual.confidence b,.pattc-howto-visual.seeds b{float:right}.pattc-howto-visual.path span{flex:1;text-align:center}.pattc-howto-visual .ok{color:#86efac}.pattc-howto-visual .no{color:#fca5a5}.pattc-howto-visual.seedscore{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.pattc-howto-visual.seedscore span{font-size:12px}.loader.pattc-howto-active:not(.is-admin){padding:12px}.loader.pattc-howto-active:not(.is-admin) .app-loader-card{width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}.loader.is-admin .pattc-loading-howto{display:none!important}.app-route-loading-shell-card .pattc-loading-howto{max-width:620px;margin-left:auto;margin-right:auto}.pattc-howto-help{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom) + 86px);z-index:8500;width:38px;height:38px;border-radius:999px;border:1px solid rgba(212,175,55,.65);background:#111827;color:#f7df86;font-weight:900;font-size:17px;box-shadow:0 4px 16px rgba(0,0,0,.24);cursor:pointer}.pattc-home-discovery{margin-top:16px;padding:14px;border:1px solid rgba(212,175,55,.35);border-radius:14px;background:rgba(15,23,42,.78);text-align:left}.pattc-home-discovery-kicker{color:#f7df86;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.pattc-home-discovery h3{margin:4px 0 10px;font-size:19px}.pattc-home-discovery-list{display:grid;gap:8px}.pattc-home-discovery-item{padding:10px 11px;border-radius:10px;background:rgba(255,255,255,.05)}.pattc-home-discovery-item strong{display:block;font-size:14px;color:#fff}.pattc-home-discovery-item p{margin:3px 0 5px;color:#cbd5e1;font-size:12px;line-height:1.35}.pattc-home-discovery-item span{color:#f7df86;font-size:11px;font-weight:800}.pattc-howto-modal{position:fixed;inset:0;z-index:10030;background:rgba(2,6,23,.82);display:flex;align-items:center;justify-content:center;padding:14px}.pattc-howto-sheet{width:min(620px,100%);max-height:92dvh;overflow:auto;border:1px solid rgba(212,175,55,.45);border-radius:20px;background:#111827;color:#fff;padding:20px}.pattc-howto-sheet h2{margin:0;font-size:28px}.pattc-howto-sheet-sub{color:#cbd5e1;margin:6px 0 16px}.pattc-howto-tip{padding:14px 0;border-top:1px solid rgba(255,255,255,.08)}.pattc-howto-tip:first-of-type{border-top:0}.pattc-howto-tip h3{margin:0 0 5px;font-size:17px}.pattc-howto-tip p{margin:0;font-size:15px;line-height:1.5}.pattc-howto-pref{display:grid;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);font-size:13px}.pattc-howto-pref label{display:flex;align-items:center;justify-content:space-between;gap:12px}.pattc-howto-close{margin-top:14px;width:100%;min-height:44px;border:0;border-radius:10px;background:#d4af37;color:#111827;font-weight:900;cursor:pointer}@media(max-width:560px){.loader.pattc-howto-active:not(.is-admin){align-items:stretch}.loader.pattc-howto-active:not(.is-admin) .app-loader-card{min-height:calc(100dvh - 24px);display:flex;flex-direction:column;padding:18px}.loader.pattc-howto-active:not(.is-admin) .pattc-loading-howto{flex:1;min-height:0}.pattc-loading-howto h3{font-size:26px}.pattc-loading-howto-copy{font-size:18px}.pattc-howto-visual{min-height:96px}.pattc-howto-sheet{max-height:94dvh;border-radius:16px;padding:18px}}";
     (global.document.head||global.document.documentElement).appendChild(style);
+  }
+
+  function homeDiscoveryHub_(game){
+    game=game||{};
+    var explicit=String(game.Hub||game.hub||game.Category||game.category||game.GameCategory||game.gameCategory||"").toLowerCase();
+    var text=(explicit+" "+String(game.GameType||game.gameType||game.Type||game.type||"")+" "+String(game.GameId||game.gameId||game.id||"")+" "+String(game.Name||game.name||game.Title||game.title||"")).toLowerCase();
+    if(/reality|television|tv|traitors|big brother|dancing|dwts/.test(explicit)||/reality-tv/.test(text))return "Reality Hub";
+    if(/award|oscars|emmys|grammys|academy/.test(explicit)||/awards?/.test(text))return "Awards Hub";
+    if(/sport|nfl|football|confidence|team[- ]fantasy|playoff[- ]race/.test(text)||/survivor/.test(String(game.GameType||game.gameType||game.Type||game.type||"").toLowerCase()))return "Sports Hub";
+    if(/reality|traitors|big brother|dwts/.test(text))return "Reality Hub";
+    return "Games Hub";
+  }
+  function homeDiscoveryName_(game){
+    game=game||{};
+    return String(game.DisplayName||game.displayName||game.GameName||game.gameName||game.Name||game.name||game.Title||game.title||game.GameId||game.gameId||game.id||"Game").trim()||"Game";
+  }
+  function homeDiscoveryDescription_(game){
+    game=game||{};
+    var supplied=String(game.ShortDescription||game.shortDescription||game.Description||game.description||game.Summary||game.summary||"").trim();
+    if(supplied)return supplied.length>150?supplied.slice(0,147)+"…":supplied;
+    var text=(homeDiscoveryName_(game)+" "+String(game.GameType||game.gameType||game.Type||game.type||game.GameId||game.gameId||"")).toLowerCase();
+    if(/team[- ]fantasy/.test(text))return "Build an NFL lineup by choosing a team for each position unit and manage weekly usage.";
+    if(/confidence/.test(text))return "Pick the winners, then assign confidence values to show which predictions you trust most.";
+    if(/playoff.*race|nfl-playoff/.test(text))return "Project the NFL playoff field and seed order as the season standings change.";
+    if(/survivor/.test(text)&&homeDiscoveryHub_(game)==="Sports Hub")return "Choose an eligible NFL team for the week and follow the contest's survival rules.";
+    if(homeDiscoveryHub_(game)==="Reality Hub")return "A Reality game is active now; visit the Reality Hub for its format, picks and weekly play.";
+    if(homeDiscoveryHub_(game)==="Awards Hub")return "An Awards game is active now; visit the Awards Hub for its categories and predictions.";
+    return "This game is active now. Visit its Hub to see the format, rules and available play.";
+  }
+  function homeDiscoveryItems_(payload){
+    var games=payload&&Array.isArray(payload.activeGames)?payload.activeGames:[];
+    return games.slice(0,4).map(function(game){return {name:homeDiscoveryName_(game),description:homeDiscoveryDescription_(game),hub:homeDiscoveryHub_(game)};});
+  }
+  function mountHomeDiscovery_(payload){
+    if(!global.document||page_()!=="dashboard")return false;
+    var loader=global.document.getElementById("loader");
+    if(!loader||loader.classList&&loader.classList.contains("is-admin"))return false;
+    var wrap=loader.querySelector&&loader.querySelector(".app-loader-card");if(!wrap)return false;
+    var prior=wrap.querySelector&&wrap.querySelector(".pattc-home-discovery");if(prior&&prior.parentNode)prior.parentNode.removeChild(prior);
+    var items=homeDiscoveryItems_(payload);if(!items.length)return false;
+    ensureStyle_();
+    var card=global.document.createElement("div");card.className="pattc-home-discovery";
+    card.innerHTML='<div class="pattc-home-discovery-kicker">Available games</div><h3>Explore something new</h3><div class="pattc-home-discovery-list">'+items.map(function(item){return '<div class="pattc-home-discovery-item"><strong>'+esc_(item.name)+'</strong><p>'+esc_(item.description)+'</p><span>Available in '+esc_(item.hub)+'</span></div>';}).join("")+'</div>';
+    wrap.appendChild(card);return true;
   }
 
   function slides_(key,deck){
@@ -225,10 +270,15 @@
     rotationTimer=global.setTimeout(rotate,ROTATION_MS);
   }
   function removeLoadingCards_(){
-    stopRotation_();if(!global.document)return;
-    var loader=global.document.getElementById&&global.document.getElementById("loader");if(loader&&loader.classList)loader.classList.remove("pattc-howto-active");
-    var nodes=global.document.querySelectorAll?global.document.querySelectorAll(".pattc-loading-howto"):[];
-    Array.prototype.forEach.call(nodes||[],function(node){if(node&&node.parentNode)node.parentNode.removeChild(node);});
+    stopRotation_();
+    if(global.document){
+      var loader=global.document.getElementById&&global.document.getElementById("loader");if(loader&&loader.classList)loader.classList.remove("pattc-howto-active");
+      var nodes=global.document.querySelectorAll?global.document.querySelectorAll(".pattc-loading-howto"):[];
+      Array.prototype.forEach.call(nodes||[],function(node){if(node&&node.parentNode)node.parentNode.removeChild(node);});
+      var discovery=global.document.querySelectorAll?global.document.querySelectorAll(".pattc-home-discovery"):[];
+      Array.prototype.forEach.call(discovery||[],function(node){if(node&&node.parentNode)node.parentNode.removeChild(node);});
+    }
+    activeKey="";activeIndex=0;activeDeck="howto";
   }
   function mountLoaderTip_(page){
     if(!global.document)return false;
@@ -272,9 +322,10 @@
     if(typeof global.showLoader==="function"&&!global.showLoader.__pattcHowToWrapped){var originalShow=global.showLoader;var wrappedShow=function(options){var out=originalShow.apply(this,arguments);mountLoaderTip_();return out;};wrappedShow.__pattcHowToWrapped=true;global.showLoader=wrappedShow;}
     if(typeof global.hideLoader==="function"&&!global.hideLoader.__pattcHowToWrapped){var originalHide=global.hideLoader;var wrappedHide=function(){completeLoadingVisit_();removeLoadingCards_();var out=originalHide.apply(this,arguments);helpButton_();return out;};wrappedHide.__pattcHowToWrapped=true;global.hideLoader=wrappedHide;}
     if(typeof global.appPaintProgressiveRouteShell_==="function"&&!global.appPaintProgressiveRouteShell_.__pattcHowToWrapped){var originalPaint=global.appPaintProgressiveRouteShell_;var wrappedPaint=function(page,app){var out=originalPaint.apply(this,arguments);mountProgressiveTip_(page,app);helpButton_();return out;};wrappedPaint.__pattcHowToWrapped=true;global.appPaintProgressiveRouteShell_=wrappedPaint;}
+    if(typeof global.apiGetDashboardGamesHub==="function"&&!global.apiGetDashboardGamesHub.__pattcHowToWrapped){var originalHomeApi=global.apiGetDashboardGamesHub;var wrappedHomeApi=function(){var out=originalHomeApi.apply(this,arguments);if(out&&typeof out.then==="function"){out.then(function(payload){mountHomeDiscovery_(payload);}).catch(function(){});}else{mountHomeDiscovery_(out);}return out;};wrappedHomeApi.__pattcHowToWrapped=true;global.apiGetDashboardGamesHub=wrappedHomeApi;}
     helpButton_();
   }
 
-  global.PATTCLoadingHowToR1={content:CONTENT,contextKey:contextKey_,shouldShow:shouldShow_,mountLoaderTip:mountLoaderTip_,mountProgressiveTip:mountProgressiveTip_,removeLoadingCards:removeLoadingCards_,openHelp:openHelp_,installHooks:installHooks_,enabled:enabled_,completed:completed_,markCompleted:markCompleted_,completeLoadingVisit:completeLoadingVisit_,deckFor:deckFor_,rotationMs:ROTATION_MS};
+  global.PATTCLoadingHowToR1={content:CONTENT,contextKey:contextKey_,shouldShow:shouldShow_,mountLoaderTip:mountLoaderTip_,mountProgressiveTip:mountProgressiveTip_,removeLoadingCards:removeLoadingCards_,openHelp:openHelp_,installHooks:installHooks_,enabled:enabled_,completed:completed_,markCompleted:markCompleted_,completeLoadingVisit:completeLoadingVisit_,deckFor:deckFor_,homeDiscoveryItems:homeDiscoveryItems_,mountHomeDiscovery:mountHomeDiscovery_,rotationMs:ROTATION_MS};
   if(global.document&&typeof global.document.addEventListener==="function")global.document.addEventListener("DOMContentLoaded",installHooks_);
 })(window);
