@@ -37,6 +37,10 @@ assert(nav.includes("button.dataset.navIconState = 'disabled';"), 'Intentional i
 assert(nav.includes("button.dataset.navIconState = 'load-failed';"), 'Remote icon failure must remain distinct from OFF.');
 assert(!nav.includes("icon.textContent = row.IconText || ALLOWED[row.NavDestination].icon;"), 'Blank/disabled icons must not revive destination emoji fallback.');
 assert(nav.includes("label.textContent = row.ShowNavLabel === false ? '' : row.DisplayName;"), 'Label OFF must have no stale/fallback text.');
+assert(nav.includes('function currentRowsFromAdminState()'), 'Persisted Appearance admin state must participate in the resolved nav source.');
+assert(nav.includes('function syncAuthoritativeRows()'), 'Route activation must reapply authoritative persisted Appearance rows.');
+assert(nav.includes('syncAuthoritativeRows();'), 'Route changes must not restore stale label state.');
+assert(nav.includes('if (hasNavigationRows(source)) remember(rows);'), 'Opening persisted Appearance state must refresh the canonical nav cache.');
 
 // Production still contains legacy cache helpers, but rescue neutralizes them before startup.
 assert(nav.includes('root.appRememberBottomNavAppearance_ = function() { return false; };'), 'Rescue must neutralize legacy nav remember cache.');
@@ -87,6 +91,34 @@ assert.strictEqual(rows[0].ShowNavIcon, false);
 assert.strictEqual(rows[0].IconText, '');
 assert.strictEqual(rows[0].ShowNavLabel, false);
 assert.strictEqual(rows[1].IconText, '');
+
+// Persisted-source conflict: nav:* is the Bottom Nav authority. Hub rows may
+// provide inheritance only when an explicit navigation row does not provide the value.
+const conflicting = api.normalize([
+  { SettingKey:'home', HubCategory:'home', DisplayName:'Home Hub', ShowNavLabel:true, IconText:'H' },
+  { SettingKey:'nav:1', HubCategory:'navigation', NavSlot:1, NavDestination:'dashboard', Active:true, ShowNavLabel:false, DisplayName:'Home' },
+  { SettingKey:'sports', HubCategory:'sports', DisplayName:'Sports Hub', ShowNavLabel:true, IconText:'S' },
+  { SettingKey:'nav:2', HubCategory:'navigation', NavSlot:2, NavDestination:'hub:sports', Active:true, ShowNavLabel:false, DisplayName:'Sports' }
+]);
+assert.strictEqual(conflicting[0].ShowNavLabel, false, 'nav:1 ShowNavLabel OFF must beat conflicting home row ON.');
+assert.strictEqual(conflicting[1].ShowNavLabel, false, 'nav:2 ShowNavLabel OFF must beat conflicting sports row ON.');
+
+// Reproduce the persisted-admin path rather than only synthetic direct apply().
+// A stale remembered cache says labels ON; loaded persisted admin rows say OFF.
+storage.set('pattcBottomNavSlotsR1', JSON.stringify({version:1, rows:[
+  {SettingKey:'nav:1',HubCategory:'navigation',HubGroup:'1',DisplayName:'Home',ShowNavLabel:true,ShowNavIcon:true,Active:true,NavSlot:1,NavDestination:'dashboard'},
+  {SettingKey:'nav:2',HubCategory:'navigation',HubGroup:'2',DisplayName:'Sports',ShowNavLabel:true,ShowNavIcon:true,Active:true,NavSlot:2,NavDestination:'hub:sports'}
+]}));
+windowObj.ADMIN_APPEARANCE_STATE = {dashboard:{hubAppearance:[
+  {SettingKey:'home',HubCategory:'home',DisplayName:'Home Hub',ShowNavLabel:true},
+  {SettingKey:'sports',HubCategory:'sports',DisplayName:'Sports Hub',ShowNavLabel:true},
+  {SettingKey:'nav:1',HubCategory:'navigation',HubGroup:'1',DisplayName:'Home',ShowNavLabel:false,ShowNavIcon:true,Active:true,NavSlot:1,NavDestination:'dashboard'},
+  {SettingKey:'nav:2',HubCategory:'navigation',HubGroup:'2',DisplayName:'Sports',ShowNavLabel:false,ShowNavIcon:true,Active:true,NavSlot:2,NavDestination:'hub:sports'}
+]}};
+windowObj.appSetActiveNavigationSlot_('dashboard');
+const rememberedAfterPersistedRoute = JSON.parse(storage.get('pattcBottomNavSlotsR1'));
+assert.strictEqual(rememberedAfterPersistedRoute.rows[0].ShowNavLabel, false, 'route activation must replace stale cached Home label ON with persisted nav:1 OFF.');
+assert.strictEqual(rememberedAfterPersistedRoute.rows[1].ShowNavLabel, false, 'route activation must replace stale cached Sports label ON with persisted nav:2 OFF.');
 
 // Simulate app.js having defined its old compatibility cache before DOM ready.
 let legacyRestoreCalls = 0;
