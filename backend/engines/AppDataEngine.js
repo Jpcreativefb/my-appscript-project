@@ -376,6 +376,30 @@ function validateUserSession_(
    Active games + past games for the logged-in user
 ========================================================= */
 
+function appDashboardGeneralProfile_(username) {
+
+  try {
+    return typeof profileGetGeneralProfile_ === "function"
+      ? (profileGetGeneralProfile_(username) || {})
+      : {};
+  } catch (err) {
+    return {};
+  }
+
+}
+
+function appDashboardHubAppearance_() {
+
+  try {
+    return typeof appearanceGetHubAppearanceRows_ === "function"
+      ? (appearanceGetHubAppearanceRows_() || [])
+      : [];
+  } catch (err) {
+    return [];
+  }
+
+}
+
 function apiGetDashboardGamesHub(payload) {
 
   payload =
@@ -402,12 +426,14 @@ function apiGetDashboardGamesHub(payload) {
     token
   );
 
+  const fastStartup = payload.fastStartup === true;
+
   const dashboardCache = CacheService.getScriptCache();
   const dashboardCacheKey = typeof appDashboardCacheKey_ === "function"
     ? appDashboardCacheKey_(username)
     : "dashboard_hub_v2_" + username.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 120);
 
-  if (dashboardCacheKey) {
+  if (!fastStartup && dashboardCacheKey) {
     try {
       const cachedDashboard = dashboardCache.get(dashboardCacheKey);
       if (cachedDashboard) {
@@ -428,7 +454,9 @@ function apiGetDashboardGamesHub(payload) {
 
   const activeGames = [];
   const pastGames = [];
-  const fastStartup = payload.fastStartup === true;
+  const profile = appDashboardGeneralProfile_(username);
+  const profileHistory = [];
+  const hubAppearance = appDashboardHubAppearance_();
 
   if (fastStartup) {
     games.forEach(function(game) {
@@ -451,9 +479,10 @@ function apiGetDashboardGamesHub(payload) {
       username: username,
       defaultGameId: defaultGameId,
       profileGameId: activeGames.length ? activeGames[0].gameId : (pastGames.length ? pastGames[0].gameId : defaultGameId),
-      profile: {},
-      profileHistory: [],
-      hubAppearance: [],
+      profile: profile,
+      profileAuthority: "saved-general",
+      profileHistory: profileHistory,
+      hubAppearance: hubAppearance,
       activeGames: activeGames,
       pastGames: pastGames
     };
@@ -531,43 +560,13 @@ function apiGetDashboardGamesHub(payload) {
         ? pastGames[0].gameId
         : defaultGameId;
 
-  // Home's player card needs only the small general profile record. Keep it
-  // inside this existing Dashboard request so the browser does not make a
-  // second blocking network call just to render the avatar/name/note.
-  let profile = {};
-  let profileHistory = [];
-
-  try {
-
-    if (typeof apiGetEditableProfile === "function") {
-      const profileResult = apiGetEditableProfile(username, "") || {};
-      profile = profileResult.success === false
-        ? {}
-        : (profileResult.generalProfile || profileResult.profile || {});
-    }
-
-  } catch (err) {
-
-    // Profile decoration must never prevent Home from opening.
-    profile = {};
-
-  }
-
-  let hubAppearance = [];
-  try {
-    hubAppearance = typeof appearanceGetHubAppearanceRows_ === "function"
-      ? appearanceGetHubAppearanceRows_()
-      : [];
-  } catch (err) {
-    hubAppearance = [];
-  }
-
   const dashboardPayload = {
     success: true,
     username: username,
     defaultGameId: defaultGameId,
     profileGameId: profileGameId,
     profile: profile,
+    profileAuthority: "saved-general",
     profileHistory: profileHistory,
     hubAppearance: hubAppearance,
     activeGames: activeGames,

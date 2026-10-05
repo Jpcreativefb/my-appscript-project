@@ -1368,6 +1368,8 @@ async function saveProfileForm() {
 
     APP_STATE.profile = res.profile;
     APP_STATE.profileData = res;
+    APP_STATE.dashboardHomePayload = null;
+    APP_STATE.dashboardHomePayloadLoadedAt = 0;
 
     applyProfileColor_(res.profile || {});
     updateHeaderProfile(res.profile);

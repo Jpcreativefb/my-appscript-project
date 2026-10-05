@@ -202,6 +202,120 @@ function dashboardClassifyHomeGames_(payload) {
   };
 }
 
+function dashboardProfileCandidate_(candidate) {
+  candidate = candidate && typeof candidate === "object" ? candidate : {};
+  return candidate.profile && typeof candidate.profile === "object"
+    ? candidate.profile
+    : candidate;
+}
+
+function dashboardProfileHasData_(candidate) {
+  const profile = dashboardProfileCandidate_(candidate);
+  return Object.keys(profile).some(function(key) {
+    const value = profile[key];
+    return value !== undefined && value !== null && String(value).trim() !== "";
+  });
+}
+
+function dashboardProfileQuality_(candidate, username) {
+  const profile = dashboardProfileCandidate_(candidate);
+  const user = String(username || profile.username || "").trim().toLowerCase();
+  const displayName = String(profile.displayName || profile.DisplayName || "").trim();
+  const realName = String(profile.realName || profile.RealName || "").trim();
+  const bio = String(profile.bio || profile.Bio || "").trim();
+  const avatarUrl = String(profile.avatarUrl || profile.AvatarUrl || profile.avatarFileId || profile.AvatarFileId || "").trim();
+  const avatarType = String(profile.avatarType || profile.AvatarType || "").trim().toLowerCase();
+  const avatarEmoji = String(profile.avatarEmoji || profile.AvatarEmoji || "").trim();
+  const color = String(profile.profileColor || profile.ProfileColor || profile.themeColor || profile.ThemeColor || "").trim().toLowerCase();
+  const color2 = String(profile.profileColor2 || profile.ProfileColor2 || "").trim().toLowerCase();
+  const mode = String(profile.profileColorMode || profile.ProfileColorMode || "").trim().toLowerCase();
+  const angle = String(profile.profileGradientAngle || profile.ProfileGradientAngle || "").trim();
+  let score = 0;
+
+  if (displayName && displayName.toLowerCase() !== user) score += 4;
+  if (realName) score += 2;
+  if (bio) score += 2;
+  if (avatarUrl) score += 5;
+  if (avatarType === "emoji" && avatarEmoji && avatarEmoji !== "🏆") score += 3;
+  if (/^#[0-9a-f]{6}$/i.test(color) && color !== "#facc15" && color !== "#354785") score += 3;
+  if (mode === "gradient") score += 2;
+  if (/^#[0-9a-f]{6}$/i.test(color2) && color2 !== "#354785") score += 1;
+  if (angle && angle !== "135") score += 1;
+  return score;
+}
+
+function dashboardResolveProfile_(stateProfile, payloadProfile, username, payloadAuthority) {
+  const current = dashboardProfileCandidate_(stateProfile);
+  const incoming = dashboardProfileCandidate_(payloadProfile);
+  const currentHasData = dashboardProfileHasData_(current);
+  const incomingHasData = dashboardProfileHasData_(incoming);
+
+  if (!incomingHasData) return currentHasData ? current : {};
+  if (!currentHasData) return incoming;
+
+  const incomingQuality = dashboardProfileQuality_(incoming, username);
+  const currentQuality = dashboardProfileQuality_(current, username);
+
+  if (payloadAuthority === "saved-general" && incomingQuality > 0) return incoming;
+  if (incomingQuality > currentQuality) return incoming;
+  if (currentQuality > 0) return current;
+
+  return Object.keys(incoming).length >= Object.keys(current).length ? incoming : current;
+}
+
+function dashboardProfileDisplayName_(profile, username) {
+  profile = dashboardProfileCandidate_(profile);
+  return profile.displayName || profile.DisplayName || profile.realName || profile.RealName || username || "Player";
+}
+
+function dashboardApplyCurrentHomeProfile_(profile, username) {
+  if (typeof document === "undefined") return;
+  const home = document.querySelector(".dashboard-home-v1218c");
+  if (!home) return;
+
+  profile = dashboardProfileCandidate_(profile);
+  const displayName = dashboardProfileDisplayName_(profile, username);
+  const bio = String(profile.bio || profile.Bio || "").trim();
+  const profileStyle = dashboardProfileColorSpec_(profile);
+  const avatarHtml = renderDashboardProfileAvatar_(profile, displayName);
+  const sticky = home.querySelector("#dashboardPlayerSticky");
+  const card = home.querySelector("#dashboardPlayerCard");
+
+  if (sticky) {
+    sticky.style.setProperty("--profile-theme-color", profileStyle.color);
+    sticky.style.setProperty("--profile-theme-fill", profileStyle.fill);
+    const stickyAvatar = sticky.querySelector(".dashboard-profile-photo");
+    if (stickyAvatar) stickyAvatar.outerHTML = avatarHtml;
+    const stickyName = sticky.querySelector("strong");
+    if (stickyName) stickyName.textContent = displayName;
+  }
+
+  if (!card) return;
+  card.style.setProperty("--profile-theme-color", profileStyle.color);
+  card.style.setProperty("--profile-theme-color2", profileStyle.color2);
+  card.style.setProperty("--profile-theme-angle", String(profileStyle.angle) + "deg");
+  card.style.setProperty("--profile-theme-fill", profileStyle.fill);
+
+  const mainAvatar = card.querySelector(".dashboard-player-main .dashboard-profile-photo");
+  if (mainAvatar) mainAvatar.outerHTML = avatarHtml;
+  const copy = card.querySelector(".dashboard-player-copy");
+  if (!copy) return;
+  const heading = copy.querySelector("h1");
+  if (heading) heading.textContent = displayName;
+  let note = copy.querySelector(".dashboard-player-note");
+  if (bio) {
+    if (!note) {
+      note = document.createElement("p");
+      note.className = "dashboard-player-note";
+      const actions = copy.querySelector(".dashboard-player-quick-actions");
+      copy.insertBefore(note, actions || null);
+    }
+    note.textContent = bio;
+  } else if (note) {
+    note.remove();
+  }
+}
+
 async function renderDashboardPage(options) {
 
   options = options || {};
@@ -261,22 +375,23 @@ async function renderDashboardPage(options) {
 
   setPageLoadStep(82, "Building your home screen…");
 
-  const activeProfile = (
+  const stateProfile = (
     typeof APP_STATE !== "undefined" &&
-    APP_STATE.profile &&
-    Object.keys(APP_STATE.profile).length
+    APP_STATE.profile
   ) ? APP_STATE.profile : {};
 
-  const profileRaw = Object.keys(activeProfile).length
-    ? activeProfile
-    : (payload.profile || {});
-
-  const profile = profileRaw.profile || profileRaw || {};
+  const profile = dashboardResolveProfile_(
+    stateProfile,
+    payload.profile || {},
+    username,
+    payload.profileAuthority || ""
+  );
   const activeGames = Array.isArray(payload.activeGames) ? payload.activeGames : [];
   const pastGames = Array.isArray(payload.pastGames) ? payload.pastGames : [];
   dashboardCacheHubAppearance_(payload.hubAppearance || []);
-  // RC24H: apply Appearance Manager navigation/header choices immediately on Home.
+  // Apply the resolved identity and Appearance Manager choices to any already-painted Home UI.
   setTimeout(function() {
+    dashboardApplyCurrentHomeProfile_(profile, username);
     if (typeof dashboardApplyHubAppearance_ === "function") dashboardApplyHubAppearance_();
   }, 0);
 
@@ -311,7 +426,7 @@ async function renderDashboardPage(options) {
     if (options.preserveHydrationId !== true || !APP_STATE.dashboardHomeHydrationId) {
       APP_STATE.dashboardHomeHydrationId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
     }
-    if (!APP_STATE.profile || !Object.keys(APP_STATE.profile).length) {
+    if (profile && Object.keys(profile).length) {
       APP_STATE.profile = profile;
     }
   }
@@ -616,7 +731,24 @@ function dashboardHubIconHtml_(category, group, className) {
   return '<span class="' + escapeAttr(className || "dashboard-hub-icon-text") + '">' + escapeHtml(fallback) + '</span>';
 }
 
+function dashboardApplyCurrentHomeAppearance_() {
+  if (typeof document === "undefined") return;
+  const cards = document.querySelectorAll(".dashboard-hub-launcher-card[data-dashboard-hub-category]");
+  cards.forEach(function(card) {
+    const category = String(card.getAttribute("data-dashboard-hub-category") || "general");
+    const row = dashboardHubSetting_(category, "");
+    if (!row || !Object.keys(row).length) return;
+    const colors = dashboardHubColorSpec_(row, "#354785");
+    const tone = dashboardHubImageTone_(row);
+    card.style.setProperty("--dashboard-hub-color", colors.color);
+    card.style.setProperty("--dashboard-hub-fill", colors.fill);
+    card.style.setProperty("--dashboard-hub-image-opacity", tone.opacity);
+    card.style.setProperty("--dashboard-hub-image-darken", tone.darken);
+  });
+}
+
 function dashboardApplyHubAppearance_() {
+  dashboardApplyCurrentHomeAppearance_();
   if (typeof appApplyNavigationSlots_ === "function") {
     const slotRows = typeof APP_STATE !== "undefined" && Array.isArray(APP_STATE.dashboardHubAppearanceRows)
       ? APP_STATE.dashboardHubAppearanceRows
@@ -974,7 +1106,7 @@ function renderDashboardHubLauncher_(activeGames, pastGames) {
           const colors = dashboardHubColorSpec_(setting, "#354785");
           const tone = dashboardHubImageTone_(setting);
           return `
-            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;--dashboard-hub-image-opacity:${tone.opacity};--dashboard-hub-image-darken:${tone.darken};">
+            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" data-dashboard-hub-category="${escapeAttr(category)}" ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;--dashboard-hub-image-opacity:${tone.opacity};--dashboard-hub-image-darken:${tone.darken};">
               <summary>
                 <span class="dashboard-hub-icon">${dashboardHubIconHtml_(category, "", "dashboard-hub-icon-custom")}</span>
                 <span><strong>${escapeHtml(dashboardHubDisplayName_(category))}</strong><small>${playing.length} playing · ${offered.length} available</small></span>
