@@ -1,5 +1,8 @@
 name: Awards App Production Checks
 
+permissions:
+  contents: write
+
 on:
   push:
   pull_request:
@@ -13,10 +16,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Apply Visual Studio rescue patch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/visual-studio-save-restore-color-authority-r1'
+        run: python3 tools/apply_visual_studio_save_restore_color_authority_r1.py
+
+      - name: Commit Visual Studio rescue patch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/visual-studio-save-restore-color-authority-r1'
+        run: |
+          if git diff --quiet -- frontend/js/ownerVisualStudioR3.js; then
+            echo "Visual Studio rescue patch already applied"
+            exit 0
+          fi
+          git diff --check
+          git config user.name "PATTC Specialist CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add frontend/js/ownerVisualStudioR3.js
+          git commit -m "Repair Visual Studio save restore and color authority"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Run Visual Studio rescue regression
+        run: node tests/visual_studio_save_restore_color_authority_r1_tests.js
 
       - name: Run production checks
         run: ./tools/run_production_checks.sh
