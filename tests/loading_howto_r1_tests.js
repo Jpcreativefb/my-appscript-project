@@ -4,12 +4,14 @@ const source=fs.readFileSync('frontend/js/sportsShell.js','utf8');
 const feature=source.slice(source.indexOf('PATTC Loading / How-to-Play R2'));
 assert(feature.length>4000,'Loading How-to R2 feature marker missing');
 assert(!/\bfetch\s*\(/.test(feature),'Feature must not add a network fetch');
-assert(!/\bapi[A-Z]\w*\s*\(/.test(feature),'Feature must not call backend APIs');
+assert(!/\bapi[A-Z]\w*\s*\(/.test(feature),'Feature must not directly call backend APIs');
 assert(feature.includes('ROTATION_MS=7000'),'Rotation must be slowed to a comfortable reading interval');
 assert(feature.includes('Finish How-To'),'Finish How-To control missing');
 assert(feature.includes('data-howto-skip'),'Skip control missing');
 assert(feature.includes('data-howto-prev')&&feature.includes('data-howto-next'),'Previous/Next controls missing');
 assert(feature.includes('pattcLoadingHowToCompleted:v2:'),'Local completion state missing');
+assert(feature.includes('pattcLoadingHowToSeen:v1:'),'Legacy seen-state migration missing');
+assert(feature.includes('originalHomeApi.apply(this,arguments)'),'Home discovery must observe the existing Home request instead of creating another request');
 assert(feature.includes('@media(max-width:560px)'),'Mobile-first layout rule missing');
 assert(feature.includes('bottom:calc(env(safe-area-inset-bottom) + 86px)'),'Help button should sit low but above Bottom Navigation');
 assert(feature.includes('width:38px;height:38px'),'Help button should be smaller while remaining tappable');
@@ -42,12 +44,18 @@ function makeEnv(){
   const document={head,body,documentElement:root,createElement:t=>new Node(t),getElementById:id=>findById(root,id),querySelectorAll:sel=>root.querySelectorAll(sel),addEventListener:(name,fn)=>{listeners[name]=fn}};
   let timerId=0;const timers=new Map();
   const window={document,localStorage:{getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v))},location:{hash:'#team-fantasy'},APP_STATE:{currentPage:'team-fantasy',gameId:'league-of-fantasy-champions-2026'},getFrontendGameId:()=>window.APP_STATE.gameId,setTimeout:(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id)};
-  let showCalls=0,hideCalls=0,progressCalls=0,paintCalls=0;
+  let showCalls=0,hideCalls=0,progressCalls=0,paintCalls=0,homeApiCalls=0;
+  const homePayload={success:true,fastStartup:true,activeGames:[
+    {GameId:'team-fantasy-2026',Name:'Team Fantasy',GameType:'team-fantasy'},
+    {GameId:'traitors-2026',Name:'The Traitors',Category:'Reality TV'}
+  ]};
+  const homeThenable={then(fn){fn(homePayload);return {catch(){return this}}}};
   window.showLoader=function(){showCalls++;return 'shown'};
   window.hideLoader=function(){hideCalls++;return 'hidden'};
   window.updateLoaderProgress=function(){progressCalls++};
   window.appPaintProgressiveRouteShell_=function(page,target){paintCalls++;const shell=new Node('div'),card=new Node('div');shell.className='app-route-loading-shell';card.className='app-route-loading-shell-card';shell.appendChild(card);target.children=[];target.appendChild(shell);return Promise.resolve(true)};
-  return {window,document,loader,loaderCard,app,storage,listeners,timers,calls:()=>({showCalls,hideCalls,progressCalls,paintCalls})};
+  window.apiGetDashboardGamesHub=function(){homeApiCalls++;return homeThenable};
+  return {window,document,loader,loaderCard,app,storage,listeners,timers,homePayload,homeThenable,calls:()=>({showCalls,hideCalls,progressCalls,paintCalls,homeApiCalls})};
 }
 
 const env=makeEnv();
@@ -67,6 +75,10 @@ api.markCompleted('team-fantasy');
 assert.strictEqual(api.completed('team-fantasy'),true);
 assert.strictEqual(api.deckFor('team-fantasy',false),'tips');
 assert.strictEqual(api.deckFor('team-fantasy',true),'howto','Reopen path must still support the full guide');
+env.storage.delete('pattcLoadingHowToCompleted:v2:team-fantasy');
+env.storage.set('pattcLoadingHowToSeen:v1:team-fantasy','1');
+assert.strictEqual(api.deckFor('team-fantasy',false),'tips','Legacy R1 seen state must migrate to returning Tips behavior');
+env.storage.delete('pattcLoadingHowToSeen:v1:team-fantasy');
 
 // All requested games have richer How-to + returning-tip content.
 for(const key of ['team-fantasy','confidence','survivor','playoff-race']){
@@ -101,6 +113,29 @@ env.window.showLoader({percent:8});
 const returningCard=env.loader.querySelector('.pattc-loading-howto');
 assert(returningCard&&returningCard.innerHTML.includes('Game Tips'),'Returning load must render the shorter Game Tips experience');
 env.window.hideLoader();
+
+// Removed loader cards must clear transient active state so a later unrelated Home load cannot mark a stale game complete.
+env.storage.delete('pattcLoadingHowToCompleted:v2:team-fantasy');
+env.window.APP_STATE.currentPage='team-fantasy';env.window.location.hash='#team-fantasy';env.storage.set('gameMode','team-fantasy');env.window.APP_STATE.gameId='league-of-fantasy-champions-2026';
+api.mountLoaderTip('team-fantasy');
+api.removeLoadingCards();
+api.completeLoadingVisit();
+assert.strictEqual(api.completed('team-fantasy'),false,'Removed/stale loader state must not complete a later unrelated visit');
+
+// Home discovery observes the already-running fast Home request and returns the exact original thenable.
+env.window.APP_STATE.currentPage='dashboard';env.window.location.hash='#dashboard';
+env.window.showLoader({percent:8});
+const beforeHomeCalls=env.calls().homeApiCalls;
+const homeResult=env.window.apiGetDashboardGamesHub({fastStartup:true});
+assert.strictEqual(homeResult,env.homeThenable,'Home observer must return the original request unchanged so first paint is not blocked');
+assert.strictEqual(env.calls().homeApiCalls,beforeHomeCalls+1,'Home discovery must not issue an additional Home backend request');
+const discovery=env.loader.querySelector('.pattc-home-discovery');
+assert(discovery,'Home loader should show informational active-game discovery after the existing payload resolves');
+assert(discovery.innerHTML.includes('Team Fantasy')&&discovery.innerHTML.includes('Available in Sports Hub'),'Sports discovery card/location missing');
+assert(discovery.innerHTML.includes('The Traitors')&&discovery.innerHTML.includes('Available in Reality Hub'),'Reality discovery card/location missing');
+assert(!discovery.innerHTML.includes('Open Game'),'Discovery must remain informational and must not add an Open Game control');
+env.window.hideLoader();
+assert.strictEqual(env.loader.querySelector('.pattc-home-discovery'),null,'Home discovery must disappear immediately with the authoritative loader');
 
 // Generic fallback remains safe.
 env.storage.set('gameMode','mystery');env.window.APP_STATE.currentPage='ranking';env.window.APP_STATE.gameId='custom-game';
