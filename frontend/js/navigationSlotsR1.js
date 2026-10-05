@@ -190,6 +190,26 @@
     var map = root.APP_STATE.dashboardHubAppearanceMap || {};
     return Object.keys(map).map(function(key){return map[key];});
   }
+  function currentRowsFromAdminState() {
+    var state = (typeof ADMIN_APPEARANCE_STATE !== 'undefined'
+      ? ADMIN_APPEARANCE_STATE
+      : (root.ADMIN_APPEARANCE_STATE || {}));
+    var dash = state && state.dashboard || {};
+    return Array.isArray(dash.hubAppearance) ? dash.hubAppearance : [];
+  }
+  function authoritativeRows() {
+    var adminRows = currentRowsFromAdminState();
+    if (hasNavigationRows(adminRows)) return adminRows;
+    var appRows = currentRowsFromAppState();
+    return hasNavigationRows(appRows) ? appRows : [];
+  }
+  function syncAuthoritativeRows() {
+    var rows = authoritativeRows();
+    if (!hasNavigationRows(rows)) return false;
+    var normalized = normalizedRows(rows);
+    remember(normalized);
+    return render(normalized);
+  }
   function pageMatches(page, dest) {
     if (page === dest) return true;
     if (dest === 'hub:sports' && ['team-fantasy','survivor','betting'].indexOf(String(page || '')) !== -1) return true;
@@ -201,6 +221,10 @@
     return false;
   }
   function setActive(page) {
+    // Persisted Appearance rows already loaded into Admin/App state are the
+    // authority. Re-apply them before route highlighting so stale local cache
+    // or fallback DOM can never restore a visible label that is saved OFF.
+    syncAuthoritativeRows();
     var buttons = Array.prototype.slice.call(document.querySelectorAll('.bottom-nav button[data-page]'));
     if (!buttons.length) return false;
     var exact = buttons.find(function(btn){return str(btn.dataset.page) === str(page);});
@@ -213,7 +237,13 @@
   function rawAdminRows() {
     var state = (typeof ADMIN_APPEARANCE_STATE !== 'undefined' ? ADMIN_APPEARANCE_STATE : (root.ADMIN_APPEARANCE_STATE || {}));
     var dash = state.dashboard || {};
-    return normalizedRows(dash.hubAppearance || []);
+    var source = dash.hubAppearance || [];
+    var rows = normalizedRows(source);
+    // Opening Appearance Manager hydrates the same persisted nav rows used by
+    // players. Remember that authoritative state immediately; explicit nav:*
+    // rows remain the owner when hub and navigation rows disagree.
+    if (hasNavigationRows(source)) remember(rows);
+    return rows;
   }
   function destinationOptions(selected) {
     return DESTINATIONS.map(function(item){return '<option value="'+esc(item.value)+'"'+(item.value===selected?' selected':'')+'>'+esc(item.label)+'</option>';}).join('');
