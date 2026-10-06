@@ -705,7 +705,7 @@ const APP_PAGE_SCRIPT_BASE_URL = APP_MAIN_SCRIPT_URL.pathname.indexOf("/js/app.j
   : new URL("./js/pages/", APP_MAIN_SCRIPT_URL);
 
 const APP_PAGE_MODULES = {
-  "castle-duel": ["castleDuel", "castleDuelRevealR2"],
+  "castle-duel": ["castleDuel", "castleDuelRevealR2", "castleDuelRevealR2Swipe"],
   "admin-castle-duel": ["castleDuel"],
   "dashboard": ["dashboard"],
   "hub": ["dashboard"],
