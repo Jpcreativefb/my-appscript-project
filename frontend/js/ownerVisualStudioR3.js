@@ -349,13 +349,20 @@
       return category === 'navigation' || setting.indexOf('nav:') === 0;
     });
   }
-  function runtimeAppearanceOwnsPaint_(node, state) {
+  function runtimeManagedPaintTarget_(node) {
     if (!node || typeof node.closest !== 'function') return false;
-    if (node.closest('[data-dashboard-profile-card],#dashboardPlayerCard,#dashboardPlayerSticky')) return profileHasSavedAppearance_(state);
-    const hub = node.closest('[data-dashboard-hub-category]');
-    if (hub) return !!hubAppearanceRow_(state, hub.getAttribute('data-dashboard-hub-category'));
-    if (node.closest('.bottom-nav')) return navigationHasSavedAppearance_(state);
-    return false;
+    return !!(
+      node.closest('[data-dashboard-profile-card],#dashboardPlayerCard,#dashboardPlayerSticky') ||
+      node.closest('[data-dashboard-hub-category]') ||
+      node.closest('.bottom-nav')
+    );
+  }
+  function runtimeAppearanceOwnsPaint_(node, state) {
+    // Dynamic runtime components own their paint slot from first paint onward.
+    // Do not let a stale Visual Studio color flash while Profile/Hub/Nav
+    // Appearance is still resolving. Visual Studio remains authoritative for
+    // layout/geometry/structure and for paint on non-runtime-managed targets.
+    return runtimeManagedPaintTarget_(node);
   }
   function visualStudioPaintAllowed_(node, property, state) {
     const key = String(property || '').trim().toLowerCase();
@@ -474,7 +481,10 @@
       const set = (k, v) => { if (paintAllowed(node, k) !== false) node.style.setProperty(k, String(v), 'important'); };
       function original(properties){
         const probe=document.createElement('div');probe.setAttribute('style',originals.get(node).style || '');
-        properties.forEach(property=>{const value=probe.style.getPropertyValue(property);if(value)node.style.setProperty(property,value,probe.style.getPropertyPriority(property));else node.style.removeProperty(property);});
+        properties.forEach(property=>{
+          if (paintAllowed(node, property) === false) return;
+          const value=probe.style.getPropertyValue(property);if(value)node.style.setProperty(property,value,probe.style.getPropertyPriority(property));else node.style.removeProperty(property);
+        });
       }
       if(value.backgroundMode==='original') original(['background','background-color','background-image','background-position','background-size','background-repeat','background-origin','background-clip','background-attachment']);
       if(value.heightMode==='original') original(['height','min-height','max-height','overflow-y']);
@@ -739,6 +749,23 @@
     const firstRenderAt = Date.now();
     let panel = null, frame = null, observer = null, renderPending = false, undo = [], versions = [];
     let colorEditor = null, colorPreview = null;
+    let pendingAuthorityTransition = 'boot';
+    const authorityTrace = [];
+    function markAuthorityTransition(name) { pendingAuthorityTransition = String(name || 'render'); }
+    function logAuthorityTransition(phase, transition) {
+      const entry = {
+        at: new Date().toISOString(), phase,
+        transition: String(transition || pendingAuthorityTransition || 'render'),
+        pageKey: scope().pageKey,
+        opened: controller ? controller.snapshot().opened : false,
+        dirty: controller ? controller.snapshot().dirty : false,
+        selected: selected || '',
+        runtimePaintInvariant: true
+      };
+      authorityTrace.push(entry); if (authorityTrace.length > 80) authorityTrace.shift();
+      host.console?.debug?.('[PATTC Visual Studio authority]', entry);
+      return entry;
+    }
     const admin = () => typeof host.isAdminSession === 'function' ? host.isAdminSession(host.getSession()) : !!host.getSession?.()?.isAdmin;
     function scope() {
       const pageKey = String((typeof APP_STATE !== 'undefined' ? APP_STATE.currentPage : host.APP_STATE?.currentPage) || host.location.hash.slice(1) || 'dashboard').split(/[?:]/)[0].toLowerCase();
@@ -747,6 +774,8 @@
     function sameScope(a, b) { return a && b && a.gameId === b.gameId && a.pageKey === b.pageKey; }
     function watch() { observer?.observe(document.getElementById('app') || document.body, { childList: true, subtree: true }); }
     function apply(manifest) {
+      const transition = pendingAuthorityTransition || 'render'; pendingAuthorityTransition = 'render';
+      logAuthorityTransition('before-render', transition);
       if (colorPreview) manifest = colorPreview(copy(manifest));
       if (controller?.snapshot().opened && !sameScope(controller.snapshot().scope, scope())) return;
       observer?.disconnect();
@@ -754,6 +783,7 @@
         const app = document.getElementById('app'); if (!app) return;
         if (root !== app) { renderer?.reset(); root = app; renderer = createRenderer(root, { paintAllowed: (node, property) => visualStudioPaintAllowed_(node, property, host.APP_STATE || (typeof APP_STATE !== 'undefined' ? APP_STATE : {})) }); }
         renderer.render(manifest, { view: controller.snapshot().opened && controller.snapshot().lock !== 'close' ? view : breakpointFor(host.innerWidth || 1280), editing: controller.snapshot().opened && controller.snapshot().lock !== 'close', scope: scope().gameId });
+        logAuthorityTransition('after-render', transition);
         highlight(selectedNode());
         const caption=panel?.querySelector('[data-selection]');
         if(caption && selected)caption.textContent=selectedNode()?name(selectedNode()):'Selected target unavailable; waiting for the page to render it.';
@@ -822,6 +852,7 @@
       moving = false; showPanel();
     }
     function restoreOriginal() {
+      markAuthorityTransition('Restore Selected Original');
       const node = selectedNode();
       edit(m => {
         Object.keys(m.items).filter(id => id === selected || renderer.find(id) === node).forEach(id => { if (id !== selected) { maps.filter(k => !['groups','generatedSections'].includes(k)).forEach(k => delete m[k][id]); } });
@@ -901,6 +932,7 @@
       input.addEventListener('input', () => {
         try {
           if(['backgroundColor','color','borderColor','headerColor','headerBackground'].includes(key) && input.value && host.CSS && !host.CSS.supports('color',input.value))return;
+          markAuthorityTransition('Field edit: ' + key);
           edit(m => {
             const destination = responsive ? layer(m) : m;
             let values;
@@ -1013,13 +1045,13 @@
       const separate = button('Separate Window', detachPanel); separate.onclick = () => { try { detachPanel(); } catch (err) { error(err); } };
       button('Return to Dock', returnToDock);
       const width = document.createElement('input'); width.type = 'range'; width.min = '260'; width.max = '520'; width.value = dockWidth; width.setAttribute('aria-label', 'Dock width'); width.oninput = () => { dockWidth = Number(width.value); panel.style.width = dockWidth + 'px'; layoutDock(); }; panel.appendChild(width);
-      button(quick ? 'Quick Edit' : 'Advanced Edit', () => { quick = !quick; mode = quick ? 'section' : 'element'; showPanel(); });
+      button(quick ? 'Quick Edit' : 'Advanced Edit', () => { logAuthorityTransition('no-render', 'Quick Edit / mode switch'); quick = !quick; mode = quick ? 'section' : 'element'; showPanel(); });
       button('Live Page Navigation', () => { picking = false; showPanel(); });
       panel.appendChild(sectionMap());
       button(picking ? 'Cursor selection ON' : 'Cursor selection OFF', () => { picking = !picking; showPanel(); });
       ['element', 'section', 'page'].forEach(value => button(value === 'page' ? 'Whole Page' : value === 'element' ? 'Element' : 'Section', () => { mode = value; clearSelection(); if (mode === 'page') selected = renderer.key(root); showPanel(); }));
-      ['desktop','tablet','mobile'].forEach(value => { const b = button(value[0].toUpperCase() + value.slice(1), () => { view = value; apply(controller.snapshot().manifest); showPanel(); }); b.setAttribute('aria-pressed', String(view === value)); });
-      button('Clear Selection', () => { clearSelection(); showPanel(); });
+      ['desktop','tablet','mobile'].forEach(value => { const b = button(value[0].toUpperCase() + value.slice(1), () => { markAuthorityTransition('View switch: ' + value); view = value; apply(controller.snapshot().manifest); showPanel(); }); b.setAttribute('aria-pressed', String(view === value)); });
+      button('Clear Selection', () => { logAuthorityTransition('no-render', 'Clear Selection'); clearSelection(); showPanel(); });
       refreshHighlights();
       const node = selectedNode(), caption = document.createElement('p'); caption.dataset.selection = selected || '';  caption.textContent = node ? name(node) : 'Click a real PATTC element to select it.'; panel.appendChild(caption);
       if (node) {
@@ -1055,7 +1087,7 @@
         button('Hide Selected', () => { edit(m => { layer(m).hidden[selected] = true; delete viewItem(m).original; }); showPanel(); });
         button('Show Selected', () => { edit(m => { layer(m).hidden[selected] = false; }); showPanel(); });
         button('Restore Selected Original', restoreOriginal);
-        button('Restore Selected Last Saved', () => { controller.restoreSelected(existing || selected); showPanel(); });
+        button('Restore Selected Last Saved', () => { markAuthorityTransition('Restore Selected Last Saved'); controller.restoreSelected(existing || selected); showPanel(); });
         const selector = similar(), count = selector ? root.querySelectorAll(selector).length : 0;
         const matches = document.createElement('p'); matches.textContent = selector ? selector + ' · ' + count + ' matches · ' + Array.from(root.querySelectorAll(selector)).filter(n => !interactive(n)).length + ' safe to hide' : 'No safe class-qualified Similar selector'; panel.appendChild(matches);
         button('Apply Style to Selected Group', () => { if (!selectedGroup.size) throw new Error('Choose members in Section Map'); edit(m => { const group = 'Selected Group'; m.groups[group] = { style: copy(item(m).style || {}) }; selectedGroup.forEach(id => { m.groupMembers[id] = group; }); }); });
@@ -1066,10 +1098,10 @@
         button('Split / Extract to New Section', () => createSection(true));
       }
       button('New Section', () => createSection(false));
-      button('Undo', () => { if (!undo.length) return; const previous = undo.pop(); controller.edit(m => { Object.keys(m).forEach(k => delete m[k]); Object.assign(m, previous); }); showPanel(); });
-      button('Original Page', () => { edit(m => { maps.forEach(k => m[k] = {}); delete m.responsive; }); showPanel(); });
-      button('Revert to Server Draft', async () => { await controller.revert(); undo = []; showPanel(); });
-      ['Save Element','Save Section','Save Page Draft','Save Whole Project Drafts'].forEach(label => button(label, () => { if (colorEditor) throw new Error('Apply or cancel the color preview before saving.'); return controller.flush(); }));
+      button('Undo', () => { if (!undo.length) return; markAuthorityTransition('Undo'); const previous = undo.pop(); controller.edit(m => { Object.keys(m).forEach(k => delete m[k]); Object.assign(m, previous); }); showPanel(); });
+      button('Original Page', () => { markAuthorityTransition('Original Page'); edit(m => { maps.forEach(k => m[k] = {}); delete m.responsive; }); showPanel(); });
+      button('Revert to Server Draft', async () => { markAuthorityTransition('Revert to Server Draft'); await controller.revert(); undo = []; showPanel(); });
+      ['Save Element','Save Section','Save Page Draft','Save Whole Project Drafts'].forEach(label => button(label, () => { if (colorEditor) throw new Error('Apply or cancel the color preview before saving.'); logAuthorityTransition('no-render', label); return controller.flush(); }));
       const saveHelp = document.createElement('p'); saveHelp.dataset.saveHelp = ''; saveHelp.textContent = 'All Save controls verify the complete current page Draft. Previously visited pages were saved before closing. Whole Project flushes the only open page; it does not publish or rewrite unopened pages.'; panel.appendChild(saveHelp);
       button('Publish Page', () => { if (host.confirm('Publish this page Draft to live appearance?')) return controller.publish(); });
       button('Load Version History', async () => { versions = await controller.versions(); showPanel(); });
@@ -1136,7 +1168,7 @@
     }
     const css = document.createElement('style'); css.textContent = 'body.r3-editing{box-sizing:border-box;padding-right:var(--r3-dock-space,0px)}#pattcStudioR3 [data-section-map]{max-height:35vh;overflow:auto}#pattcStudioR3 [data-map-key]{margin-left:8px}#pattcStudioR3{position:fixed;z-index:2147483000;right:8px;top:8px;max-height:94vh;overflow:auto;padding:12px;border:1px solid #c99748;border-radius:12px;background:#171d29;color:#eee;box-shadow:0 8px 30px #0008;font:12px system-ui}#pattcStudioR3 button{padding:6px;margin:3px;border:1px solid #627089;border-radius:5px;background:#293447;color:#fff;font:inherit}#pattcStudioR3 select,#pattcStudioR3 input{width:100%;max-width:100%;background:#101722;color:#fff;border:1px solid #657089;padding:4px}#pattcStudioR3 details{border-top:1px solid #46536b;padding:8px 0}#pattcStudioR3 summary{cursor:pointer;font-weight:700;padding:5px 0}#pattcStudioR3 .r3-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px}#pattcStudioR3Demo{position:fixed;inset:0;width:calc(100% - 330px);height:100vh;background:#151923;border:0;z-index:2147482999}#pattcStudioR3Launch{position:fixed;right:12px;bottom:80px;z-index:2147482998;padding:9px;background:#242d40;color:#efcd86;border:1px solid #c99748;border-radius:10px}'; css.textContent += '#pattcStudioR3 .r3-color-editor{box-sizing:border-box;width:100%;padding:10px;margin-bottom:12px;border:2px solid #dca64c;border-radius:8px;background:#171d29;color:#fff}#pattcStudioR3 .r3-color-editor [hidden]{display:none!important}#pattcStudioR3 .r3-color-editor input[type=color]{height:56px;padding:2px;cursor:pointer}#pattcStudioR3 .r3-color-editor input[type=checkbox]{width:auto}#pattcStudioR3 .r3-color-preview{height:60px;border:1px solid #94a3b8;border-radius:6px;margin:8px 0;background-image:linear-gradient(45deg,#8883 25%,transparent 25%)}#pattcStudioR3 .r3-color-formats{overflow-wrap:anywhere;font:12px monospace}#pattcStudioR3 .r3-color-palette{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}#pattcStudioR3 .r3-color-chip{width:32px;height:32px;padding:0;border:2px solid #cbd5e1}#pattcStudioR3 [aria-haspopup=dialog]{cursor:pointer}'; document.head.appendChild(css);
     launch = document.createElement('button'); launch.id = 'pattcStudioR3Launch'; launch.textContent = localhost ? 'Visual Studio R3 · LOCAL' : 'Visual Studio R3';
-    launch.onclick = () => perform(async () => { if (!admin()) throw new Error('Owner access required'); await verifyEnvironment(); if (!controller.snapshot().opened){launch.textContent='Loading fresh Studio Draft…';await controller.open(scope());}launch.textContent=localhost ? 'Visual Studio R3 · LOCAL' : 'Visual Studio R3';showPanel();if(detached && !detached.closed)detached.focus(); }); document.body.appendChild(launch);
+    launch.onclick = () => perform(async () => { if (!admin()) throw new Error('Owner access required'); await verifyEnvironment(); if (!controller.snapshot().opened){markAuthorityTransition('Open Visual Studio / fresh Draft');launch.textContent='Loading fresh Studio Draft…';await controller.open(scope());}launch.textContent=localhost ? 'Visual Studio R3 · LOCAL' : 'Visual Studio R3';showPanel();if(detached && !detached.closed)detached.focus(); }); document.body.appendChild(launch);
     document.addEventListener('pointermove',event=>{
       const state=controller.snapshot();
       hoverTarget=state.opened && !state.demo && picking && root?.contains(event.target)
@@ -1171,7 +1203,7 @@
       runtimeRequest=true;
       try{
         const bundle=await host.apiGetGameAppearance(current.gameId);
-        if(!controller.snapshot().opened && sameScope(current,scope())){runtimeScope=current;runtimeManifest=rowManifest(bundle,TYPES.published,current.pageKey)||normalize({pageKey:current.pageKey});apply(runtimeManifest);}
+        if(!controller.snapshot().opened && sameScope(current,scope())){runtimeScope=current;runtimeManifest=rowManifest(bundle,TYPES.published,current.pageKey)||normalize({pageKey:current.pageKey});markAuthorityTransition('Cold/runtime published Visual Studio manifest');apply(runtimeManifest);}
       }catch(err){console.warn('R3 published runtime read failed',err.message);}finally{runtimeRequest=null;}
     }
     observer = new MutationObserver(() => {
@@ -1191,9 +1223,9 @@
     if (localhost && admin()) verifyEnvironment();
     // Do not compete with the Home Hub's critical initial API request.
     host.setTimeout(() => { if (!controller.snapshot().opened) runtimeAppearance(); }, 7000);
-    host.PATTC_OWNER_VISUAL_STUDIO_R3 = { open: () => launch.click(), close: async () => {cancelColorEditor();removePreview();await controller.close();panel?.remove();panel=null;layoutDock();clearSelection();}, snapshot: controller.snapshot };
+    host.PATTC_OWNER_VISUAL_STUDIO_R3 = { open: () => launch.click(), close: async () => {cancelColorEditor();removePreview();await controller.close();panel?.remove();panel=null;layoutDock();clearSelection();}, snapshot: controller.snapshot, authorityTrace: () => copy(authorityTrace) };
   }
-  const exports = { parseColor, colorFormats, blendColor, colorContrast, createColorEditor, verifyDevelopmentEnvironment, developmentWritePolicy, verifyProductionEnvironment, productionWritePolicy, requireDevelopmentWrite, TYPES, normalize, exact, rowManifest, createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor, profileHasSavedAppearance_, hubAppearanceRow_, navigationHasSavedAppearance_, runtimeAppearanceOwnsPaint_, visualStudioPaintAllowed_, restoreOriginalSelected_ };
+  const exports = { parseColor, colorFormats, blendColor, colorContrast, createColorEditor, verifyDevelopmentEnvironment, developmentWritePolicy, verifyProductionEnvironment, productionWritePolicy, requireDevelopmentWrite, TYPES, normalize, exact, rowManifest, createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor, profileHasSavedAppearance_, hubAppearanceRow_, navigationHasSavedAppearance_, runtimeManagedPaintTarget_, runtimeAppearanceOwnsPaint_, visualStudioPaintAllowed_, restoreOriginalSelected_ };
   if (typeof module !== 'undefined' && module.exports) module.exports = exports;
   else { host.PATTC_STUDIO_R3 = exports; if (host.document.readyState === 'loading') host.document.addEventListener('DOMContentLoaded', mountBrowser); else mountBrowser(); }
 })(typeof window !== 'undefined' ? window : globalThis);
