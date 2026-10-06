@@ -206,7 +206,8 @@
         const next = copy(manifest); change(next); manifest = normalize(next);
         manifest.pageKey = scope.pageKey;
         revision++; dirty = true; render(copy(manifest)); emit('Unsaved');
-        clearTimer(); timer = later(() => { timer = null; api.flush().catch(() => {}); }, options.debounce == null ? 650 : options.debounce);
+        clearTimer();
+        if (options.autosave !== false) timer = later(() => { timer = null; api.flush().catch(() => {}); }, options.debounce == null ? 650 : options.debounce);
       },
       restoreSelected(id) {
         if (!id) throw new Error('Select a section or element first');
@@ -310,8 +311,71 @@
   const sectionHeader = node => node.querySelector(':scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > summary,:scope > header') || node.querySelector('h1,h2,h3,h4,summary');
   const sectionSelector = 'section,details,article,.card,.panel,[class*="section"],[class*="hero"]';
 
+  const VISUAL_STUDIO_PAINT_PROPERTIES = new Set([
+    'background', 'background-color', 'background-image', 'color', 'border-color',
+    'outline-color', 'fill', 'stroke'
+  ]);
+  function appearanceValue_(value) {
+    return value !== undefined && value !== null && String(value).trim() !== '';
+  }
+  function profileHasSavedAppearance_(state) {
+    const profile = state && state.profile && typeof state.profile === 'object' ? state.profile : {};
+    const nested = [profile.appearance, profile.profileAppearance].filter(value => value && typeof value === 'object');
+    const direct = [
+      profile.profileColor, profile.ProfileColor, profile.themeColor, profile.ThemeColor,
+      profile.profileColor2, profile.ProfileColor2, profile.profileColorMode, profile.ProfileColorMode,
+      profile.profileGradientAngle, profile.ProfileGradientAngle, profile.textColor, profile.TextColor
+    ];
+    const nestedValues = [];
+    nested.forEach(value => ['primaryColor','secondaryColor','color','color2','textColor','gradientMode','gradientAngle'].forEach(key => nestedValues.push(value[key])));
+    return direct.concat(nestedValues).some(appearanceValue_);
+  }
+  function hubAppearanceRow_(state, category) {
+    const key = String(category || '').trim().toLowerCase();
+    if (!key || !state) return null;
+    const map = state.dashboardHubAppearanceMap && typeof state.dashboardHubAppearanceMap === 'object' ? state.dashboardHubAppearanceMap : {};
+    if (map[key] && typeof map[key] === 'object') return map[key];
+    const rows = Array.isArray(state.dashboardHubAppearanceRows) ? state.dashboardHubAppearanceRows : [];
+    return rows.find(row => String(row && (row.HubCategory || row.hubCategory || row.SettingKey || row.settingKey) || '').trim().toLowerCase() === key) || null;
+  }
+  function navigationHasSavedAppearance_(state) {
+    if (!state) return false;
+    const rows = Array.isArray(state.dashboardHubAppearanceRows)
+      ? state.dashboardHubAppearanceRows
+      : Object.values(state.dashboardHubAppearanceMap && typeof state.dashboardHubAppearanceMap === 'object' ? state.dashboardHubAppearanceMap : {});
+    return rows.some(row => {
+      const category = String(row && (row.HubCategory || row.hubCategory) || '').trim().toLowerCase();
+      const setting = String(row && (row.SettingKey || row.settingKey) || '').trim().toLowerCase();
+      return category === 'navigation' || setting.indexOf('nav:') === 0;
+    });
+  }
+  function runtimeAppearanceOwnsPaint_(node, state) {
+    if (!node || typeof node.closest !== 'function') return false;
+    if (node.closest('[data-dashboard-profile-card],#dashboardPlayerCard,#dashboardPlayerSticky')) return profileHasSavedAppearance_(state);
+    const hub = node.closest('[data-dashboard-hub-category]');
+    if (hub) return !!hubAppearanceRow_(state, hub.getAttribute('data-dashboard-hub-category'));
+    if (node.closest('.bottom-nav')) return navigationHasSavedAppearance_(state);
+    return false;
+  }
+  function visualStudioPaintAllowed_(node, property, state) {
+    const key = String(property || '').trim().toLowerCase();
+    return !VISUAL_STUDIO_PAINT_PROPERTIES.has(key) || !runtimeAppearanceOwnsPaint_(node, state);
+  }
+
+  function restoreOriginalSelected_(manifest, id) {
+    if (!id) throw new Error('Select a section or element first');
+    maps.filter(key => !['groups','generatedSections'].includes(key)).forEach(key => { delete manifest[key][id]; });
+    ['tablet','mobile'].forEach(view => {
+      const target = responsiveLayer(manifest, view, true);
+      ['items','hidden','collapse'].forEach(key => { if (target[key]) delete target[key][id]; });
+    });
+    manifest.items[id] = { original: true, style: {} };
+    return manifest;
+  }
+
   function createRenderer(root, options = {}) {
     const document = root.ownerDocument, originals = new Map(), keys = new Map();
+    const paintAllowed = typeof options.paintAllowed === 'function' ? options.paintAllowed : (() => true);
     let generated = [], collapseCleanup = [];
     const textOriginals = new Map();
     const collapseStates = new Map(), collapseControls = new Map();
@@ -407,7 +471,7 @@
     }
     function style(node, value) {
       remember(node);
-      const set = (k, v) => node.style.setProperty(k, String(v), 'important');
+      const set = (k, v) => { if (paintAllowed(node, k) !== false) node.style.setProperty(k, String(v), 'important'); };
       function original(properties){
         const probe=document.createElement('div');probe.setAttribute('style',originals.get(node).style || '');
         properties.forEach(property=>{const value=probe.style.getPropertyValue(property);if(value)node.style.setProperty(property,value,probe.style.getPropertyPriority(property));else node.style.removeProperty(property);});
@@ -426,7 +490,7 @@
       });
       if(value.scale != null && value.scale !== '') set('zoom',Math.max(50,Math.min(150,Number(value.scale)||100))/100);
       if(value.headerFontSize != null && value.headerFontSize !== '') [sectionHeader(node)].filter(Boolean).forEach(header=>{remember(header);header.style.setProperty('font-size',Math.max(8,Number(value.headerFontSize)||16)+'px','important');});
-      if (value.headerColor || value.headerBackground) [sectionHeader(node)].filter(Boolean).forEach(header => { remember(header); if (value.headerColor) header.style.setProperty('color', value.headerColor, 'important'); if (value.headerBackground) header.style.setProperty('background-color', value.headerBackground, 'important'); });
+      if (value.headerColor || value.headerBackground) [sectionHeader(node)].filter(Boolean).forEach(header => { remember(header); if (value.headerColor && paintAllowed(header, 'color') !== false) header.style.setProperty('color', value.headerColor, 'important'); if (value.headerBackground && paintAllowed(header, 'background-color') !== false) header.style.setProperty('background-color', value.headerBackground, 'important'); });
       if (value.borderWidth > 0) set('border-style', 'solid');
       if (value.objectFit) set('object-fit', value.objectFit);
       if (value.objectPosition) { set('object-position', value.objectPosition); set('background-position', value.objectPosition); }
@@ -534,7 +598,7 @@
         function paint(animate) {
           const open = !enabled || state.open;
           const color = open ? config.expandedColor : config.collapsedColor;
-          if (color || headerColor) header.style.setProperty('background-color', color || headerColor, 'important'); else header.style.removeProperty('background-color');
+          if (paintAllowed(header, 'background-color') !== false) { if (color || headerColor) header.style.setProperty('background-color', color || headerColor, 'important'); else header.style.removeProperty('background-color'); }
           const reduced = host.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
           body.style.setProperty('overflow', 'hidden');
           body.style.setProperty('transition', animate && config.collapseStyle === 'blind' && !reduced ? 'max-height 240ms ease' : 'none');
@@ -688,7 +752,7 @@
       observer?.disconnect();
       try {
         const app = document.getElementById('app'); if (!app) return;
-        if (root !== app) { renderer?.reset(); root = app; renderer = createRenderer(root); }
+        if (root !== app) { renderer?.reset(); root = app; renderer = createRenderer(root, { paintAllowed: (node, property) => visualStudioPaintAllowed_(node, property, host.APP_STATE || (typeof APP_STATE !== 'undefined' ? APP_STATE : {})) }); }
         renderer.render(manifest, { view: controller.snapshot().opened && controller.snapshot().lock !== 'close' ? view : breakpointFor(host.innerWidth || 1280), editing: controller.snapshot().opened && controller.snapshot().lock !== 'close', scope: scope().gameId });
         highlight(selectedNode());
         const caption=panel?.querySelector('[data-selection]');
@@ -701,7 +765,7 @@
       else if (launch) launch.textContent = 'R3: ' + error.message;
     }
     function perform(work) { Promise.resolve().then(work).catch(error); }
-    const controller = createController(serverAdapter(host), { assertWritable: () => requireDevelopmentWrite(host), render: apply, onChange: updateStatus });
+    const controller = createController(serverAdapter(host), { autosave: false, assertWritable: () => requireDevelopmentWrite(host), render: apply, onChange: updateStatus });
     function updateStatus(state) {
       if (!panel) return;
       panel.querySelector('[data-status]').textContent = state.status;
@@ -758,7 +822,11 @@
       moving = false; showPanel();
     }
     function restoreOriginal() {
-      edit(m => { maps.filter(k => !['groups','generatedSections'].includes(k)).forEach(k => Object.keys(m[k]).forEach(id=>{if(id===selected || renderer.find(id)===selectedNode())delete m[k][id];})); ['tablet','mobile'].forEach(device => { const target = responsiveLayer(m, device); ['items','hidden','collapse'].forEach(k => { if (target[k]) delete target[k][selected]; }); }); m.items[selected] = { original: true, style: {} }; });
+      const node = selectedNode();
+      edit(m => {
+        Object.keys(m.items).filter(id => id === selected || renderer.find(id) === node).forEach(id => { if (id !== selected) { maps.filter(k => !['groups','generatedSections'].includes(k)).forEach(k => delete m[k][id]); } });
+        restoreOriginalSelected_(m, selected);
+      });
       showPanel();
     }
     function layer(m) { return responsiveLayer(m, view, true); }
@@ -987,7 +1055,7 @@
         button('Hide Selected', () => { edit(m => { layer(m).hidden[selected] = true; delete viewItem(m).original; }); showPanel(); });
         button('Show Selected', () => { edit(m => { layer(m).hidden[selected] = false; }); showPanel(); });
         button('Restore Selected Original', restoreOriginal);
-        button('Restore Selected Last Saved', () => { controller.restoreSelected(selected); showPanel(); });
+        button('Restore Selected Last Saved', () => { controller.restoreSelected(existing || selected); showPanel(); });
         const selector = similar(), count = selector ? root.querySelectorAll(selector).length : 0;
         const matches = document.createElement('p'); matches.textContent = selector ? selector + ' · ' + count + ' matches · ' + Array.from(root.querySelectorAll(selector)).filter(n => !interactive(n)).length + ' safe to hide' : 'No safe class-qualified Similar selector'; panel.appendChild(matches);
         button('Apply Style to Selected Group', () => { if (!selectedGroup.size) throw new Error('Choose members in Section Map'); edit(m => { const group = 'Selected Group'; m.groups[group] = { style: copy(item(m).style || {}) }; selectedGroup.forEach(id => { m.groupMembers[id] = group; }); }); });
@@ -1125,7 +1193,7 @@
     host.setTimeout(() => { if (!controller.snapshot().opened) runtimeAppearance(); }, 7000);
     host.PATTC_OWNER_VISUAL_STUDIO_R3 = { open: () => launch.click(), close: async () => {cancelColorEditor();removePreview();await controller.close();panel?.remove();panel=null;layoutDock();clearSelection();}, snapshot: controller.snapshot };
   }
-  const exports = { parseColor, colorFormats, blendColor, colorContrast, createColorEditor, verifyDevelopmentEnvironment, developmentWritePolicy, verifyProductionEnvironment, productionWritePolicy, requireDevelopmentWrite, TYPES, normalize, exact, rowManifest, createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor };
+  const exports = { parseColor, colorFormats, blendColor, colorContrast, createColorEditor, verifyDevelopmentEnvironment, developmentWritePolicy, verifyProductionEnvironment, productionWritePolicy, requireDevelopmentWrite, TYPES, normalize, exact, rowManifest, createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor, profileHasSavedAppearance_, hubAppearanceRow_, navigationHasSavedAppearance_, runtimeAppearanceOwnsPaint_, visualStudioPaintAllowed_, restoreOriginalSelected_ };
   if (typeof module !== 'undefined' && module.exports) module.exports = exports;
   else { host.PATTC_STUDIO_R3 = exports; if (host.document.readyState === 'loading') host.document.addEventListener('DOMContentLoaded', mountBrowser); else mountBrowser(); }
 })(typeof window !== 'undefined' ? window : globalThis);
