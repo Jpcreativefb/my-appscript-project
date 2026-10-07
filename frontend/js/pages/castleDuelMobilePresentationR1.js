@@ -6,14 +6,15 @@
   'use strict';
 
   var CASTLE_ASSET_ROOT = './assets/castle/';
+  var CASTLE_ROOM_ASSET_ROOT = CASTLE_ASSET_ROOT+'rooms/';
   var CASTLE_DUEL_ROOM_THEMES = {
-    STRATEGY:{key:'STRATEGY',cls:'castle-room-theme castle-room-theme--strategy',title:'The Strategy Chamber',subtitle:'Across the table sits another PATTC player.',background:CASTLE_ASSET_ROOT+'strategy-chamber.svg',overlay:'warm-table',frame:'brass',accent:'gold',randomizerCard:'player'},
-    PORTRAIT:{key:'PORTRAIT',cls:'castle-room-theme castle-room-theme--portrait',title:'The Portrait Gallery',subtitle:'A familiar face waits beneath the frames.',background:CASTLE_ASSET_ROOT+'portrait-gallery.svg',overlay:'gallery-vignette',frame:'gallery',accent:'parchment',randomizerCard:'portrait'},
-    MASKED:{key:'MASKED',cls:'castle-room-theme castle-room-theme--masked',title:'The Masked Hall',subtitle:'The face is hidden. The risk is not.',background:CASTLE_ASSET_ROOT+'masked-hall.svg',overlay:'violet-shadow',frame:'silver',accent:'violet',randomizerCard:'mask'},
-    TRAITOR:{key:'TRAITOR',cls:'castle-room-theme castle-room-theme--traitor',title:'The Traitor Passage',subtitle:'Someone in the shadows has chosen you.',background:CASTLE_ASSET_ROOT+'traitor-gallery.svg',overlay:'red-shadow',frame:'iron',accent:'crimson',randomizerCard:'shadow'},
-    MURDER:{key:'MURDER',cls:'castle-room-theme castle-room-theme--murder',title:'The Hidden Passage',subtitle:'Some doors in the Castle should stay closed.',background:CASTLE_ASSET_ROOT+'murder-passage.svg',overlay:'blood-vignette',frame:'iron',accent:'crimson',randomizerCard:'murder'},
-    HOST:{key:'HOST',cls:'castle-room-theme castle-room-theme--host',title:"The Host's Study",subtitle:'A quieter room. That does not mean a safer one.',background:CASTLE_ASSET_ROOT+'host-study.svg',overlay:'study-glow',frame:'wood',accent:'amber',randomizerCard:'host'},
-    FINALE:{key:'FINALE',cls:'castle-room-theme castle-room-theme--finale',title:'The Throne Room',subtitle:'Ten final tests. Every choice echoes.',background:CASTLE_ASSET_ROOT+'throne-room.svg',overlay:'royal-vignette',frame:'royal',accent:'gold',randomizerCard:'finale'}
+    STRATEGY:{key:'STRATEGY',cls:'castle-room-theme castle-room-theme--strategy',title:'The Strategy Chamber',subtitle:'Across the table sits another PATTC player.',background:CASTLE_ROOM_ASSET_ROOT+'strategy-chamber-modern.webp',overlay:'warm-table',frame:'brass',accent:'gold',randomizerCard:'player'},
+    PORTRAIT:{key:'PORTRAIT',cls:'castle-room-theme castle-room-theme--portrait',title:'The Portrait Gallery',subtitle:'A familiar face waits beneath the frames.',background:CASTLE_ROOM_ASSET_ROOT+'portrait-gallery-modern.webp',overlay:'gallery-vignette',frame:'gallery',accent:'parchment',randomizerCard:'portrait'},
+    MASKED:{key:'MASKED',cls:'castle-room-theme castle-room-theme--masked',title:'The Masked Hall',subtitle:'The face is hidden. The risk is not.',background:CASTLE_ROOM_ASSET_ROOT+'masked-hall-modern.webp',overlay:'violet-shadow',frame:'silver',accent:'violet',randomizerCard:'mask'},
+    TRAITOR:{key:'TRAITOR',cls:'castle-room-theme castle-room-theme--traitor',title:'The Traitor Passage',subtitle:'Someone in the shadows has chosen you.',background:CASTLE_ROOM_ASSET_ROOT+'traitor-gallery-modern.webp',overlay:'red-shadow',frame:'iron',accent:'crimson',randomizerCard:'shadow'},
+    MURDER:{key:'MURDER',cls:'castle-room-theme castle-room-theme--murder',title:'The Hidden Passage',subtitle:'Some doors in the Castle should stay closed.',background:CASTLE_ROOM_ASSET_ROOT+'murder-passage-modern.webp',overlay:'blood-vignette',frame:'iron',accent:'crimson',randomizerCard:'murder'},
+    HOST:{key:'HOST',cls:'castle-room-theme castle-room-theme--host',title:"The Host's Study",subtitle:'A quieter room. That does not mean a safer one.',background:CASTLE_ROOM_ASSET_ROOT+'host-study-modern.webp',overlay:'study-glow',frame:'wood',accent:'amber',randomizerCard:'host'},
+    FINALE:{key:'FINALE',cls:'castle-room-theme castle-room-theme--finale',title:'The Throne Room',subtitle:'Ten final tests. Every choice echoes.',background:CASTLE_ROOM_ASSET_ROOT+'throne-room-modern.webp',overlay:'royal-vignette',frame:'royal',accent:'gold',randomizerCard:'finale'}
   };
   Object.keys(CASTLE_DUEL_ROOM_THEMES).forEach(function(key){CASTLE_DUEL_ROOM_THEMES[key].sub=CASTLE_DUEL_ROOM_THEMES[key].subtitle;});
 
@@ -247,14 +248,14 @@
   }
 
   function castleMobileStyles_(){return '<style id="castleMobilePresentationR1Styles">'+
-    '.castle-room-theme{background-color:#151219!important;background-image:linear-gradient(180deg,rgba(10,8,12,.12),rgba(10,8,12,.76)),var(--castle-room-art)!important;background-size:cover!important;background-position:center!important;}'+
-    '.castle-room-theme--strategy{--castle-room-art:url("./assets/castle/strategy-chamber.svg")}'+
-    '.castle-room-theme--portrait{--castle-room-art:url("./assets/castle/portrait-gallery.svg")}'+
-    '.castle-room-theme--masked{--castle-room-art:url("./assets/castle/masked-hall.svg")}'+
-    '.castle-room-theme--traitor{--castle-room-art:url("./assets/castle/traitor-gallery.svg")}'+
-    '.castle-room-theme--murder{--castle-room-art:url("./assets/castle/murder-passage.svg")}'+
-    '.castle-room-theme--host{--castle-room-art:url("./assets/castle/host-study.svg")}'+
-    '.castle-room-theme--finale{--castle-room-art:url("./assets/castle/throne-room.svg")}'+
+    '.castle-room-theme{background-color:#151219!important;background-image:linear-gradient(180deg,rgba(10,8,12,.12),rgba(10,8,12,.76)),var(--castle-room-art)!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;}'+
+    '.castle-room-theme--strategy{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.STRATEGY.background+'")}'+
+    '.castle-room-theme--portrait{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.PORTRAIT.background+'")}'+
+    '.castle-room-theme--masked{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.MASKED.background+'")}'+
+    '.castle-room-theme--traitor{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.TRAITOR.background+'")}'+
+    '.castle-room-theme--murder{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.MURDER.background+'")}'+
+    '.castle-room-theme--host{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.HOST.background+'")}'+
+    '.castle-room-theme--finale{--castle-room-art:url("'+CASTLE_DUEL_ROOM_THEMES.FINALE.background+'")}'+
     '.castle-mobile-portrait-shell{position:relative}.castle-mobile-portrait-shell>img{width:100%;height:100%;object-fit:cover}.castle-mobile-fallback-slot{display:contents}.castle-mobile-fallback-slot[hidden]{display:none!important}.castle-mobile-fallback{width:100%;height:100%;min-height:100%;display:grid;place-items:center;background:radial-gradient(circle at 50% 30%,rgba(244,212,138,.22),rgba(18,14,20,.96) 72%);color:#f4d48a;font-weight:1000}.castle-mobile-fallback span{display:grid;place-items:center;width:38%;aspect-ratio:1;border-radius:50%;border:2px solid currentColor;font-size:clamp(28px,11vw,72px);background:rgba(0,0,0,.28)}'+
     '.castle-mobile-fallback--mask{background:radial-gradient(ellipse at 50% 35%,rgba(151,112,210,.32),rgba(12,10,17,.98) 72%)}.castle-mobile-fallback--shadow{background:linear-gradient(160deg,#0b090d,#2b0d13 55%,#09080b)}.castle-mobile-fallback--player{background:radial-gradient(circle at 50% 25%,rgba(211,166,94,.3),#16131a 72%)}'+
     '.castle-mobile-spinner-stage{overflow:hidden}.castle-mobile-atmosphere{position:relative;overflow:hidden;transition:filter .14s ease,box-shadow .14s ease}.castle-mobile-atmosphere:after{content:"";pointer-events:none;position:absolute;inset:0;box-shadow:inset 0 0 48px rgba(0,0,0,.18);opacity:.4;transition:opacity .15s ease}.castle-mobile-atmosphere.is-castle-spinning:after{opacity:.78}.castle-mobile-spinner-window{padding:0!important;min-height:0!important;overflow:hidden;background:#151219!important}'+
