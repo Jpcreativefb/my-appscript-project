@@ -235,3 +235,13 @@ function castleR2Next_(){
   try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){}
 }
 function castleR2ShowSummary_(){CASTLE_DUEL_R2_SUMMARY=true;castleR2Render_();try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){}}
+
+(function castleR2LoadMobilePresentation_(){
+  if(typeof document==='undefined'||window.CASTLE_DUEL_MOBILE_PRESENTATION_R1_LOADING)return;
+  window.CASTLE_DUEL_MOBILE_PRESENTATION_R1_LOADING=true;
+  var script=document.createElement('script');
+  script.src='./js/pages/castleDuelMobilePresentationR1.js?v=castle-mobile-presentation-r1';
+  script.async=true;
+  script.onerror=function(){window.CASTLE_DUEL_MOBILE_PRESENTATION_R1_LOADING=false;};
+  document.head.appendChild(script);
+})();
