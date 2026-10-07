@@ -50,15 +50,40 @@ roomKeys.forEach((key) => {
 });
 assert(/castleEscape_\(theme\.sub\)/.test(swipe), 'existing castleR2RoomHtml_ renderer must continue consuming theme.sub');
 
+const modernRoomBackgrounds = {
+  STRATEGY:'./assets/castle/rooms/strategy-chamber-modern.webp',
+  PORTRAIT:'./assets/castle/rooms/portrait-gallery-modern.webp',
+  MASKED:'./assets/castle/rooms/masked-hall-modern.webp',
+  TRAITOR:'./assets/castle/rooms/traitor-gallery-modern.webp',
+  MURDER:'./assets/castle/rooms/murder-passage-modern.webp',
+  HOST:'./assets/castle/rooms/host-study-modern.webp',
+  FINALE:'./assets/castle/rooms/throne-room-modern.webp'
+};
+Object.entries(modernRoomBackgrounds).forEach(([key, background]) => {
+  assert.strictEqual(context.window.CASTLE_DUEL_ROOM_THEMES[key].background, background, key + ' theme must point to approved modern WebP backdrop');
+  assert(fs.existsSync(path.join(root, background.replace('./',''))), 'missing approved Castle modern room asset: ' + background);
+});
+assert(presentation.includes("background-repeat:no-repeat!important"), 'modern room backdrops must never tile');
+assert(presentation.includes('background-size:cover!important'), 'modern room backdrops must use cover sizing');
+
 assert(presentation.includes('castle-mobile-random-card'), 'randomizer must render visual cards');
 assert(presentation.includes('castle-mobile-random-image'), 'randomizer must include portrait presentation');
 assert(presentation.includes('castle-mobile-random-copy'), 'randomizer must include styled name presentation');
 
 const profiles = context.window.CASTLE_MOBILE_REVEAL_PROFILES;
-const profileKeys = ['SLOW_CREEP','RAPID_SNAP','FALSE_STOP','HEARTBEAT','CHAOTIC_BURST'];
+const expectedProfiles = {
+  SLOW_CREEP:{timings:[72,78,86,98,116,142,178,224,286],finalEffect:'slow-landing'},
+  RAPID_SNAP:{timings:[170,58,48,42,38,36,34,32],finalEffect:'snap'},
+  FALSE_STOP:{timings:[70,76,86,105,138,190,270,105,235],finalEffect:'door-slam'},
+  HEARTBEAT:{timings:[118,210,105,245,82,72,62,54],finalEffect:'shadow-reveal'},
+  CHAOTIC_BURST:{timings:[118,86,64,48,40,34,30,145,38],finalEffect:'snap'}
+};
+const profileKeys = Object.keys(expectedProfiles);
 profileKeys.forEach((key) => {
   assert(profiles[key], 'reveal profile must exist: ' + key);
   assert(Array.isArray(profiles[key].timings) && profiles[key].timings.length >= 6, key + ' must define a multi-step local timing sequence');
+  assert.deepStrictEqual(Array.from(profiles[key].timings), expectedProfiles[key].timings, key + ' timing profile must remain unchanged');
+  assert.strictEqual(profiles[key].finalEffect, expectedProfiles[key].finalEffect, key + ' final-stop effect must remain unchanged');
 });
 const timingSignatures = profileKeys.map((key) => profiles[key].timings.join(','));
 assert(new Set(timingSignatures).size === profileKeys.length, 'reveal profiles must use different timing sequences');
