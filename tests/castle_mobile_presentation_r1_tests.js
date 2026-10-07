@@ -3,12 +3,15 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const presentationPath = path.join(root, 'frontend/js/pages/castleDuelMobilePresentationR1.js');
 const revealPath = path.join(root, 'frontend/js/pages/castleDuelRevealR2.js');
+const swipePath = path.join(root, 'frontend/js/pages/castleDuelRevealR2Swipe.js');
 const presentation = fs.readFileSync(presentationPath, 'utf8');
 const reveal = fs.readFileSync(revealPath, 'utf8');
+const swipe = fs.readFileSync(swipePath, 'utf8');
 
 function functionBody(source, name) {
   const start = source.indexOf('function ' + name + '(');
@@ -17,11 +20,31 @@ function functionBody(source, name) {
   return source.slice(start, next >= 0 ? next : source.length);
 }
 
-['STRATEGY','PORTRAIT','MASKED','TRAITOR','MURDER','HOST','FINALE'].forEach((key) => {
+const roomKeys = ['STRATEGY','PORTRAIT','MASKED','TRAITOR','MURDER','HOST','FINALE'];
+roomKeys.forEach((key) => {
   assert(new RegExp('\\b' + key + ':\\{').test(presentation), 'theme registry must define ' + key);
 });
 assert(presentation.includes('window.CASTLE_DUEL_ROOM_THEMES = CASTLE_DUEL_ROOM_THEMES'), 'theme registry must be exposed as the Castle presentation source of truth');
 assert(presentation.includes("window.castleR2RoomTheme_=function(m,round){return castleMobileTheme_(m,round);}"), 'existing room renderer must reuse the registry');
+
+const context = {
+  window: {
+    CASTLE_DUEL_STATE: null,
+    castleR2SwipeStyles_: () => '',
+    castleR2RoomHtml_: () => '',
+    castleR2SpinnerHtml_: () => ''
+  },
+  setInterval: () => 0,
+  clearInterval: () => {}
+};
+vm.runInNewContext(presentation, context, { filename: presentationPath });
+roomKeys.forEach((key) => {
+  const theme = context.window.CASTLE_DUEL_ROOM_THEMES[key];
+  assert(theme && typeof theme.cls === 'string' && theme.cls.trim(), key + ' theme must provide non-empty cls');
+  assert(theme && typeof theme.title === 'string' && theme.title.trim(), key + ' theme must provide non-empty title');
+  assert(theme && typeof theme.sub === 'string' && theme.sub.trim(), key + ' theme must provide non-empty sub');
+});
+assert(/castleEscape_\(theme\.sub\)/.test(swipe), 'existing castleR2RoomHtml_ renderer must continue consuming theme.sub');
 
 assert(presentation.includes('castle-mobile-random-card'), 'randomizer must render visual cards');
 assert(presentation.includes('castle-mobile-random-image'), 'randomizer must include portrait presentation');
