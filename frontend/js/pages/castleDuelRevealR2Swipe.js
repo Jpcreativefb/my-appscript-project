@@ -51,8 +51,43 @@ function castleR2SwipeStyles_(){return `<style>
 .castle-r3-traitor-card{margin-top:16px;border-radius:18px;padding:20px;background:linear-gradient(145deg,#351117,#171015);border:1px solid rgba(198,45,58,.48);text-align:center}.castle-r3-traitor-card h2{color:#ffbd8e;margin:6px 0}.castle-r3-traitor-list{display:grid;gap:10px;margin-top:14px;text-align:left}.castle-r3-traitor-option{display:flex;align-items:center;gap:12px;background:#f6e7c6;color:#3d2117;border:2px solid transparent;border-radius:13px;padding:12px 14px;cursor:pointer;font-weight:900}.castle-r3-traitor-option.is-selected{border-color:#9c2430;background:#fff4da}.castle-r3-traitor-option span:first-child{width:24px;height:24px;border:2px solid #5d3c27;border-radius:5px;display:grid;place-items:center}.castle-r3-traitor-option.is-selected span:first-child{background:#8d1d29;color:#fff;border-color:#8d1d29}.castle-r3-full{width:100%;margin-top:14px}
 .castle-r3-fate-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.castle-r3-fate-card{min-height:180px;border-radius:17px;border:1px solid #c8a46d;background:linear-gradient(150deg,#f7e7bf,#c9a56c);color:#4a2f1b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;box-shadow:0 14px 28px rgba(0,0,0,.28);font-family:"Apple Chancery","Segoe Script",cursive;font-size:28px;font-weight:900}.castle-r3-fate-seal{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#791722;color:#f0c88b;border:4px double #4d0b12;font-family:Georgia,serif}.castle-r3-fate-result{margin-top:16px;border-radius:18px;padding:22px;text-align:center}.castle-r3-fate-safe{background:#dff2e3;color:#18391f}.castle-r3-fate-dead{background:#5e1720;color:#fff3df}.castle-r3-fate-result h2{margin:2px 0 7px;font-size:32px}
 .castle-r3-host-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:15px}.castle-r3-host-envelope{min-height:150px;border:1px solid #c8a46d;border-radius:14px;background:linear-gradient(145deg,#fff1ce,#d9b879);color:#4d301a;font-weight:1000;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px}.castle-r3-host-envelope .castle-r3-fate-seal{width:52px;height:52px}
+.castle-r3-photo-label{position:absolute;left:0;right:0;bottom:0;padding:38px 18px 14px;text-align:left;background:linear-gradient(transparent,rgba(8,7,10,.92));pointer-events:none}
+.castle-r3-photo-label span{display:block;color:#f4d48a;font-size:11px;font-weight:1000;letter-spacing:.12em;text-transform:uppercase}
+.castle-r3-photo-label strong{display:block;color:#fff;font-size:clamp(27px,5vw,40px);line-height:1.02;margin-top:3px;text-shadow:0 2px 8px #000}
+.castle-r2-play-stage .castle-r2-portrait-wrap{width:min(100%,640px);max-width:none;margin:0 auto 8px}
+.castle-r2-play-stage .castle-r2-portrait{width:100%;aspect-ratio:16/10;border-radius:8px}
+.castle-r2-play-stage .castle-r2-portrait img{object-position:center top}
+.castle-r2-play-stage .castle-r2-ally{top:10px;bottom:auto;left:10px;transform:none}
 .castle-r3-mask-outcome{margin-top:16px;border-radius:18px;padding:18px;background:rgba(0,0,0,.34);border:1px solid rgba(244,212,138,.3)}.castle-r3-mask-outcome h2{color:#f4d48a}
-@media(max-width:560px){.castle-r2-room-scene{padding:12px}.castle-r2-paper{padding:14px 12px}.castle-r2-check{font-size:20px;padding:9px 11px;gap:9px}.castle-r2-swipe-actions{grid-template-columns:1fr}.castle-r2-envelope{min-height:270px;padding-left:15px;padding-right:15px}.castle-r2-envelope-title{font-size:36px}.castle-r3-host-grid{grid-template-columns:1fr}.castle-r3-fate-card{min-height:145px}}
+@media(max-width:560px){
+.castle-r2-play-stage{margin-left:-8px;margin-right:-8px;padding:0;border:0;border-radius:0;background:transparent;overflow:visible}
+.castle-r2-play-stage>.castle-r2-progress{padding:0 12px;margin-bottom:6px}
+.castle-r2-play-stage .castle-r2-room-scene{border-radius:0;border-left:0;border-right:0;padding-left:10px;padding-right:10px}
+.castle-r2-play-stage .castle-r2-portrait-wrap{width:calc(100% + 20px);margin-left:-10px;margin-right:-10px}
+.castle-r2-play-stage .castle-r2-portrait{border-radius:0;border-left:0;border-right:0;aspect-ratio:16/9}
+.castle-r3-photo-label{padding:34px 14px 10px}
+.castle-r3-photo-label strong{font-size:28px}
+
+.castle-r2-room-scene{padding:10px}
+.castle-r2-room-heading{margin-bottom:8px}
+.castle-r2-room-heading h2{font-size:23px;margin-bottom:2px}
+.castle-r2-room-heading p{font-size:14px;line-height:1.15}
+.castle-r2-portrait-wrap{margin-bottom:8px}
+.castle-r2-opponent{font-size:26px;margin:2px 0 3px}
+.castle-r2-swipe-wrap{margin-top:7px}
+.castle-r2-swipe-progress{margin:2px 0 6px}
+.castle-r2-paper{padding:10px}
+.castle-r2-paper-sub{font-size:10px;margin-bottom:4px}
+.castle-r2-script{font-size:20px;line-height:1.02;margin-bottom:7px}
+.castle-r2-check-list{gap:3px}
+.castle-r2-check{font-size:18px;padding:7px 9px;gap:8px}
+.castle-r2-check input{width:20px;height:20px;min-width:20px}
+.castle-r2-swipe-actions{grid-template-columns:1fr}
+.castle-r2-envelope{min-height:270px;padding-left:15px;padding-right:15px}
+.castle-r2-envelope-title{font-size:36px}
+.castle-r3-host-grid{grid-template-columns:1fr}
+.castle-r3-fate-card{min-height:145px}
+}
 </style>`;}
 
 function castleR3BanishHtml_(s){
@@ -178,5 +213,5 @@ function castleR2MaskControls_(m,index,matches,round,players){
 function castleR2RoomHtml_(s,index){
   var matches=s.matches||[],m=matches[index],round=s.round,players=s.leaderboard||[];if(!m)return castleR2SummaryHtml_(s);if(!castleR2WasRevealed_(m)&&!castleR2RoundLocked_(round))return castleR2SwipeStyles_()+castleR2SpinnerHtml_(m,index,matches);
   var title=castleR2OpponentName_(m),theme=castleR2RoomTheme_(m,round),kindLabel=m.traitorStage?'TRAITOR ENCOUNTER':m.kind==='HUMAN'?'PATTC PLAYER':m.kind==='MASK'?'MASKED ENCOUNTER':m.kind==='HOST'?'SPECIAL ENCOUNTER':'TV CONTESTANT';
-  return castleR2SwipeStyles_()+`<section class="castle-r2-stage">${castleR2ProgressHtml_(matches,index)}<div class="castle-r2-room-scene ${theme.cls}"><div class="castle-r2-room-heading"><div class="castle-r2-kicker">EPISODE ${castleEscape_(round&&round.number||'')} · ENCOUNTER ${index+1}</div><h2>${castleEscape_(theme.title)}</h2><p>${castleEscape_(theme.sub)}</p></div><div class="castle-r2-room"><div class="castle-r2-portrait-wrap">${castleR2Portrait_(m,false)}${m.allied?'<div class="castle-r2-ally">CASTLE FIVE ALLY</div>':''}</div><div class="castle-r2-kicker">${kindLabel}</div><h2 class="castle-r2-opponent">${castleEscape_(title)}</h2>${m.identityCorrect===true?'<p class="castle-r2-sub"><b>Correct.</b> You identified the Traitor and are safe from murder in this encounter.</p>':''}${m.identityCorrect===false&&m.status==='FATE_REQUIRED'?'<p class="castle-r2-sub"><b>Wrong Traitor.</b> The real identity remains hidden.</p>':''}${m.allied?'<p class="castle-r2-sub">One of your chosen Castle Five has appeared.</p>':''}${m.clue?`<div class="castle-r2-insight"><b>ALLIANCE INSIGHT</b><br>Your ally suggests <b>${castleEscape_(m.clue)}</b>. This clue is 75% accurate. A correct read earns the Alliance bonus.</div>`:''}${castleR2HistoryHtml_(m)}${m.kind==='MASK'?castleR2MaskControls_(m,index,matches,round,players):castleR2NormalControls_(m,index,matches,round)}</div></div></section>`;
+  return castleR2SwipeStyles_()+`<section class="castle-r2-stage castle-r2-play-stage">${castleR2ProgressHtml_(matches,index)}<div class="castle-r2-room-scene ${theme.cls}"><div class="castle-r2-room-heading"><div class="castle-r2-kicker">EPISODE ${castleEscape_(round&&round.number||'')} · ENCOUNTER ${index+1}</div><h2>${castleEscape_(theme.title)}</h2><p>${castleEscape_(theme.sub)}</p></div><div class="castle-r2-room"><div class="castle-r2-portrait-wrap">${castleR2Portrait_(m,false)}${m.allied?'<div class="castle-r2-ally">CASTLE FIVE ALLY</div>':''}<div class="castle-r3-photo-label"><span>${castleEscape_(kindLabel)}</span><strong>${castleEscape_(title)}</strong></div></div>${m.identityCorrect===true?'<p class="castle-r2-sub"><b>Correct.</b> You identified the Traitor and are safe from murder in this encounter.</p>':''}${m.identityCorrect===false&&m.status==='FATE_REQUIRED'?'<p class="castle-r2-sub"><b>Wrong Traitor.</b> The real identity remains hidden.</p>':''}${m.allied?'<p class="castle-r2-sub">One of your chosen Castle Five has appeared.</p>':''}${m.clue?`<div class="castle-r2-insight"><b>ALLIANCE INSIGHT</b><br>Your ally suggests <b>${castleEscape_(m.clue)}</b>. This clue is 75% accurate. A correct read earns the Alliance bonus.</div>`:''}${castleR2HistoryHtml_(m)}${m.kind==='MASK'?castleR2MaskControls_(m,index,matches,round,players):castleR2NormalControls_(m,index,matches,round)}</div></div></section>`;
 }

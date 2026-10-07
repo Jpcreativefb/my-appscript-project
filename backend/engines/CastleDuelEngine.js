@@ -60,6 +60,20 @@ function cdConfig_(gameId){var r=cdRead_('CastleDuelGames',gameId);cdAssert_(r,'
 function cdSaveConfig_(gameId,c){return cdWrite_('CastleDuelGames',gameId,undefined,undefined,c);}
 function cdPlayers_(gameId){return cdRows_('CastleDuelPlayers').filter(function(r){return r.gameId===gameId;}).map(function(r){return r.data;});}
 function cdPlayer_(gameId,username){return cdPlayers_(gameId).find(function(p){return cdKey_(p.user)===cdKey_(username);})||null;}
+function cdPublicProfile_(username,gameId){
+  username=String(username||'').trim();
+  if(!username)return {name:'PATTC Player',imageUrl:''};
+  try{
+    if(typeof apiGetEditableProfile==='function'){
+      var result=apiGetEditableProfile(username,gameId)||{},profile=result.profile||{};
+      return {
+        name:String(profile.displayName||username).trim()||username,
+        imageUrl:String(profile.avatarUrl||'').trim()
+      };
+    }
+  }catch(err){}
+  return {name:username,imageUrl:''};
+}
 function cdSavePlayer_(gameId,p){return cdWrite_('CastleDuelPlayers',gameId,p.user,undefined,p);}
 function cdRounds_(gameId){return cdRows_('CastleDuelRounds').filter(function(r){return r.gameId===gameId;}).map(function(r){return r.data;}).sort(function(a,b){return a.number-b.number;});}
 function cdRound_(gameId,key){return cdRounds_(gameId).find(function(r){return r.key===key;})||null;}
@@ -154,14 +168,58 @@ function apiAdminCastleDuelConfigure(payload){return cdLock_(function(){
 function apiCastleDuelGetState(payload){
   var gameId=cdGameId_(payload),c=cdConfig_(gameId),username=payload.username,p=cdPlayer_(gameId,username),rounds=cdRounds_(gameId),r=rounds.length?rounds[rounds.length-1]:null;
   var matches=p&&r?cdMatches_(gameId,r.key).filter(function(m){return cdKey_(m.user)===cdKey_(username);}).sort(function(a,b){return a.number-b.number;}):[];
-  var publicPlayers=cdPlayers_(gameId).map(function(q){return {user:q.user,lives:q.publicLives===undefined?q.lives:q.publicLives,points:q.points,episodesPlayed:q.episodesPlayed,finalePoints:c.phase==='COMPLETE'?q.finalePoints:undefined};});
+  var realityCast=realityTvContestantsForSeason_(c.seasonId)||[],castById={};
+  realityCast.forEach(function(x){castById[String(x.ContestantId||'')]=x;});
+  var profileCache={};
+  function publicProfile(user){
+    var key=cdKey_(user);
+    if(!profileCache[key])profileCache[key]=cdPublicProfile_(user,gameId);
+    return profileCache[key];
+  }
+  var publicPlayers=cdPlayers_(gameId).map(function(q){
+    var profile=publicProfile(q.user);
+    return {
+      user:q.user,
+      displayName:profile.name,
+      imageUrl:profile.imageUrl,
+      lives:q.publicLives===undefined?q.lives:q.publicLives,
+      points:q.points,
+      episodesPlayed:q.episodesPlayed,
+      finalePoints:c.phase==='COMPLETE'?q.finalePoints:undefined
+    };
+  });
   var ownEvent=r&&r.status==='SETTLED'&&r.announcement&&r.announcement.events?r.announcement.events.find(function(e){return cdKey_(e.victim)===cdKey_(username);}):null;
   var murderHistory=c.phase==='COMPLETE'?rounds.filter(function(x){return !x.finale;}).reduce(function(history,round){var events=round.announcement&&round.announcement.events||[];cdMatches_(gameId,round.key).forEach(function(m){if(m.kind==='MASK'&&m.outcome==='MURDERER'&&m.target){var victimEvent=events.find(function(e){return cdKey_(e.victim)===cdKey_(m.target);});history.push({episode:round.number,murderer:m.user,victim:m.target,lifeLost:!!(victimEvent&&victimEvent.lost),shieldUsed:!!(victimEvent&&victimEvent.shieldUsed)});}});return history;},[]):null;
   var threshold=cdBanishThreshold_(r?r.number:1,c);
   return {success:true,config:{gameId:gameId,seasonId:c.seasonId,phase:c.phase,encounters:c.encounters,startingPoints:c.startingPoints,jackpot:c.jackpot,finaleCounts:c.finaleCounts,banishThreshold:threshold,banishThresholds:c.banishThresholds},player:p?{user:p.user,lives:p.lives,shield:p.shield,banish:cdNum_(p.banish,0),points:p.points,wallet:p.wallet,alliance:p.alliance,joinedRound:p.joinedRound,episodesPlayed:p.episodesPlayed,finaleTokens:p.finaleTokens,finaleLives:p.finaleLives,finaleShield:p.finaleShield,finalePoints:p.finalePoints}:null,
-    cast:cdEligibleCast_(c,r?r.number:1,true).map(function(x){return {id:x.id,name:x.name,active:!r||cdEligibleCast_(c,r.number,false).some(function(z){return z.id===x.id;})};}),
+    cast:cdEligibleCast_(c,r?r.number:1,true).map(function(x){
+      var row=castById[String(x.id)]||{};
+      return {
+        id:x.id,
+        name:x.name,
+        imageUrl:String(row.ImageUrl||'').trim(),
+        active:!r||cdEligibleCast_(c,r.number,false).some(function(z){return z.id===x.id;})
+      };
+    }),
     round:r?{key:r.key,number:r.number,status:r.status,lockAt:r.lockAt,finale:r.finale,announcement:r.status==='OPEN'?r.announcement||null:null}:null,
-    matches:matches.map(function(m){return cdPublicMatch_(m,r&&r.status==='SETTLED');}),leaderboard:publicPlayers,
+    matches:matches.map(function(m){
+      var out=cdPublicMatch_(m,r&&r.status==='SETTLED');
+
+      // Never leak the identity or photo of a still-hidden Traitor.
+      if(out.opponent==='A Traitor')return out;
+
+      if(m.kind==='HUMAN'){
+        var humanProfile=publicProfile(m.opponentUser||m.opponent);
+        out.opponent=humanProfile.name||out.opponent;
+        out.profileImageUrl=humanProfile.imageUrl||'';
+      }else if(m.contestantId&&castById[String(m.contestantId)]){
+        var castRow=castById[String(m.contestantId)];
+        out.opponent=String(castRow.Name||castRow.FullName||out.opponent||'Contestant');
+        out.imageUrl=String(castRow.ImageUrl||'').trim();
+      }
+
+      return out;
+    }),leaderboard:publicPlayers,
     announcement:r&&r.status==='OPEN'?r.announcement||null:null,privateNotice:ownEvent?{lost:ownEvent.lost,shieldUsed:ownEvent.shieldUsed,source:ownEvent.source,banishLife:!!ownEvent.banishLife}:null,
     finale:c.phase==='COMPLETE'?{winner:c.winner,jackpot:c.winnerJackpot,murderHistory:murderHistory}:null};
 }
