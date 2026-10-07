@@ -111,8 +111,9 @@ assert(presentation.includes('WHO CAN YOU TRUST?'), 'trust spin-button state mus
 assert(presentation.includes('THE CASTLE HAS CHOSEN…'), 'final spin-button state must exist');
 
 const polish = functionBody(presentation, 'castleMobilePolishStyles_');
-assert(polish.includes('.castle-r2-progress b{display:none!important}'), 'mobile room framing must hide the redundant Encounter X of Y label');
-assert(polish.includes('.castle-r2-progress{position:absolute!important'), 'encounter dots must overlay the room so room art starts higher');
+assert(polish.includes('.castle-r2-play-stage,.castle-mobile-spinner-stage{position:relative!important'), 'mobile framing must be scoped to encounter and spinner stages only');
+assert(polish.includes('.castle-r2-play-stage>.castle-r2-progress b,.castle-mobile-spinner-stage>.castle-r2-progress b{display:none!important}'), 'mobile room framing must hide the redundant Encounter X of Y label');
+assert(polish.includes('.castle-r2-play-stage>.castle-r2-progress,.castle-mobile-spinner-stage>.castle-r2-progress{position:absolute!important'), 'encounter dots must overlay the room so room art starts higher');
 assert(polish.includes('justify-content:center!important'), 'encounter progress dots must be centered');
 assert(polish.includes('.castle-r2-play-stage .castle-r2-portrait-wrap{width:calc(100% - 34px)!important'), '390px portrait must leave visible room slivers at both sides');
 assert(polish.includes('.castle-r2-paper{width:auto!important;margin:0 4px!important'), 'parchment must remain inset so room art stays visible beside it');
