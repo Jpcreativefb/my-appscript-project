@@ -15,6 +15,7 @@
     HOST:{key:'HOST',cls:'castle-room-theme castle-room-theme--host',title:"The Host's Study",subtitle:'A quieter room. That does not mean a safer one.',background:CASTLE_ASSET_ROOT+'host-study.svg',overlay:'study-glow',frame:'wood',accent:'amber',randomizerCard:'host'},
     FINALE:{key:'FINALE',cls:'castle-room-theme castle-room-theme--finale',title:'The Throne Room',subtitle:'Ten final tests. Every choice echoes.',background:CASTLE_ASSET_ROOT+'throne-room.svg',overlay:'royal-vignette',frame:'royal',accent:'gold',randomizerCard:'finale'}
   };
+  Object.keys(CASTLE_DUEL_ROOM_THEMES).forEach(function(key){CASTLE_DUEL_ROOM_THEMES[key].sub=CASTLE_DUEL_ROOM_THEMES[key].subtitle;});
 
   window.CASTLE_DUEL_ROOM_THEMES = CASTLE_DUEL_ROOM_THEMES;
 
