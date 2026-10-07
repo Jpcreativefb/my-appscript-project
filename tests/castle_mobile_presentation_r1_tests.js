@@ -110,6 +110,21 @@ assert(presentation.includes('THE DOOR IS OPENING…'), 'door-opening spin-butto
 assert(presentation.includes('WHO CAN YOU TRUST?'), 'trust spin-button state must exist');
 assert(presentation.includes('THE CASTLE HAS CHOSEN…'), 'final spin-button state must exist');
 
+const polish = functionBody(presentation, 'castleMobilePolishStyles_');
+assert(polish.includes('.castle-r2-progress b{display:none!important}'), 'mobile room framing must hide the redundant Encounter X of Y label');
+assert(polish.includes('.castle-r2-progress{position:absolute!important'), 'encounter dots must overlay the room so room art starts higher');
+assert(polish.includes('justify-content:center!important'), 'encounter progress dots must be centered');
+assert(polish.includes('.castle-r2-play-stage .castle-r2-portrait-wrap{width:calc(100% - 34px)!important'), '390px portrait must leave visible room slivers at both sides');
+assert(polish.includes('.castle-r2-paper{width:auto!important;margin:0 4px!important'), 'parchment must remain inset so room art stays visible beside it');
+assert(polish.includes('.castle-r2-swipe-wrap{margin:12px 8px 6px!important'), 'note area must leave room visible around and below the parchment');
+assert(polish.includes('.castle-r2-swipe-next,.castle-r2-swipe-back{min-height:44px!important'), 'mobile Next and Back controls must use the smaller tap-safe treatment');
+assert(polish.includes('background:rgba(31,25,31,.46)!important'), 'mobile navigation controls must use a lighter ghosted treatment');
+assert(polish.includes('font-family:Georgia,"Times New Roman",serif!important'), 'Castle presentation must use softer web-safe serif typography for themed copy');
+assert(polish.includes('border-radius:5px!important'), 'rectangular Castle surfaces must use small architectural corner radii');
+assert(polish.includes('@media(max-width:375px)'), '360px room framing protection must exist');
+assert(polish.includes('@media(min-width:410px) and (max-width:560px)'), '430px room framing protection must exist');
+assert(presentation.includes('baseSwipeStyles()+castleMobileStyles_()+castleMobilePolishStyles_()'), 'mobile polish layer must be appended after accepted Castle styles');
+
 ['strategy-chamber.svg','portrait-gallery.svg','masked-hall.svg','traitor-gallery.svg','murder-passage.svg','host-study.svg','throne-room.svg'].forEach((file) => {
   assert(fs.existsSync(path.join(root, 'frontend/assets/castle', file)), 'missing Castle room asset: ' + file);
 });
