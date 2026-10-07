@@ -60,20 +60,22 @@ function cdConfig_(gameId){var r=cdRead_('CastleDuelGames',gameId);cdAssert_(r,'
 function cdSaveConfig_(gameId,c){return cdWrite_('CastleDuelGames',gameId,undefined,undefined,c);}
 function cdPlayers_(gameId){return cdRows_('CastleDuelPlayers').filter(function(r){return r.gameId===gameId;}).map(function(r){return r.data;});}
 function cdPlayer_(gameId,username){return cdPlayers_(gameId).find(function(p){return cdKey_(p.user)===cdKey_(username);})||null;}
-function cdPublicProfile_(username,gameId){
-  username=String(username||'').trim();
-  if(!username)return {name:'PATTC Player',imageUrl:''};
-  try{
-    if(typeof apiGetEditableProfile==='function'){
-      var result=apiGetEditableProfile(username,gameId)||{},profile=result.profile||{};
-      return {
-        name:String(profile.displayName||username).trim()||username,
-        imageUrl:String(profile.avatarUrl||'').trim()
-      };
-    }
-  }catch(err){}
-  return {name:username,imageUrl:''};
+function cdPublicImageUrl_(value){
+  var url=String(value||'').trim();
+  if(!url)return '';
+
+  var match=url.match(/drive\.google\.com\/file\/d\/([^\/?#]+)/i);
+  if(!match)match=url.match(/[?&]id=([^&#]+)/i);
+
+  if(match&&match[1]){
+    return 'https://drive.google.com/thumbnail?id='+
+      encodeURIComponent(match[1])+
+      '&sz=w1200';
+  }
+
+  return url;
 }
+
 function cdSavePlayer_(gameId,p){return cdWrite_('CastleDuelPlayers',gameId,p.user,undefined,p);}
 function cdRounds_(gameId){return cdRows_('CastleDuelRounds').filter(function(r){return r.gameId===gameId;}).map(function(r){return r.data;}).sort(function(a,b){return a.number-b.number;});}
 function cdRound_(gameId,key){return cdRounds_(gameId).find(function(r){return r.key===key;})||null;}
@@ -170,18 +172,9 @@ function apiCastleDuelGetState(payload){
   var matches=p&&r?cdMatches_(gameId,r.key).filter(function(m){return cdKey_(m.user)===cdKey_(username);}).sort(function(a,b){return a.number-b.number;}):[];
   var realityCast=realityTvContestantsForSeason_(c.seasonId)||[],castById={};
   realityCast.forEach(function(x){castById[String(x.ContestantId||'')]=x;});
-  var profileCache={};
-  function publicProfile(user){
-    var key=cdKey_(user);
-    if(!profileCache[key])profileCache[key]=cdPublicProfile_(user,gameId);
-    return profileCache[key];
-  }
   var publicPlayers=cdPlayers_(gameId).map(function(q){
-    var profile=publicProfile(q.user);
     return {
       user:q.user,
-      displayName:profile.name,
-      imageUrl:profile.imageUrl,
       lives:q.publicLives===undefined?q.lives:q.publicLives,
       points:q.points,
       episodesPlayed:q.episodesPlayed,
@@ -197,7 +190,7 @@ function apiCastleDuelGetState(payload){
       return {
         id:x.id,
         name:x.name,
-        imageUrl:String(row.ImageUrl||'').trim(),
+        imageUrl:cdPublicImageUrl_(row.ImageUrl),
         active:!r||cdEligibleCast_(c,r.number,false).some(function(z){return z.id===x.id;})
       };
     }),
@@ -208,14 +201,10 @@ function apiCastleDuelGetState(payload){
       // Never leak the identity or photo of a still-hidden Traitor.
       if(out.opponent==='A Traitor')return out;
 
-      if(m.kind==='HUMAN'){
-        var humanProfile=publicProfile(m.opponentUser||m.opponent);
-        out.opponent=humanProfile.name||out.opponent;
-        out.profileImageUrl=humanProfile.imageUrl||'';
-      }else if(m.contestantId&&castById[String(m.contestantId)]){
+      if(m.kind!=='HUMAN'&&m.contestantId&&castById[String(m.contestantId)]){
         var castRow=castById[String(m.contestantId)];
         out.opponent=String(castRow.Name||castRow.FullName||out.opponent||'Contestant');
-        out.imageUrl=String(castRow.ImageUrl||'').trim();
+        out.imageUrl=cdPublicImageUrl_(castRow.ImageUrl);
       }
 
       return out;
