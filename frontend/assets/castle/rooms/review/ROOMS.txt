@@ -1,0 +1,7 @@
+strategy-chamber-modern.webp
+portrait-gallery-modern.webp
+masked-hall-modern.webp
+traitor-gallery-modern.webp
+murder-passage-modern.webp
+host-study-modern.webp
+throne-room-modern.webp
