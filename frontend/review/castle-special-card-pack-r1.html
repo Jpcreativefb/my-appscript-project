@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Castle Special Encounter Card Pack R1</title>
+<script src="../js/pages/castleSpecialEncounterCardsR1.js"></script>
+<style>
+html,body{margin:0;background:#0e0c0d;color:#eee}body{font-family:Arial,Helvetica,sans-serif}.gallery-shell{width:min(100%,430px);margin:0 auto;padding:12px 10px 42px;background:radial-gradient(circle at 50% 0,#392b25 0,transparent 24%),linear-gradient(#171214,#0a090a);min-height:100vh}.gallery-head{padding:9px 4px 14px}.gallery-head h1{font:600 25px/1.05 Georgia,serif;margin:4px 0;color:#f3e7cf}.gallery-head p{font-size:11px;color:#b9ad99;line-height:1.4;margin:7px 0}.section{margin:0 0 17px}.section h2{font:700 10px/1 Arial,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#c8b68f;margin:0 0 7px;padding:0 2px}.state-grid{display:grid;gap:9px}.note{font-size:9px;color:#847b70;margin:5px 2px 0}.width-badge{position:sticky;top:7px;z-index:20;float:right;margin:7px;background:rgba(8,7,8,.85);border:1px solid #6f5d47;border-radius:4px;padding:5px 7px;font-size:9px;color:#d5c49f}.gallery-sep{height:1px;background:linear-gradient(90deg,transparent,rgba(198,167,106,.3),transparent);margin:12px 0}
+</style></head><body><div class="gallery-shell csec-root"><div class="width-badge" id="widthBadge"></div><header class="gallery-head"><div class="csec-kicker">PATTC Castle Duel · Visual Review Only</div><h1>Special Encounter Card Pack R1</h1><p>Isolated component gallery. No live Castle state, backend requests, scoring, or sealed-result logic.</p></header><main id="gallery"></main></div>
+<script>
+(function(){
+ const C=window.CastleSpecialEncounterCardsR1; document.head.insertAdjacentHTML('beforeend','<style>'+C.style+'</style>');
+ const svg=(bg,face,hair,shirt,label)=>'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 210"><rect width="160" height="210" fill="${bg}"/><circle cx="80" cy="76" r="39" fill="${face}"/><path d="M42 74q4-49 38-49t38 49q-12-20-38-20T42 74" fill="${hair}"/><path d="M28 210q5-70 52-70t52 70" fill="${shirt}"/><circle cx="65" cy="77" r="3" fill="#3b2a23"/><circle cx="95" cy="77" r="3" fill="#3b2a23"/><path d="M68 98q12 8 24 0" stroke="#8c5b50" stroke-width="3" fill="none"/><text x="80" y="198" text-anchor="middle" fill="#ffffffaa" font-family="Arial" font-size="11">${label}</text></svg>`);
+ const portraitA=svg('#6c513b','#d8a982','#3b2a23','#73373c','PREVIEW');
+ const portraitB=svg('#3b4654','#b98968','#1b1817','#4d674a','PREVIEW');
+ const portraitC=svg('#654247','#e0b08b','#5a3427','#334963','PREVIEW');
+ const portraitP=svg('#435345','#d2a17f','#33251f','#7a5d35','PLAYER');
+ const sec=(title,html,note='')=>`<section class="section"><h2>${title}</h2><div class="state-grid">${html}</div>${note?`<div class="note">${note}</div>`:''}</section>`;
+ let out='';
+ out+=sec('1 · Randomizer / Reveal Card',[
+ C.randomizer({room:'Portrait Gallery',name:'Avery Stone',image:portraitA,type:'contestant'}),
+ C.randomizer({room:'Strategy Chamber',name:'Player Morgan',image:portraitP,type:'player',copy:'A PATTC player waits across the strategy table.'}),
+ C.randomizer({room:'Masked Hall',type:'mask',roomClass:'csec-room--masked',copy:'The face remains hidden until the encounter allows it.'}),
+ C.randomizer({room:'Traitor Passage',type:'hidden',roomClass:'csec-room--traitor',copy:'Identity stays concealed.'}),
+ C.randomizer({room:"Host's Study",name:'The Host',type:'host',roomClass:'csec-room--host',copy:'The Host has called you in.'})
+ ].join(''),'Contestant/player/hidden/mask/host variants with room-aware accents and different name treatment.');
+ out+=sec('2 · Traitor Guess Candidate',[C.candidate({name:'Avery Stone',image:portraitA}),C.candidate({name:'Jordan Vale',image:portraitB,selected:true})].join(''),'Suspicion styling never implies the actual role.');
+ out+=sec('3 · Revealed Traitor',C.revealedTraitor({name:'Jordan Vale',image:portraitB}),'Visual state only; authorization remains outside this pack.');
+ out+=sec('4 · Masked Hall',[C.masked({revealed:false}),C.masked({revealed:true,name:'Casey North',image:portraitC})].join(''));
+ out+=sec('5 · Fate Cards','<div class="csec-fate">'+C.fate('murdered')+C.fate('spared')+'</div>');
+ out+=sec('6 · Murderer Card',C.murderer({targets:[{name:'Player Morgan',image:portraitP},{name:'Riley',image:portraitB}]}));
+ out+=sec('7 · Host Reward Envelopes',C.envelopes());
+ out+=sec('8 · Castle Five Ally',[C.ally({name:'Avery Stone',image:portraitA,encounters:3}),C.ally({name:'Jordan Vale',image:portraitB,encounters:2,eliminated:true})].join(''));
+ out+=sec('9 · Repeat Encounter History',[C.history({episode:'4',prediction:'Trust',decision:'Share clue',result:'Correct',points:'+3'}),C.history({episode:'6',prediction:'Distrust',decision:'Keep distance',result:'Wrong',points:'0'})].join(''));
+ out+=sec('10 · Decision Sealed',C.sealed({prediction:'Protect',decision:'Keep the alliance'}));
+ out+=sec('11 · Finale Encounter',C.finale({title:'One Last Door',copy:'The final choice is compact, dramatic, and still leaves the Throne Room visible.'}));
+ document.getElementById('gallery').innerHTML=out; document.getElementById('widthBadge').textContent=innerWidth+'px review';
+})();
+</script></body></html>
