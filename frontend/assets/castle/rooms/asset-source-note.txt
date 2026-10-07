@@ -1,0 +1,1 @@
+Approved Castle modern-room backdrop assets are committed as binary WebP files on this branch. This note is visual-asset scope only.
