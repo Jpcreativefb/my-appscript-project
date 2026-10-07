@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="Host amber gold portrait frame">
+<defs><linearGradient id="h" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0b5"/><stop offset=".26" stop-color="#d99a3a"/><stop offset=".7" stop-color="#8b5221"/><stop offset="1" stop-color="#f0c46d"/></linearGradient><radialGradient id="a"><stop offset="60%" stop-color="#9b591f" stop-opacity="0"/><stop offset="100%" stop-color="#7a3e17" stop-opacity=".34"/></radialGradient></defs>
+<rect x="5" y="5" width="350" height="470" rx="7" fill="none" stroke="#2a170b" stroke-width="10"/><rect x="10" y="10" width="340" height="460" rx="5" fill="none" stroke="url(#h)" stroke-width="4"/><rect width="360" height="480" rx="8" fill="url(#a)"/>
+<path d="M27 58V27h31M302 27h31v31" fill="none" stroke="#f2cc7a" stroke-width="3"/><path d="M142 448h76" stroke="#e5ad53" stroke-width="2"/><circle cx="180" cy="448" r="4" fill="#f1d38c"/></svg>

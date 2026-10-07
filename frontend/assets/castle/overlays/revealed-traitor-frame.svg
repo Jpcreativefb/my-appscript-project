@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="Revealed traitor portrait frame">
+<defs><linearGradient id="r" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4b050a"/><stop offset=".45" stop-color="#b42a37"/><stop offset="1" stop-color="#190305"/></linearGradient><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#070707" stop-opacity="0"/><stop offset="1" stop-color="#050203" stop-opacity=".9"/></linearGradient></defs>
+<rect x="5" y="5" width="350" height="470" rx="7" fill="none" stroke="#050506" stroke-width="11"/><rect x="11" y="11" width="338" height="458" rx="5" fill="none" stroke="url(#r)" stroke-width="4"/>
+<path d="M11 370h338v99H11z" fill="url(#b)"/><path d="M88 430h184" stroke="#b92d3b" stroke-width="1.5"/><text x="180" y="417" text-anchor="middle" font-family="Georgia,serif" font-size="20" fill="#f3d8d8" letter-spacing="1.1">Revealed Traitor</text>
+<path d="M26 52V26h26M308 26h26v26M26 428v26h26M308 454h26v-26" fill="none" stroke="#9e1c29" stroke-width="3"/></svg>

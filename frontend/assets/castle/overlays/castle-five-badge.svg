@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Castle Five ally badge">
+<defs><radialGradient id="m"><stop stop-color="#2d402c"/><stop offset="1" stop-color="#10170f"/></radialGradient><linearGradient id="r" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0d28a"/><stop offset="1" stop-color="#8e6a2b"/></linearGradient></defs>
+<circle cx="60" cy="60" r="52" fill="#080b08" fill-opacity=".85" stroke="url(#r)" stroke-width="5"/><circle cx="60" cy="60" r="43" fill="url(#m)" stroke="#e8d29b" stroke-opacity=".34"/>
+<path d="M38 72c8-15 16-23 22-31 7 8 15 16 22 31-8 8-15 12-22 12S46 80 38 72z" fill="none" stroke="#e2c579" stroke-width="4"/><path d="M47 61h26M60 47v29" stroke="#e2c579" stroke-width="3"/>
+<text x="60" y="103" text-anchor="middle" font-family="Georgia,serif" font-size="13" fill="#f5e4b6" letter-spacing="1.2">ALLY</text></svg>

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="Eliminated contestant muted overlay">
+<defs><filter id="mono"><feColorMatrix type="saturate" values="0"/></filter><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#202227" stop-opacity=".12"/><stop offset="1" stop-color="#0b0c0e" stop-opacity=".62"/></linearGradient></defs>
+<rect width="360" height="480" rx="8" fill="url(#fade)" opacity=".85"/><rect x="9" y="9" width="342" height="462" rx="6" fill="none" stroke="#9b9a94" stroke-opacity=".46" stroke-width="3"/>
+<path d="M50 421h260" stroke="#d0cec4" stroke-opacity=".45"/><text x="180" y="449" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="21" fill="#e2e0d7" opacity=".88">Eliminated</text></svg>

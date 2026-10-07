@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="Murder danger portrait overlay">
+<defs><radialGradient id="d"><stop offset="48%" stop-color="#000" stop-opacity="0"/><stop offset="82%" stop-color="#21090d" stop-opacity=".32"/><stop offset="100%" stop-color="#3b0710" stop-opacity=".7"/></radialGradient><linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8d1524" stop-opacity=".25"/><stop offset="1" stop-color="#d13445" stop-opacity=".82"/></linearGradient></defs>
+<rect width="360" height="480" rx="8" fill="url(#d)"/><rect x="8" y="8" width="344" height="464" rx="6" fill="none" stroke="url(#edge)" stroke-width="3"/>
+<path d="M42 427c38-14 76-20 114-17M318 427c-38-14-76-20-114-17" fill="none" stroke="#8e1724" stroke-opacity=".54" stroke-width="2"/><circle cx="180" cy="430" r="5" fill="#c12838" opacity=".72"/></svg>
