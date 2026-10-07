@@ -32,10 +32,14 @@ const context = {
     CASTLE_DUEL_STATE: null,
     castleR2SwipeStyles_: () => '',
     castleR2RoomHtml_: () => '',
-    castleR2SpinnerHtml_: () => ''
+    castleR2SpinnerHtml_: () => '',
+    matchMedia: () => ({ matches: false })
   },
+  Math,
   setInterval: () => 0,
-  clearInterval: () => {}
+  clearInterval: () => {},
+  setTimeout: () => 0,
+  clearTimeout: () => {}
 };
 vm.runInNewContext(presentation, context, { filename: presentationPath });
 roomKeys.forEach((key) => {
@@ -50,21 +54,61 @@ assert(presentation.includes('castle-mobile-random-card'), 'randomizer must rend
 assert(presentation.includes('castle-mobile-random-image'), 'randomizer must include portrait presentation');
 assert(presentation.includes('castle-mobile-random-copy'), 'randomizer must include styled name presentation');
 
+const profiles = context.window.CASTLE_MOBILE_REVEAL_PROFILES;
+const profileKeys = ['SLOW_CREEP','RAPID_SNAP','FALSE_STOP','HEARTBEAT','CHAOTIC_BURST'];
+profileKeys.forEach((key) => {
+  assert(profiles[key], 'reveal profile must exist: ' + key);
+  assert(Array.isArray(profiles[key].timings) && profiles[key].timings.length >= 6, key + ' must define a multi-step local timing sequence');
+});
+const timingSignatures = profileKeys.map((key) => profiles[key].timings.join(','));
+assert(new Set(timingSignatures).size === profileKeys.length, 'reveal profiles must use different timing sequences');
+assert(!timingSignatures.includes(Array(18).fill(90).join(',')), 'fixed 18 x 90ms cycle must not remain as a reveal profile');
+
 const spin = functionBody(presentation, 'castleMobileSpin_');
 assert(!spin.includes('castleCall_'), 'animation cycle must not make Castle API calls');
 assert(spin.includes('castleMobileCandidates_'), 'animation must use already-loaded candidates');
-assert(spin.includes('setInterval'), 'animation must cycle local cards');
+assert(spin.includes('castleMobileRevealProfile_'), 'animation must choose a presentation-only reveal profile');
+assert(spin.includes('setTimeout'), 'variable animation timing must be scheduled locally');
+assert(!spin.includes('setInterval(function(){'), 'spin must no longer rely on one fixed interval loop');
+assert(spin.includes("kind:m.kind||'TV'"), 'final card kind must come from sealed match m');
+assert(spin.includes('name:castleMobileName_(m)'), 'final card name must come from sealed match m');
+assert(spin.includes('imageUrl:castleMobileSafeImage_(m)'), 'final card portrait must come from sealed match m');
+assert(spin.indexOf('var profile=castleMobileRevealProfile_()') < spin.indexOf('var finalEntry={'), 'motion profile may only affect presentation before the sealed final card is constructed');
+
+assert(presentation.includes('CASTLE_MOBILE_PALETTES'), 'theme-aware Castle palette system must exist');
+roomKeys.forEach((key) => assert(presentation.includes(key+':['), 'palette mapping must include ' + key));
+assert(presentation.includes('castleMobilePalette_(theme,step)'), 'spinning cards must rotate theme-aware Castle accents');
+assert(presentation.includes('castle-final-slow-landing'), 'slow landing final effect must exist');
+assert(presentation.includes('castle-final-snap'), 'snap final effect must exist');
+assert(presentation.includes('castle-final-shadow-reveal'), 'shadow reveal final effect must exist');
+assert(presentation.includes('castle-final-door-slam'), 'door slam final effect must exist');
+
+assert(presentation.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'reduced-motion preference must be detected');
+assert(presentation.includes('@media(prefers-reduced-motion:reduce)'), 'reduced-motion CSS path must exist');
+assert(presentation.includes('CASTLE_MOBILE_REDUCED_PROFILE'), 'reduced-motion users must receive a short simple reveal profile');
 
 assert(presentation.includes('onerror="this.hidden=true;this.nextElementSibling.hidden=false"'), 'remote portrait errors must switch to intentional fallback');
+assert(presentation.includes('.castle-mobile-fallback-slot[hidden]{display:none!important}'), 'successful portrait must keep fallback slot hidden');
 assert(presentation.includes('castle-mobile-fallback--player'), 'human portrait fallback must exist');
 assert(presentation.includes('castle-mobile-fallback--mask'), 'masked fallback must exist');
 assert(presentation.includes('castle-mobile-fallback--shadow'), 'hidden Traitor fallback must exist');
+
+const portrait = functionBody(presentation, 'castleMobilePortrait_');
+assert(portrait.includes('class="castle-mobile-fallback-slot" hidden'), 'valid portrait markup must start with fallback hidden');
+assert(portrait.includes('this.hidden=true;this.nextElementSibling.hidden=false'), 'failed portrait must hide image and reveal fallback');
 
 const hidden = functionBody(presentation, 'castleMobileSafeImage_');
 assert(hidden.includes("if(castleMobileHiddenTraitor_(m))return '';"), 'hidden Traitor must never return a portrait URL');
 const candidates = functionBody(presentation, 'castleMobileCandidates_');
 assert(candidates.includes("if(castleMobileHiddenTraitor_(m))return [{kind:'MASK',name:'A Traitor',hiddenTraitor:true}];"), 'hidden Traitor animation must not preload identifying candidates');
 assert(!presentation.includes('data-traitor-id'), 'hidden identity must not be placed in data attributes');
+
+assert(!presentation.includes('The encounter is already sealed. The reveal uses only Castle state already loaded on this page.'), 'player copy must not expose implementation/debug language');
+assert(presentation.includes('The Castle has made its choice.'), 'atmospheric randomizer copy must exist');
+assert(presentation.includes('THE CASTLE IS WATCHING…'), 'atmospheric spin-button state must exist');
+assert(presentation.includes('THE DOOR IS OPENING…'), 'door-opening spin-button state must exist');
+assert(presentation.includes('WHO CAN YOU TRUST?'), 'trust spin-button state must exist');
+assert(presentation.includes('THE CASTLE HAS CHOSEN…'), 'final spin-button state must exist');
 
 ['strategy-chamber.svg','portrait-gallery.svg','masked-hall.svg','traitor-gallery.svg','murder-passage.svg','host-study.svg','throne-room.svg'].forEach((file) => {
   assert(fs.existsSync(path.join(root, 'frontend/assets/castle', file)), 'missing Castle room asset: ' + file);
