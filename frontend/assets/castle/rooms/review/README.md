@@ -1,0 +1,1 @@
+Open `castle-modern-room-contact-sheet.html` to review all seven approved modern-manor room backdrops together.
