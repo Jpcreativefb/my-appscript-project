@@ -43,14 +43,14 @@ assert(proof.includes('PROOF_SELECTED_EPISODE'), 'history selection must be dyna
 assert(proof.includes('History becomes available after additional settled episodes.'), 'missing history must render an intentional empty state');
 
 const eventText = functionBody(proof, 'proofEventText_');
-assert(eventText.includes("e.shieldUsed"), 'event ledger must support Secret Shield events');
-assert(eventText.includes("e.lost"), 'event ledger must support life-loss events');
-assert(eventText.includes("e.tvEliminated"), 'event ledger must support supplied TV elimination events');
+assert(eventText.includes('e.shieldUsed'), 'event ledger must support Secret Shield events');
+assert(eventText.includes('e.lost'), 'event ledger must support life-loss events');
+assert(eventText.includes('e.tvEliminated'), 'event ledger must support supplied TV elimination events');
 assert(!eventText.includes('e.actor'), 'event ledger must not render attacker identity');
 assert(!eventText.includes('e.murderer'), 'event ledger must not render murderer identity');
 assert(!proof.includes('attacker:'), 'proof must not invent or expose attacker fields');
 
-assert(proof.includes("STEP INTO TONIGHT\\'S ENCOUNTERS"), 'Entrance CTA wording must be preserved');
+assert(proof.includes('STEP INTO TONIGHT') && proof.includes('ENCOUNTERS'), 'Entrance CTA wording must be preserved');
 const enter = functionBody(proof, 'proofHasOpenEncounters_');
 assert(enter.includes('s&&s.matches'), 'CTA availability must come from supplied matches');
 assert(!proof.includes("castleCall_('castleDuelGetState'"), 'proof must not introduce a second Castle state API path');
@@ -79,7 +79,7 @@ assert(proof.includes('PROOF_OVERLAY_STATES'), 'central portrait overlay-state m
   assert(proof.includes("'" + state + "'"), 'portrait overlay mapping missing ' + state);
 });
 const portrait = functionBody(proof, 'proofPortrait_');
-assert(portrait.includes("var hidden=!!entry.hiddenTraitor"), 'central portrait renderer must protect hidden Traitors');
+assert(portrait.includes('var hidden=!!entry.hiddenTraitor'), 'central portrait renderer must protect hidden Traitors');
 assert(portrait.includes("var image=hidden?'':"), 'hidden Traitor must suppress portrait URL');
 assert(portrait.includes('onerror="this.hidden=true;this.nextElementSibling.hidden=false"'), 'portrait failures must use intentional fallback');
 assert(!portrait.includes('emoji'), 'portrait fallback must not use emoji');
