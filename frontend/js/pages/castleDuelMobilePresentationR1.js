@@ -312,3 +312,16 @@
     var attempts=0,installer=setInterval(function(){attempts+=1;if(castleMobileInstall_()||attempts>240)clearInterval(installer);},25);
   }
 })();
+
+(function castleMobileFinalGameplayProofLoader_(){
+  if(typeof document==='undefined'||typeof window==='undefined')return;
+  var enabled=false;
+  try{enabled=new URLSearchParams(window.location.search||'').get('castleProof')==='1';}catch(e){}
+  if(!enabled||window.CASTLE_DUEL_MOBILE_FINAL_GAMEPLAY_R1_LOADING)return;
+  window.CASTLE_DUEL_MOBILE_FINAL_GAMEPLAY_R1_LOADING=true;
+  var script=document.createElement('script');
+  script.src='./js/pages/castleDuelMobileFinalGameplayR1.js?v=castle-mobile-final-gameplay-r1';
+  script.async=true;
+  script.onerror=function(){window.CASTLE_DUEL_MOBILE_FINAL_GAMEPLAY_R1_LOADING=false;};
+  document.head.appendChild(script);
+})();
