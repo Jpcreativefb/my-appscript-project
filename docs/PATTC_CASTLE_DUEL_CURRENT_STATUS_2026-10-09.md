@@ -55,17 +55,15 @@ Branch:
 
 `feature/castle-presentation-proof-r1`
 
-The Director fast-forwarded this branch from stale `4b7c597...` to the accepted modern-room mobile baseline:
+The proof branch was brought forward to the accepted modern-room mobile baseline and is the integration/proof owner.
 
-`094888437ffff0528332b0420639c7c0d4b670e2`
-
-Assignment committed on that branch:
+Assignment:
 
 `docs/PATTC_CASTLE_MOBILE_FINAL_GAMEPLAY_INTEGRATION_R1.md`
 
 Owns the complete proof-mode mobile journey behind `?castleProof=1`:
 
-- new Grand Entrance / Previous Castle Reveal opening screen
+- Grand Entrance / Previous Castle Reveal opening screen
 - Castle Jackpot display
 - affected TV contestant/PATTC-player portraits
 - life-loss / murder / shield event ledger
@@ -77,45 +75,70 @@ Owns the complete proof-mode mobile journey behind `?castleProof=1`:
 - Final Three / Armory / Throne Room / Winner presentation shells using authorized supplied state
 - hooks for approved overlay and special-card packs
 
-Without `castleProof=1`, existing renderer must remain unchanged.
+Without `castleProof=1`, existing renderer remains unchanged.
 
-## Backdrop specialist — ACTIVE narrow continuation
+## Backdrop asset status — ACCEPTED / ALREADY DISTRIBUTED
 
-Branch:
+Source branch:
 
 `feature/castle-realistic-room-backdrops-r1`
 
-Approved existing room asset HEAD before continuation:
+Approved production asset commit:
 
 `3ec4591411cc37701af0f04181355ec41a6f1e40`
 
-Assignment committed:
+The seven approved WebP room assets are complete and were already transplanted/wired into the accepted mobile-presentation line. They are not waiting on another review pass.
 
-`docs/PATTC_CASTLE_GRAND_ENTRANCE_BACKDROP_R1.md`
+Accepted files:
 
-Owns exactly one new production asset:
+- `frontend/assets/castle/rooms/strategy-chamber-modern.webp`
+- `frontend/assets/castle/rooms/portrait-gallery-modern.webp`
+- `frontend/assets/castle/rooms/masked-hall-modern.webp`
+- `frontend/assets/castle/rooms/traitor-gallery-modern.webp`
+- `frontend/assets/castle/rooms/murder-passage-modern.webp`
+- `frontend/assets/castle/rooms/host-study-modern.webp`
+- `frontend/assets/castle/rooms/throne-room-modern.webp`
+
+The accepted mobile-presentation branch at `094888437ffff0528332b0420639c7c0d4b670e2` references those exact modern WebPs in the room registry.
+
+Do NOT ask the backdrop specialist to recreate or recommit these seven rooms.
+
+The only new backdrop request is the separately assigned **Grand Entrance** asset for the new Previous Castle Reveal opening screen:
 
 `frontend/assets/castle/rooms/grand-entrance-modern.webp`
 
-Modern luxury-manor foyer/entrance, portrait/mobile geometry consistent with the existing room pack.
+That new asset is additive and is not a correction to the approved seven-room pack.
 
-## Overlay specialist — ACTIVE narrow finalization
+## Overlay asset status — ACCEPTED FOR PROOF INTEGRATION
 
-Branch:
+Source branch:
 
 `feature/castle-image-overlays-r1`
 
-Verified asset HEAD before continuation:
+Production asset commit:
 
 `ca6325b5712d0b5e2a465169a3e88a798aa6c09e`
 
-Director verified actual production SVGs are already present on this branch, including `portrait-normal.svg` and `portrait-hidden-traitor.svg`, using shared 320×420 / `0 0 320 420` geometry.
+The Director verified the actual reusable production SVG files are present. The main portrait assets use shared `320×420` / `viewBox="0 0 320 420"` geometry, and the hidden-Traitor overlay is generic/non-identifying.
 
-Assignment committed:
+Main assets accepted for proof use:
 
-`docs/PATTC_CASTLE_OVERLAY_FINAL_HANDOFF_R1.md`
+- `portrait-normal.svg`
+- `portrait-pattc-player.svg`
+- `portrait-castle-five.svg`
+- `portrait-suspect.svg`
+- `portrait-hidden-traitor.svg`
+- `portrait-revealed-traitor.svg`
+- `portrait-eliminated.svg`
+- `portrait-shield.svg`
+- `portrait-murder-danger.svg`
+- `portrait-host.svg`
 
-Do not rebuild the overlay pack. Remaining work is geometry/privacy verification, review/contact sheet, 360/390/430 review, and final branch handoff.
+The source branch also contains reusable supporting overlay/badge assets and `review-gallery.svg`.
+
+Do NOT ask the overlay specialist to rebuild the production pack. Future overlay-specialist work, if any, is limited to refinements discovered by actual proof/mobile review.
+
+The approved main overlay assets have been selected for transplant into `feature/castle-presentation-proof-r1` so the Mobile specialist can wire them into real proof-mode gameplay.
 
 ## Special Encounter Card specialist — ACTIVE R2 continuation
 
@@ -123,57 +146,20 @@ Branch:
 
 `feature/castle-special-card-pack-r1`
 
-Prior branch HEAD before R2 continuation:
+Owns actual reusable presentation components/assets for Traitor Guess, Fate, Masked Hall, Host envelopes, Murderer, Decision Sealed, Final Three, Armory and Winner/Jackpot presentation, while obeying the locked R2 gameplay contract.
 
-`343530bd8455600a506310e44d21a371964b8c9b`
+No backend/scoring/routing changes.
 
-Assignment committed:
+## Director integration order
 
-`docs/PATTC_CASTLE_SPECIAL_CARD_PACK_R2_ASSIGNMENT.md`
-
-Owns actual reusable presentation components/assets for:
-
-- Traitor Guess
-- Fate
-- Masked Hall
-- Masked Faithful/Traitor transition
-- Host envelopes/reveals
-- Murderer Card / target selection
-- Human encounter presentation hook
-- randomizer visual skin
-- Decision Sealed
-- Final Three intro
-- Finale Armory
-- Winner / Jackpot reveal
-
-No backend/gameplay/routing changes.
-
-## Existing mobile presentation baseline
-
-`feature/castle-mobile-presentation-r1`
-
-Current verified remote HEAD:
-
-`094888437ffff0528332b0420639c7c0d4b670e2`
-
-This includes the approved modern room assets and room-registry wiring. It remains the protected known-good mobile presentation source while richer final integration happens in proof mode.
-
-## Production state
-
-Castle remains isolated from live PATTC production.
+1. Keep the accepted seven modern room backdrops as-is.
+2. Use the accepted portrait overlay SVG pack in proof mode; do not restart overlay creation.
+3. Receive the one new Grand Entrance backdrop.
+4. Receive the Special Encounter Card R2 component pack.
+5. Receive Rules Alignment R2 backend/test handoff.
+6. Assemble/review all pieces in `feature/castle-presentation-proof-r1` with real TEST state.
+7. Run mobile live review at 360/390/430.
+8. Run complete Castle season E2E/privacy gate.
+9. Only after acceptance plan transplant to the then-current PATTC Director baseline.
 
 Do not merge/deploy specialist branches directly to production.
-
-Do not deploy Apps Script or Cloudflare production during these specialist phases.
-
-## Director next actions
-
-1. Receive Rules Alignment specialist handoff and review actual backend/tests against R2.
-2. Receive Grand Entrance backdrop asset.
-3. Receive Overlay final review/handoff.
-4. Receive Special Card Pack R2 handoff.
-5. Receive Mobile Final Gameplay proof handoff/screenshots.
-6. Transplant only accepted assets/components into the proof branch as needed; do not wholesale-merge specialist branches.
-7. Run combined Castle focused tests and live TEST proof review at 360/390/430.
-8. Only after the full mobile journey and R2 engine align, run the full-season E2E/survival gate.
-9. Castle does not move toward PATTC production until the Director accepts those gates.
