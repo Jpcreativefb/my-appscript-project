@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Castle Special Card Pack R2 Review</title><script src="../../../../js/pages/castleDuelSpecialCardsR1.js"></script><style>html,body{margin:0;background:#0c0a0b;color:#eee}body{font-family:Arial,sans-serif}.review{width:min(100%,430px);margin:auto;padding:12px 10px 50px;background:linear-gradient(#171214,#090809);min-height:100vh}.head h1{font:600 27px/1 Georgia,serif;margin:5px 0}.head p,.note{font-size:11px;color:#bbae99;line-height:1.4}.sec{margin:18px 0}.sec>h2{font:700 10px/1 Arial;letter-spacing:.15em;text-transform:uppercase;color:#cbb581;margin:0 0 7px}.stack{display:grid;gap:9px}</style></head><body><main class="review csp2-root"><header class="head"><div class="csp2-kicker">PATTC Castle Duel · R2 Production Component Review</div><h1>Special Encounter Card Pack</h1><p>Presentation-only fixtures. No live Castle state, gameplay decisions, scoring, routing, or sealed-result authority.</p></header><div id="gallery"></div></main><script>
+(function(){const C=window.CastleSpecialEncounterCardsR2;document.head.insertAdjacentHTML('beforeend','<style>'+C.style+'</style>');
+const svg=(bg,label)=>'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200"><rect width="160" height="200" fill="${bg}"/><circle cx="80" cy="67" r="35" fill="#c99a78"/><path d="M40 66q8-48 40-48t40 48q-15-18-40-18T40 66" fill="#32251f"/><path d="M26 200q8-67 54-67t54 67" fill="#4f3840"/><text x="80" y="188" text-anchor="middle" fill="#ffffffaa" font-size="10" font-family="Arial">${label}</text></svg>`);
+const A={id:'a',name:'Avery',image:svg('#5a4437','REVIEW')},B={id:'b',name:'Jordan',image:svg('#3d4857','REVIEW')},D={id:'d',name:'Casey',image:svg('#584047','REVIEW')},P={id:'p',name:'Player One',image:svg('#394c40','PLAYER')},Q={id:'q',name:'Player Two',image:svg('#4b3a52','PLAYER')},R={id:'r',name:'Player Three',image:svg('#354b54','PLAYER')};
+const sec=(t,h)=>`<section class="sec"><h2>${t}</h2><div class="stack">${h}</div></section>`;let out='';
+out+=sec('Traitor Guess · 2 candidates',C.traitorGuess({candidates:[A,B],selectedId:'b'}));
+out+=sec('Traitor Guess · 3 candidates',C.traitorGuess({candidates:[A,B,D]}));
+out+=sec('Correct Traitor Reveal',C.traitorReveal({traitor:B}));
+out+=sec('Single Known Traitor',C.singleTraitorFate());
+out+=sec('Fate · sealed / safe / murdered',C.fate({state:'sealed'})+C.fate({state:'safe'})+C.fate({state:'murdered'}));
+out+=sec('Masked Hall · intro',C.maskedIntro({wagerLabel:'25 Castle Bank'}));
+out+=sec('Masked · Faithful / Traitor',C.maskedFaithful({person:A})+C.maskedTraitor({traitor:B}));
+out+=sec('Host Envelopes',C.hostEnvelopes());
+out+=sec('Host Reveals',C.hostReveal({type:'GOLD',title:'GOLD',detail:'Castle Bank reward supplied by state.'})+C.hostReveal({type:'PROTECTION',title:'PROTECTION',detail:'Life Restored supplied by state.'})+C.hostReveal({type:'MERCY',title:'MERCY',detail:'Banish Pressure Cleared.'}));
+out+=sec('Murderer Card / Targets',C.murdererCard()+C.murderTargets({targets:[P,Q,R],selectedId:'q'}));
+out+=sec('Human Encounter',C.humanEncounter({player:P}));
+out+=sec('Randomizer Final Cards',C.randomizer({roomKey:'portrait',type:'contestant',card:A})+C.randomizer({roomKey:'strategy',type:'player',card:P})+C.randomizer({roomKey:'masked',type:'mask'})+C.randomizer({roomKey:'traitor',type:'hidden'})+C.randomizer({roomKey:'host',type:'host',card:{name:'The Host',image:svg('#3c2d22','HOST')}}));
+out+=sec('Decision Sealed',C.decisionSealed({prediction:'Cooperate',decision:'Betray'}));
+out+=sec('Final Three',C.finalThree({finalists:[P,Q,R],jackpotLabel:'$1,250 Castle Jackpot'}));
+out+=sec('Finale Armory',C.finaleArmory({items:[{key:'CLUE',costLabel:'1 Token',statusLabel:'Available',remainingLabel:'3'},{key:'DOUBLE',costLabel:'1 Token',statusLabel:'Purchased',remainingLabel:'2'},{key:'SHIELD',costLabel:'2 Tokens',statusLabel:'Unavailable',remainingLabel:'0',available:false},{key:'BANISH',costLabel:'1 Advantage',statusLabel:'Available',remainingLabel:'1'},{key:'RECRUIT',costLabel:'1 Advantage',statusLabel:'Purchased',remainingLabel:'0'}]}));
+out+=sec('Winner / Jackpot',C.winnerJackpot({winner:P,jackpotLabel:'$1,250 Castle Jackpot'}));document.getElementById('gallery').innerHTML=out;})();
+</script></body></html>
