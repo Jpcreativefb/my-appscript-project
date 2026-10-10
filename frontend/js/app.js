@@ -816,6 +816,7 @@ async function ensurePageModules_(page) {
     if (castleProof) {
       names.push(
         "castleDuelMobilePresentationR1",
+        "castleDuelSpecialCardsR1",
         "castleDuelMobileFinalGameplayR1"
       );
     }
