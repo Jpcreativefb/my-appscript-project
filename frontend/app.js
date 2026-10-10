@@ -803,7 +803,24 @@ function loadPageScript_(name) {
 }
 
 async function ensurePageModules_(page) {
-  const names = APP_PAGE_MODULES[pageModuleKey_(page)] || [];
+  const moduleKey = pageModuleKey_(page);
+  let names = (APP_PAGE_MODULES[moduleKey] || []).slice();
+
+  if (moduleKey === "castle-duel") {
+    let castleProof = false;
+    try {
+      castleProof =
+        new URLSearchParams(window.location.search || "").get("castleProof") === "1";
+    } catch (err) {}
+
+    if (castleProof) {
+      names.push(
+        "castleDuelMobilePresentationR1",
+        "castleDuelMobileFinalGameplayR1"
+      );
+    }
+  }
+
   if (!names.length) return;
 
   for (let index = 0; index < names.length; index += 1) {
