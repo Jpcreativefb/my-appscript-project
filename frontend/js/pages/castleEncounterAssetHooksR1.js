@@ -3,9 +3,10 @@
 
   var ROOM_ROOT='./assets/castle/rooms/';
   var OVERLAY_ROOT='./assets/castle/overlays/';
+  var SPECIAL_ROOT='./assets/castle/special/';
 
   var CASTLE_ENCOUNTER_REAL_ASSET_HOOKS_R1={
-    version:'r1-prepare-only',
+    version:'r1-integrated',
     sourceCheckpoints:{
       rooms:'02df8dd6ec4f5cc019ef1c583110ac3b39360a76',
       overlays:'23745a1a27d25b9330b4f58d3ac0b30a2ba140fb'
@@ -14,7 +15,7 @@
       'room backdrop',
       'dynamic portrait',
       'approved transparent overlay',
-      'physical encounter prop',
+      'approved physical prop',
       'live HTML labels/status/explanations',
       'controls'
     ],
@@ -41,13 +42,25 @@
       HOST:OVERLAY_ROOT+'portrait-host.svg'
     },
     props:{
-      REGULAR_HOST:null,
-      MASKED_OFFER:null,
-      MASKED_HOST:null,
-      MASKED_FAITHFUL:null,
-      MASKED_MURDERER:null,
-      MASKED_TRAITOR_FATE:null,
-      MURDER_TARGET:null
+      MASKED_HALL_MASK:SPECIAL_ROOT+'masked-hall-mask.svg',
+      MASKED_OFFER:SPECIAL_ROOT+'host-envelope-sealed.svg',
+      HOST_PROTECTION:SPECIAL_ROOT+'host-protection.svg',
+      HOST_BONUS:SPECIAL_ROOT+'host-gold.svg',
+      HOST_MERCY:SPECIAL_ROOT+'host-mercy.svg',
+      MURDERER_CARD:SPECIAL_ROOT+'murderer-card.svg',
+      FATE_SEALED:SPECIAL_ROOT+'fate-card-sealed.svg',
+      FATE_SAFE:SPECIAL_ROOT+'fate-card-safe.svg',
+      FATE_MURDERED:SPECIAL_ROOT+'fate-card-murdered.svg',
+      TRAITOR_CHOICE:SPECIAL_ROOT+'traitor-choice-frame.svg',
+      DAGGER:null,
+      POISON:null,
+      ROPE:null,
+      WRENCH:null,
+      MURDER_KEY:null,
+      CANDLESTICK:null,
+      TOASTER:null,
+      TECHNOLOGY_PHONE:null,
+      HOST_PORTRAIT_SOURCE:null
     }
   };
 
@@ -59,7 +72,7 @@
 
   function assetSlot_(slotKey,label){
     return '<div class="castle-encounter-prop-slot" data-prop-slot="'+esc_(slotKey)+'" aria-label="'+esc_(label)+'">'
-      +'<span class="castle-encounter-prop-slot__label">PRODUCTION ART SLOT</span>'
+      +'<span class="castle-encounter-prop-slot__label">PRODUCTION ART PENDING</span>'
       +'<span class="castle-encounter-prop-slot__name">'+esc_(label)+'</span>'
       +'</div>';
   }
@@ -70,9 +83,10 @@
     var overlayUrl=String(opts.overlayUrl||CASTLE_ENCOUNTER_REAL_ASSET_HOOKS_R1.overlays.NORMAL);
     var name=String(opts.name||'');
     var status=String(opts.status||'');
+    var pending=String(opts.pending||'PORTRAIT SOURCE PENDING');
     return '<figure class="castle-encounter-portrait-stack">'
       +'<div class="castle-encounter-portrait-stack__media">'
-      +(imageUrl?'<img class="castle-encounter-portrait-stack__portrait" src="'+esc_(imageUrl)+'" alt="'+esc_(name)+'">':'<div class="castle-encounter-portrait-stack__portrait castle-encounter-portrait-stack__portrait--empty" aria-hidden="true"></div>')
+      +(imageUrl?'<img class="castle-encounter-portrait-stack__portrait" src="'+esc_(imageUrl)+'" alt="'+esc_(name)+'">':'<div class="castle-encounter-portrait-stack__portrait castle-encounter-portrait-stack__portrait--empty"><span>'+esc_(pending)+'</span></div>')
       +'<img class="castle-encounter-portrait-stack__overlay" src="'+esc_(overlayUrl)+'" alt="" aria-hidden="true">'
       +'</div>'
       +'<figcaption class="castle-encounter-portrait-stack__caption">'
