@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="PATTC player Strategy Chamber portrait treatment">
+<defs><linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd58b"/><stop offset=".55" stop-color="#b57032"/><stop offset="1" stop-color="#efd28c"/></linearGradient><linearGradient id="name" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#2b1b0f" stop-opacity="0"/><stop offset=".2" stop-color="#2b1b0f" stop-opacity=".25"/><stop offset="1" stop-color="#1a0e08" stop-opacity=".88"/></linearGradient></defs>
+<rect x="6" y="6" width="348" height="468" rx="7" fill="none" stroke="#2c1b0d" stroke-width="10" stroke-opacity=".8"/><rect x="11" y="11" width="338" height="458" rx="5" fill="none" stroke="url(#edge)" stroke-width="3"/>
+<path d="M11 351h338v118H11z" fill="url(#name)"/><path d="M31 416h298" stroke="#f2c56f" stroke-opacity=".54"/><path d="M29 446h86M245 446h86" stroke="#d99a45" stroke-opacity=".5" stroke-width="2"/>
+<path d="M24 46V24h22M314 24h22v22" stroke="#f0c877" fill="none" stroke-width="2.5"/></svg>

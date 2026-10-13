@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="Normal contestant portrait gallery frame">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f0d58a"/><stop offset=".48" stop-color="#8d6a2d"/><stop offset="1" stop-color="#d8b764"/></linearGradient><radialGradient id="v"><stop offset="62%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#090705" stop-opacity=".36"/></radialGradient></defs>
+<rect x="5" y="5" width="350" height="470" rx="7" fill="none" stroke="#1d1710" stroke-opacity=".72" stroke-width="10"/>
+<rect x="10" y="10" width="340" height="460" rx="5" fill="none" stroke="url(#g)" stroke-width="2.5"/>
+<rect x="15" y="15" width="330" height="450" rx="4" fill="none" stroke="#fff0bc" stroke-opacity=".24"/>
+<rect width="360" height="480" rx="8" fill="url(#v)" pointer-events="none"/>
+<path d="M24 45V24h21M315 24h21v21M24 435v21h21M315 456h21v-21" fill="none" stroke="#ddb965" stroke-opacity=".72" stroke-width="2"/>
+</svg>
