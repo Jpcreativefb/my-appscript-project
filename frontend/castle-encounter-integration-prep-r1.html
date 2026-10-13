@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Castle Real-Asset Integration Prep R1</title>
+<style>
+:root{--gold:#d7b15c;--cream:#f6edd9;--line:rgba(215,177,92,.48);--panel:rgba(7,7,7,.76)}
+*{box-sizing:border-box;min-width:0}html,body{margin:0;background:#090909;color:var(--cream);font-family:Georgia,"Times New Roman",serif;overflow-x:hidden}body{padding:14px 0 28px}.phone{width:390px;max-width:100%;margin:0 auto}.intro{padding:0 10px 10px}.eyebrow{font:700 10px Arial,sans-serif;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}.intro h1{font-size:25px;margin:4px 0}.intro p,.copy{font:12px/1.45 Arial,sans-serif;color:#ddd}.encounter{position:relative;min-height:640px;margin:0 0 14px;background-position:center;background-size:cover;overflow:hidden;border-radius:2px;border:1px solid rgba(215,177,92,.28)}.encounter:before{content:'';position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.18),rgba(0,0,0,.76));pointer-events:none}.stack{position:relative;z-index:2;width:274px;margin:26px auto 4px}.portrait-media{position:relative;aspect-ratio:320/420}.portrait-source,.overlay{position:absolute;inset:0;width:100%;height:100%}.portrait-source{background:linear-gradient(160deg,#252525,#101010);display:grid;place-items:center;color:#aaa;font:700 12px Arial,sans-serif;text-align:center;padding:22px}.overlay{object-fit:contain;z-index:2;pointer-events:none}.identity{position:relative;z-index:3;text-align:center;margin-top:4px}.identity strong{display:block;font-size:18px}.identity span{display:block;font:10px Arial,sans-serif;color:#d7cfbf;margin-top:2px}.prop{position:relative;z-index:4;margin:9px 16px 0;min-height:90px;border:1px dashed rgba(215,177,92,.82);background:rgba(8,8,8,.72);display:grid;place-items:center;text-align:center;padding:10px}.prop b{display:block;font:700 9px Arial,sans-serif;letter-spacing:.14em;color:var(--gold);margin-bottom:4px}.prop span{font-size:14px}.content{position:relative;z-index:5;margin:9px 16px 16px;padding:10px;background:rgba(8,8,8,.76);border:1px solid var(--line);border-radius:2px}.content h2{font-size:20px;margin:2px 0 6px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.controls button{min-height:44px;border:1px solid var(--gold);background:#111;color:var(--cream);font:700 12px Arial,sans-serif;border-radius:2px}.flow{padding:8px 10px;margin:0 0 14px;border:1px solid rgba(215,177,92,.28);font:11px/1.5 Arial,sans-serif;color:#ddd}.flow strong{color:var(--gold)}
+@media(max-width:389px){body{padding-top:8px}.phone{width:100%}.stack{width:min(72vw,260px)}.encounter{min-height:620px}.content,.prop{margin-left:10px;margin-right:10px}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="intro"><div class="eyebrow">PATTC CASTLE · REAL-ASSET INTEGRATION R1</div><h1>Prepare-only layout review</h1><p>Approved rooms and overlays only. Portrait source stays interchangeable. Dashed areas are Director-controlled production-art slots, not substitute art.</p></div>
+  <div class="flow"><strong>MASKED FLOW:</strong> Masked Hall → wager/envelope acceptance → identity reveal → Host Study / Portrait Gallery / Murder Passage / Fate.</div>
+  <main id="review"></main>
+</div>
+<script src="./js/pages/castleEncounterAssetHooksR1.js"></script>
+<script>
+(function(){
+  var H=window.CASTLE_ENCOUNTER_REAL_ASSET_HOOKS_R1;
+  var rows=[
+    ['REGULAR_HOST','HOST','REGULAR_HOST','Regular Host','Host Study','Approved behavior remains unchanged.'],
+    ['MASKED_HALL','NORMAL','MASKED_OFFER','Masked Hall','Envelope / wager offer','All Masked encounters begin here.'],
+    ['MASKED_HOST','HOST','MASKED_HOST','Masked Host','Masked Host physical prop','Identity reveal branches into Host Study.'],
+    ['MASKED_FAITHFUL','CASTLE_FIVE','MASKED_FAITHFUL','Masked Faithful','Faithful physical prop','Identity reveal branches into Portrait Gallery.'],
+    ['MASKED_MURDERER','MURDER_DANGER','MASKED_MURDERER','Masked Murderer','Murderer physical prop','Identity reveal branches into Murder Passage.'],
+    ['MASKED_TRAITOR_FATE','HIDDEN_TRAITOR','MASKED_TRAITOR_FATE','Masked Traitor / Fate','Fate physical prop','Identity reveal branches into Fate in Murder Passage.'],
+    ['MURDER_TARGET','MURDER_DANGER','MURDER_TARGET','Murder Target','Target-selection physical prop','Dynamic eligible PATTC portrait remains interchangeable.']
+  ];
+  function esc(v){return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+  document.getElementById('review').innerHTML=rows.map(function(r){
+    return '<section class="encounter" data-room="'+r[0]+'" style="background-image:url(\''+H.rooms[r[0]]+'\')">'
+      +'<div class="stack"><div class="portrait-media"><div class="portrait-source">DYNAMIC TV CONTESTANT / PATTC USER PORTRAIT<br><br>SAME SOURCE PORTRAIT IN EVERY STATE</div><img class="overlay" src="'+H.overlays[r[1]]+'" alt=""></div><div class="identity"><strong>'+esc(r[3])+'</strong><span>LIVE HTML NAME / STATUS LAYER</span></div></div>'
+      +'<div class="prop"><div><b>AWAITING FINAL APPROVED PRODUCTION ART</b><span>'+esc(r[4])+'</span></div></div>'
+      +'<div class="content"><div class="eyebrow">PREPARE ONLY</div><h2>'+esc(r[3])+'</h2><div class="copy">'+esc(r[5])+' No backend, scoring, probabilities, secrecy, Lives, Banish or routing authority exists in this layout.</div><div class="controls"><button type="button">CONTROL A</button><button type="button">CONTROL B</button></div></div>'
+      +'</section>';
+  }).join('');
+})();
+</script>
+</body></html>
