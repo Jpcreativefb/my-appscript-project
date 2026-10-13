@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420" viewBox="0 0 320 420" role="img" aria-label="Non-Alliance Faithful">
+<defs>
+<linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d2a45b"/><stop offset=".38" stop-color="#6f4b24"/><stop offset=".7" stop-color="#b17a36"/><stop offset="1" stop-color="#3b2818"/></linearGradient>
+<filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity=".65"/></filter>
+</defs>
+<rect x="10" y="10" width="300" height="400" rx="8" fill="none" stroke="url(#bronze)" stroke-width="4"/>
+<rect x="16" y="16" width="288" height="388" rx="5" fill="none" stroke="#9b7a4d" stroke-opacity=".45" stroke-width="1.5"/>
+<circle cx="160" cy="332" r="44" fill="#111114" fill-opacity=".94" stroke="url(#bronze)" stroke-width="5" filter="url(#shadow)"/>
+<circle cx="160" cy="332" r="35" fill="#9b7a4d" fill-opacity=".18" stroke="#9b7a4d" stroke-width="1.5"/>
+<text x="160" y="340" text-anchor="middle" fill="#e4cfaa" font-family="Georgia,serif" font-size="15" font-weight="700">FAITHFUL</text>
+</svg>
