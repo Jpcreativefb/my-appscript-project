@@ -3,157 +3,157 @@
 <text x="24" y="42" fill="#e4c88d" font-family="Georgia,serif" font-size="28">PATTC Castle Production Art R3 — Exported Asset Contact Sheet</text>
 <text x="24" y="68" fill="#b6a27f" font-family="Arial,sans-serif" font-size="12">Each tile below references the actual runtime file committed in this production library.</text>
 <rect x="20" y="100" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-hall/masked-hall-entrance-hero.svg" x="38" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-hall/masked-hall-entrance-hero.svg" x="38" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="415" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-hall/masked-hall-entrance-hero.svg</text>
 <rect x="360" y="100" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-hall/sealed-wager-envelope.svg" x="378" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-hall/sealed-wager-envelope.svg" x="378" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="415" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-hall/sealed-wager-envelope.svg</text>
 <rect x="700" y="100" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-card-back.svg" x="718" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-card-back.svg" x="718" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="415" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-card-back.svg</text>
 <rect x="1040" y="100" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-life-shield.svg" x="1058" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-life-shield.svg" x="1058" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="415" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-life-shield.svg</text>
 <rect x="1380" y="100" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-big-bonus.svg" x="1398" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-big-bonus.svg" x="1398" y="116" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="415" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-big-bonus.svg</text>
 <rect x="20" y="460" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-banish-reduction.svg" x="38" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-banish-reduction.svg" x="38" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="775" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-banish-reduction.svg</text>
 <rect x="360" y="460" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-selected.svg" x="378" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-selected.svg" x="378" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="775" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-selected.svg</text>
 <rect x="700" y="460" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-unselected-faded.svg" x="718" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-unselected-faded.svg" x="718" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="775" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-unselected-faded.svg</text>
 <rect x="1040" y="460" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-final-reward.svg" x="1058" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-final-reward.svg" x="1058" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="775" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-final-reward.svg</text>
 <rect x="1380" y="460" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/host/host-teal-source.svg" x="1398" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/host/host-teal-source.svg" x="1398" y="476" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="775" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">host/host-teal-source.svg</text>
 <rect x="20" y="820" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-faithful/facedown-contestant-card.svg" x="38" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-faithful/facedown-contestant-card.svg" x="38" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="1135" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-faithful/facedown-contestant-card.svg</text>
 <rect x="360" y="820" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-faithful/faithful-non-alliance-badge.svg" x="378" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-faithful/faithful-non-alliance-badge.svg" x="378" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="1135" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-faithful/faithful-non-alliance-badge.svg</text>
 <rect x="700" y="820" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-faithful/wager-2x.svg" x="718" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-faithful/wager-2x.svg" x="718" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="1135" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-faithful/wager-2x.svg</text>
 <rect x="1040" y="820" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-faithful/wager-3x.svg" x="1058" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-faithful/wager-3x.svg" x="1058" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="1135" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-faithful/wager-3x.svg</text>
 <rect x="1380" y="820" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-faithful/wager-returned.svg" x="1398" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-faithful/wager-returned.svg" x="1398" y="836" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="1135" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-faithful/wager-returned.svg</text>
 <rect x="20" y="1180" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-sealed.svg" x="38" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-sealed.svg" x="38" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="1495" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-sealed.svg</text>
 <rect x="360" y="1180" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-dagger.svg" x="378" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-dagger.svg" x="378" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="1495" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-dagger.svg</text>
 <rect x="700" y="1180" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-poison.svg" x="718" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-poison.svg" x="718" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="1495" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-poison.svg</text>
 <rect x="1040" y="1180" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-rope.svg" x="1058" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-rope.svg" x="1058" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="1495" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-rope.svg</text>
 <rect x="1380" y="1180" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-wrench.svg" x="1398" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-wrench.svg" x="1398" y="1196" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="1495" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-wrench.svg</text>
 <rect x="20" y="1540" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-toaster.svg" x="38" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-toaster.svg" x="38" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="1855" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-toaster.svg</text>
 <rect x="360" y="1540" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-technology.svg" x="378" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-technology.svg" x="378" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="1855" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-technology.svg</text>
 <rect x="700" y="1540" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-safe.svg" x="718" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-safe.svg" x="718" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="1855" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-safe.svg</text>
 <rect x="1040" y="1540" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/cards/fate-safe-duck.svg" x="1058" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/cards/fate-safe-duck.svg" x="1058" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="1855" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/cards/fate-safe-duck.svg</text>
 <rect x="1380" y="1540" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/safe-lifesaver.svg" x="1398" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/safe-lifesaver.svg" x="1398" y="1556" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="1855" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/safe-lifesaver.svg</text>
 <rect x="20" y="1900" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/safe-duck.svg" x="38" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/safe-duck.svg" x="38" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="2215" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/safe-duck.svg</text>
 <rect x="360" y="1900" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/murdered.svg" x="378" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/murdered.svg" x="378" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="2215" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/murdered.svg</text>
 <rect x="700" y="1900" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/death-dagger.svg" x="718" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/death-dagger.svg" x="718" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="2215" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/death-dagger.svg</text>
 <rect x="1040" y="1900" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/death-poison.svg" x="1058" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/death-poison.svg" x="1058" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="2215" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/death-poison.svg</text>
 <rect x="1380" y="1900" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/death-rope.svg" x="1398" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/death-rope.svg" x="1398" y="1916" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="2215" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/death-rope.svg</text>
 <rect x="20" y="2260" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/death-wrench.svg" x="38" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/death-wrench.svg" x="38" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="2575" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/death-wrench.svg</text>
 <rect x="360" y="2260" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/death-toaster.svg" x="378" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/death-toaster.svg" x="378" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="2575" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/death-toaster.svg</text>
 <rect x="700" y="2260" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/fate/results/death-technology.svg" x="718" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/fate/results/death-technology.svg" x="718" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="2575" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">fate/results/death-technology.svg</text>
 <rect x="1040" y="2260" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-murderer/standard-murder.svg" x="1058" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-murderer/standard-murder.svg" x="1058" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="2575" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-murderer/standard-murder.svg</text>
 <rect x="1380" y="2260" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-murderer/weapon-match.svg" x="1398" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-murderer/weapon-match.svg" x="1398" y="2276" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="2575" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-murderer/weapon-match.svg</text>
 <rect x="20" y="2620" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-murderer/murder-key.svg" x="38" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-murderer/murder-key.svg" x="38" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="2935" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-murderer/murder-key.svg</text>
 <rect x="360" y="2620" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-murderer/murderer-card.svg" x="378" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-murderer/murderer-card.svg" x="378" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="2935" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-murderer/murderer-card.svg</text>
 <rect x="700" y="2620" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/masked-murderer/murder-confirmation.svg" x="718" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/masked-murderer/murder-confirmation.svg" x="718" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="2935" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">masked-murderer/murder-confirmation.svg</text>
 <rect x="1040" y="2620" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/murder-wheel-r3.svg" x="1058" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/murder-wheel-r3.svg" x="1058" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="2935" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/murder-wheel-r3.svg</text>
 <rect x="1380" y="2620" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/murder-wheel-pointer.svg" x="1398" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/murder-wheel-pointer.svg" x="1398" y="2636" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="2935" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/murder-wheel-pointer.svg</text>
 <rect x="20" y="2980" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/result-panel-shell.svg" x="38" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/result-panel-shell.svg" x="38" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="3295" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/result-panel-shell.svg</text>
 <rect x="360" y="2980" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/technology.svg" x="378" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/technology.svg" x="378" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="3295" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/technology.svg</text>
 <rect x="700" y="2980" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/dagger.svg" x="718" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/dagger.svg" x="718" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="3295" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/dagger.svg</text>
 <rect x="1040" y="2980" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/poison.svg" x="1058" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/poison.svg" x="1058" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="3295" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/poison.svg</text>
 <rect x="1380" y="2980" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/rope.svg" x="1398" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/rope.svg" x="1398" y="2996" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="3295" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/rope.svg</text>
 <rect x="20" y="3340" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/skull.svg" x="38" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/skull.svg" x="38" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="3655" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/skull.svg</text>
 <rect x="360" y="3340" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/wrench.svg" x="378" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/wrench.svg" x="378" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="374" y="3655" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/wrench.svg</text>
 <rect x="700" y="3340" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/toaster.svg" x="718" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/toaster.svg" x="718" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="714" y="3655" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/toaster.svg</text>
 <rect x="1040" y="3340" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/murderer-card.svg" x="1058" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/murderer-card.svg" x="1058" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1054" y="3655" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/murderer-card.svg</text>
 <rect x="1380" y="3340" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/murder-key.svg" x="1398" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/murder-key.svg" x="1398" y="3356" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="1394" y="3655" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/murder-key.svg</text>
 <rect x="20" y="3700" width="328" height="348" fill="#171619" stroke="#76552e"/>
-<image href="/frontend/assets/castle/production/murder-wheel/symbols/candlestick.svg" x="38" y="3716" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
+<image href="/assets/castle/production/murder-wheel/symbols/candlestick.svg" x="38" y="3716" width="292" height="275" preserveAspectRatio="xMidYMid meet"/>
 <text x="34" y="4015" fill="#eee2ca" font-family="Arial,sans-serif" font-size="10">murder-wheel/symbols/candlestick.svg</text>
 <text x="24" y="4085" fill="#e4c88d" font-family="Georgia,serif" font-size="17">Accepted portrait overlays copied unchanged</text>
 <text x="24" y="4109" fill="#c4b28f" font-family="Arial,sans-serif" font-size="11">portrait-host.svg • portrait-masked-faithful-selected.svg • portrait-unselected-faded.svg • portrait-castle-five.svg • portrait-alliance-new-member.svg • portrait-castle-five-welcome.svg • portrait-normal.svg • portrait-fate-traitor.svg • portrait-pattc-player.svg • portrait-murder-target.svg • portrait-murder-danger.svg</text>
