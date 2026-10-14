@@ -49,3 +49,14 @@
   if(typeof MutationObserver!=='undefined')new MutationObserver(inject).observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',inject);else setTimeout(inject,0);
 })(window);
+
+/* R2 Admin sports organization is presentation/routing only and is intentionally
+ * loaded outside the page-module map so it can reorganize both Admin and Manage Games. */
+(function(){
+  if(document.querySelector('script[data-pattc-admin-sports-r2]'))return;
+  var script=document.createElement('script');
+  script.src='./js/adminSportsGameOrganizationR2.js?release=admin-sports-game-organization-r2';
+  script.async=false;
+  script.setAttribute('data-pattc-admin-sports-r2','1');
+  document.head.appendChild(script);
+})();
