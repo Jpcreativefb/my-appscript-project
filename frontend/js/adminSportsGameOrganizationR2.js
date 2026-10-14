@@ -11,6 +11,12 @@
       return String(button.getAttribute('onclick')||'').indexOf(fragment)!==-1;
     })||null;
   }
+  function buttonIn_(host,fragment){
+    if(!host)return null;
+    return Array.prototype.find.call(host.querySelectorAll('button[onclick]'),function(button){
+      return String(button.getAttribute('onclick')||'').indexOf(fragment)!==-1;
+    })||null;
+  }
   function targetLabel_(target){
     return ({
       confidence:'Confidence',
@@ -67,8 +73,8 @@
     if(!sportsRow) return;
 
     var oldActions=guide.querySelector('[data-admin-games-design-team-fantasy="1"]');
-    var teamFantasyButton=oldActions&&buttonByOnclick_("navigate('admin-team-fantasy')");
-    var sharedGamesButton=oldActions&&buttonByOnclick_("navigate('admin-games')");
+    var teamFantasyButton=buttonIn_(oldActions,"navigate('admin-team-fantasy')");
+    var sharedGamesButton=buttonIn_(oldActions,"navigate('admin-games')");
     var holder=document.createElement('div');
     holder.innerHTML=sportsMarkup_();
     var sports=holder.firstElementChild;
