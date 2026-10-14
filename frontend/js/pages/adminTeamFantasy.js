@@ -19,16 +19,9 @@ function adminTfEscape_(value) {
 }
 
 function teamFantasyEnhanceAdminLanding_() {
-  if (document.getElementById('teamFantasyAdminLauncher')) return;
-  const root = document.getElementById('app') || document.querySelector('.admin-page') || document.body;
-  if (!root) return;
-  const card = document.createElement('div');
-  card.id = 'teamFantasyAdminLauncher';
-  card.className = 'card tf-admin-launcher';
-  card.innerHTML = `
-    <div><strong>🏈 Team Fantasy Football</strong><div class="tf-muted">NFL team-unit lineups, leagues, scoring, reminders and playoffs.</div></div>
-    <button class="tf-button" onclick="navigate('admin-team-fantasy')">Open Team Fantasy</button>`;
-  root.appendChild(card);
+  // Games & Design owns the single Team Fantasy Admin entry in R1.
+  const legacy = document.getElementById('teamFantasyAdminLauncher');
+  if (legacy) legacy.remove();
 }
 
 function adminTfValue_(id) {
@@ -113,6 +106,15 @@ async function adminTfGetGames_() {
   return { response: res, games: games.filter(function(game){ return String(game.type || game.gameType || '').toLowerCase() === 'team-fantasy'; }) };
 }
 
+function adminTfGamesDesignBreadcrumb_(seasonYear) {
+  const season = adminTfEscape_(seasonYear || '2026');
+  return `<nav class="tf-admin-breadcrumbs" aria-label="Admin breadcrumb"><button type="button" class="tf-button secondary" onclick="navigate('admin')">Admin</button><span>→</span><button type="button" class="tf-button secondary" onclick="navigate('admin')">Games &amp; Design</button><span>→ Sports → NFL → ${season} → </span><strong>Team Fantasy Football</strong></nav>`;
+}
+
+function adminTfBackToGamesDesign_(seasonYear) {
+  navigate('admin');
+}
+
 async function renderAdminTeamFantasyPage() {
   if (typeof setPageLoadStep === 'function') setPageLoadStep(48, 'Loading Team Fantasy admin…');
   const found = await adminTfGetGames_();
@@ -120,7 +122,7 @@ async function renderAdminTeamFantasyPage() {
   if (!found.games.length) {
     return `
       <div class="page tf-admin-page">
-        <div class="tf-admin-header"><div><h1>Team Fantasy Football</h1><p>Create the season game first, then return here.</p></div><button class="tf-button secondary" onclick="navigate('admin')">Back</button></div>
+        ${adminTfGamesDesignBreadcrumb_("2026")}<div class="tf-admin-header"><div><h1>Team Fantasy Football</h1><p>Create the season game first in Games &amp; Design, then return here.</p></div><button class="tf-button secondary" onclick="adminTfBackToGamesDesign_('2026')">← Back to NFL 2026 Games</button></div>
         <div class="card"><h2>No Team Fantasy game yet</h2><p>Open <strong>Manage Games</strong>, create a game with type <strong>Team Fantasy Football</strong>, then open this manager again.</p><button class="tf-button" onclick="navigate('admin-games')">Open Manage Games</button></div>
       </div>`;
   }
@@ -137,9 +139,10 @@ async function renderAdminTeamFantasyPage() {
   const standings = dash.standings && Array.isArray(dash.standings.rows) ? dash.standings.rows : [];
   return `
     <div class="page tf-admin-page">
+      ${adminTfGamesDesignBreadcrumb_(s.seasonYear || game.year || "2026")}
       <div class="tf-admin-header">
-        <div><div class="tf-eyebrow">ADMIN</div><h1>Team Fantasy Football</h1><p>One entry can participate in the Complete League plus multiple subleagues without making duplicate picks.</p></div>
-        <button class="tf-button secondary" onclick="navigate('admin')">Back to Admin</button>
+        <div><div class="tf-eyebrow">GAMES &amp; DESIGN · SPORTS · NFL · ${adminTfEscape_(s.seasonYear || game.year || "2026")}</div><h1>Team Fantasy Football</h1><p>This is the one authoritative Team Fantasy-specific configuration manager. Shared game identity/status/display settings remain in Manage Games.</p></div>
+        <button class="tf-button secondary" onclick="adminTfBackToGamesDesign_(s.seasonYear || game.year || '2026')">← Back to NFL ${adminTfEscape_(s.seasonYear || game.year || "2026")} Games</button>
       </div>
       <div id="adminTfStatus" class="tf-status" aria-live="polite"></div>
       <section class="card">
