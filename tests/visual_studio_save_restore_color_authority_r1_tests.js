@@ -236,7 +236,7 @@ function sourceContractTest() {
     'runtime paint ownership must not depend on a restore/revert action');
   assert(source.includes("paintAllowed(node, k)"),
     'renderer must honor runtime paint authority');
-  assert(source.includes('paintAllowed(node,property)===false'),
+  assert(/paintAllowed\(node,\s*property\)\s*===\s*false/.test(source),
     'Original mode must not bypass runtime paint authority');
   assert(source.includes("paintAllowed(header, 'background-color')"),
     'section/collapse header paint must honor runtime authority');
