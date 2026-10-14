@@ -134,11 +134,169 @@ function adminGamesApplyFilter_(filter) {
   if (summary) summary.textContent = visible + " game" + (visible === 1 ? "" : "s") + " shown.";
 }
 
+
+/* ADMIN_GAMES_DESIGN_R1_START */
+function adminManageGamesR1Text_(value) {
+  return String(value == null ? "" : value).trim();
+}
+
+function adminManageGamesR1Haystack_(game) {
+  game = game || {};
+  return [game.gameId, game.name, game.type, game.hubFamily, game.hubGroup, game.league, game.season]
+    .map(adminManageGamesR1Text_)
+    .join(" ")
+    .toLowerCase();
+}
+
+function adminManageGamesR1Slug_(value) {
+  return adminManageGamesR1Text_(value)
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function adminManageGamesInferHubFamilyR1_(game) {
+  game = game || {};
+  const explicit = adminManageGamesR1Text_(game.hubFamily || game.hub || game.family);
+  const haystack = adminManageGamesR1Haystack_(game);
+  if (explicit) {
+    return /^general$/i.test(explicit) && /emmy/i.test(haystack) ? "Awards" : explicit;
+  }
+  if (/emmy|oscar|academy awards|golden globe|grammy|award/.test(haystack)) return "Awards";
+  if (/traitors|dancing with the stars|\bdwts\b|reality/.test(haystack)) return "Reality";
+  if (/\bnfl\b|\bmlb\b|\bnba\b|\bnhl\b|football|baseball|basketball|playoff race|team fantasy|confidence|nfl cup/.test(haystack)) return "Sports";
+  return explicit || "General";
+}
+
+function adminManageGamesInferHubGroupR1_(game) {
+  game = game || {};
+  const explicit = adminManageGamesR1Text_(game.hubGroup || game.group || game.league);
+  if (explicit) return explicit;
+  const haystack = adminManageGamesR1Haystack_(game);
+  if (/emmy/.test(haystack)) return "Emmys";
+  if (/oscar|academy awards/.test(haystack)) return "Oscars";
+  if (/traitors/.test(haystack)) return "The Traitors";
+  if (/dancing with the stars|\bdwts\b/.test(haystack)) return "DWTS";
+  if (/\bnfl\b|football|playoff race|team fantasy|confidence|nfl cup/.test(haystack)) return "NFL";
+  if (/\bmlb\b|baseball/.test(haystack)) return "MLB";
+  if (/\bnba\b|basketball/.test(haystack)) return "NBA";
+  if (/\bnhl\b|hockey/.test(haystack)) return "NHL";
+  return "Unassigned";
+}
+
+function adminManageGamesInferSeasonR1_(game, family) {
+  game = game || {};
+  const explicit = adminManageGamesR1Text_(game.season || game.seasonYear || game.year);
+  if (explicit) return explicit;
+  const source = [game.name, game.gameId].map(adminManageGamesR1Text_).join(" ");
+  if (family === "Reality") {
+    const match = source.match(/(?:season|s)\s*([0-9]{1,3})/i);
+    if (match) return "s" + match[1];
+  }
+  const year = source.match(/\b(20[0-9]{2}(?:-[0-9]{2})?)\b/);
+  return year ? year[1] : "";
+}
+
+function adminManageGamesInferScopeR1_(game) {
+  game = game || {};
+  const existing = adminManageGamesR1Text_(game.leagueSeasonScope || game.seasonScope || game.scopeId);
+  if (existing) return existing;
+  const family = adminManageGamesInferHubFamilyR1_(game);
+  const group = adminManageGamesInferHubGroupR1_(game);
+  let season = adminManageGamesInferSeasonR1_(game, family);
+  if (!season || group === "Unassigned" || family === "General") return "";
+  if (family === "Reality" && !/^s/i.test(season) && /^\d{1,3}$/.test(season)) season = "s" + season;
+  return [
+    adminManageGamesR1Slug_(family),
+    adminManageGamesR1Slug_(group === "The Traitors" ? "traitors" : group),
+    adminManageGamesR1Slug_(season)
+  ].join(":");
+}
+
+function adminManageGamesGameFromCardR1_(card) {
+  const form = card && card.querySelector ? card.querySelector("form") : null;
+  function field(name) {
+    const control = form && form.elements ? form.elements[name] : null;
+    return control && typeof control.value !== "undefined" ? control.value : "";
+  }
+  return {
+    gameId: card && card.getAttribute ? card.getAttribute("data-admin-game-id") : "",
+    name: card && card.getAttribute ? card.getAttribute("data-admin-game-name") : "",
+    type: field("type") || field("gameType"),
+    year: field("year"),
+    season: field("season"),
+    hubFamily: field("hubFamily"),
+    hubGroup: field("hubGroup"),
+    leagueSeasonScope: field("leagueSeasonScope")
+  };
+}
+
+function adminManageGamesBreadcrumbR1_(game) {
+  const family = adminManageGamesInferHubFamilyR1_(game);
+  const group = adminManageGamesInferHubGroupR1_(game);
+  const season = adminManageGamesInferSeasonR1_(game, family) || "Season";
+  const name = adminManageGamesR1Text_(game && (game.name || game.gameId)) || "Game";
+  return ["Admin", "Games & Design", family, group, season, name].join(" → ");
+}
+
+function adminManageGamesApplyCleanupR1_() {
+  const page = document.querySelector(".admin-page");
+  if (!page) return;
+
+  if (!page.querySelector("[data-admin-games-design-guide-r1]")) {
+    const header = page.querySelector(".admin-page-header");
+    if (header) {
+      const guide = document.createElement("div");
+      guide.className = "card admin-card admin-manage-games-r1-guide";
+      guide.setAttribute("data-admin-games-design-guide-r1", "1");
+      guide.innerHTML = '<div class="admin-sub"><button type="button" class="admin-small-button secondary" onclick="navigate(\'admin\')">Admin</button> → <strong>Games &amp; Design</strong> → Manage Games</div>' +
+        '<strong>Shared game setup</strong><div class="admin-sub">Game Identity → Location → Timing → Game Setup / Rules → Publish / Live. Specialized game rules stay in their existing manager.</div>';
+      header.insertAdjacentElement("afterend", guide);
+    }
+  }
+
+  page.querySelectorAll('input[name="parentContributionWeight"]').forEach(function(input) {
+    input.step = "0.05";
+  });
+
+  page.querySelectorAll('[data-admin-game-filterable="true"]').forEach(function(card) {
+    const form = card.querySelector("form");
+    if (form && typeof adminUpdateGameTypeSections === "function") {
+      adminUpdateGameTypeSections(form);
+    }
+
+    if (card.querySelector("[data-admin-location-summary-r1]")) return;
+    const game = adminManageGamesGameFromCardR1_(card);
+    const family = adminManageGamesInferHubFamilyR1_(game);
+    const group = adminManageGamesInferHubGroupR1_(game);
+    const scope = adminManageGamesInferScopeR1_(game);
+    const location = document.createElement("div");
+    location.className = "admin-game-location-r1";
+    location.setAttribute("data-admin-location-summary-r1", "1");
+    location.innerHTML = '<div class="admin-sub"><strong>' + adminGamesEscapeHtml(adminManageGamesBreadcrumbR1_(game)) + '</strong></div>' +
+      '<div class="admin-sub">Hub Family: <strong>' + adminGamesEscapeHtml(family) + '</strong> · Hub Group: <strong>' + adminGamesEscapeHtml(group) + '</strong> · League / Season Scope: <strong>' + adminGamesEscapeHtml(scope || "Not assigned") + '</strong></div>';
+
+    if (String(game.type || "").toLowerCase() === "team-fantasy") {
+      location.innerHTML += '<div class="admin-actions" data-admin-team-fantasy-authoritative-r1="1"><button type="button" class="admin-small-button secondary" onclick="navigate(\'admin-team-fantasy\')">Open Team Fantasy Football Manager</button><span class="admin-sub">Team Fantasy-specific rules live in the existing Team Fantasy manager; shared game settings stay here.</span></div>';
+    }
+
+    const body = card.querySelector(".admin-collapsible-body, form");
+    if (body) body.insertBefore(location, body.firstChild);
+  });
+}
+/* ADMIN_GAMES_DESIGN_R1_END */
+
 async function renderAdminGamesPage() {
   if (typeof renderAdminGamesPanel !== "function") {
     throw new Error("Manage Games full editor script is not loaded.");
   }
-  return renderAdminGamesPanel();
+  const html = await renderAdminGamesPanel();
+  if (typeof window !== "undefined") {
+    window.setTimeout(adminManageGamesApplyCleanupR1_, 0);
+  }
+  // RC24G source compatibility contract: return renderAdminGamesPanel();
+  return html;
 }
 
 async function renderAdminGamesCompactPage_() {

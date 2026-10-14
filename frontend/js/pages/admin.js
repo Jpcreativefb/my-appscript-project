@@ -53,10 +53,27 @@ async function renderAdminPage() {
 
         <details class="card admin-card admin-collapsible-card" open>
           <summary class="admin-card-summary">
-            <div><h2>🎮 Games & Design</h2><div class="admin-sub">Create, configure, test, style and launch games.</div></div>
+            <div><h2>🎮 Games & Design</h2><div class="admin-sub">Create and configure games, seasons, hubs, game-specific rules, and player presentation. Specialized managers such as Team Fantasy are opened from here.</div></div>
             <span class="admin-collapse-icon">▾</span>
           </summary>
           <div class="admin-collapsible-body">
+            <div class="admin-category-card" data-admin-games-design-r1="1">
+              <div class="admin-sub"><strong>Admin → Games &amp; Design</strong></div>
+              <div class="admin-sub">Choose the primary Hub → League → Season → Game. One authoritative game record may gain additional placements later; R1 does not duplicate game rows or migrate schema.</div>
+              <div class="admin-list" style="margin-top:10px;">
+                <div class="admin-list-row"><div><strong>Sports → NFL → 2026</strong><div class="admin-sub">Confidence, Survivor, Team Fantasy Football, Playoff Race, and NFL Cup belong here.</div></div></div>
+                <div class="admin-actions" data-admin-games-design-team-fantasy="1">
+                  <button class="button admin-button" onclick="navigate('admin-team-fantasy')">Team Fantasy Football</button>
+                  <button class="button admin-button secondary" onclick="navigate('admin-games')">NFL 2026 Shared Game Settings</button>
+                </div>
+                <div class="admin-list-row"><div><strong>Reality</strong><div class="admin-sub">Show/season managers such as The Traitors and DWTS remain in the existing Reality TV Manager.</div></div></div>
+                <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager. Emmys belongs under Awards, not General.</div></div></div>
+              </div>
+            </div>
+            <div class="admin-category-card">
+              <strong>Appearance</strong><div class="admin-sub">Manage colors, icons, labels, navigation appearance, and branding. Gameplay rules do not belong here.</div>
+              <strong style="display:block;margin-top:8px;">Visual Studio</strong><div class="admin-sub">Manage page layout, spacing, sizing, and positioning. Appearance-owned styling remains under Appearance Manager.</div>
+            </div>
             <div class="admin-actions">
               <button class="button admin-button" onclick="navigate('admin-games')">Manage Games & Templates</button>
               <button class="button admin-button secondary" onclick="navigate('admin-appearance')">Appearance Manager</button>
@@ -72,7 +89,7 @@ async function renderAdminPage() {
 
         <details class="card admin-card admin-collapsible-card">
           <summary class="admin-card-summary">
-            <div><h2>🏆 Results & Scoring</h2><div class="admin-sub">Approve external results or open manual result controls only when needed.</div></div>
+            <div><h2>🏆 Results & Scoring</h2><div class="admin-sub">Review, validate, approve, or manually enter results. Game setup and game-specific rules belong in Games & Design.</div></div>
             <span class="admin-collapse-icon">▾</span>
           </summary>
           <div class="admin-collapsible-body">
@@ -94,7 +111,7 @@ async function renderAdminPage() {
 
         <details class="card admin-card admin-collapsible-card">
           <summary class="admin-card-summary">
-            <div><h2>👥 Players & Leagues</h2><div class="admin-sub">Manage players, admins, access and private leagues.</div></div>
+            <div><h2>👥 Players & Leagues</h2><div class="admin-sub">Manage users, administrators, league membership, season access, and player participation. Game rules remain in Games & Design.</div></div>
             <span class="admin-collapse-icon">▾</span>
           </summary>
           <div class="admin-collapsible-body">
@@ -108,7 +125,7 @@ async function renderAdminPage() {
 
         <details class="card admin-card admin-collapsible-card" id="adminSystemHealthSection">
           <summary class="admin-card-summary">
-            <div><h2>⚙️ System & Automation</h2><div class="admin-sub">Trigger usage, automation health, storage and caches.</div></div>
+            <div><h2>⚙️ System & Automation</h2><div class="admin-sub">Review automation health, trigger status, schedules, service health, and operational diagnostics. Game-specific settings stay with their game manager.</div></div>
             <span class="admin-collapse-icon">▾</span>
           </summary>
           <div class="admin-collapsible-body">
@@ -119,6 +136,23 @@ async function renderAdminPage() {
             </div>
             <div id="adminAutomationHealth" class="admin-storage-health"></div>
             <div id="adminStorageHealth" class="admin-storage-health"></div>
+          </div>
+        </details>
+
+        <details class="card admin-card admin-collapsible-card" data-admin-system-data-tools-r1="1">
+          <summary class="admin-card-summary">
+            <div><h2>🗂 System / Data Tools</h2><div class="admin-sub">Read-only ownership and storage diagnostics. R1 does not delete Sheets, migrate data, consolidate engines, or perform destructive cleanup.</div></div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body">
+            <div class="admin-list">
+              <div class="admin-list-row"><div><strong>Games</strong><div class="admin-sub">Manager: Manage Games · Data/API ownership remains with the existing Games/Admin API path.</div></div><span class="admin-pill">READ ONLY</span></div>
+              <div class="admin-list-row"><div><strong>Team Fantasy Football</strong><div class="admin-sub">Manager: admin-team-fantasy · Engine/API/automation ownership stays with the existing Team Fantasy implementation.</div></div><span class="admin-pill">READ ONLY</span></div>
+              <div class="admin-list-row"><div><strong>Sports Engine</strong><div class="admin-sub">Scores, schedules, odds, snapshots, and sports automation remain owned by the existing Sports Engine controls.</div></div><span class="admin-pill">READ ONLY</span></div>
+              <div class="admin-list-row"><div><strong>Legacy / cleanup candidates</strong><div class="admin-sub">Review required. This R1 surface reports ownership only and provides no deletion, migration, or consolidation action.</div></div><span class="admin-pill">REVIEW</span></div>
+            </div>
+            <div class="admin-actions"><button class="button admin-button secondary" onclick="adminCheckStorageHealth('${escapeJs(currentGameId || "")}')">Read Storage Health</button></div>
+            <div class="admin-sub">Future model: Primary Hub + Primary League + Season, with additional Hubs/Leagues/Cups/Collections referencing the same authoritative game record. Persistence is deferred until a safe backend contract exists.</div>
           </div>
         </details>
 
@@ -1487,7 +1521,7 @@ function adminSetGameFormSaveState_(form, state, message) {
 
   const cleanText = button.getAttribute("data-clean-text") || "SAVE GAME";
 
-  button.classList.remove("is-dirty", "is-saved", "is-saving");
+  button.classList.remove("is-dirty", "is-saved", "is-saving", "is-error");
 
   if (state === "dirty") {
     button.classList.add("is-dirty");
@@ -1518,6 +1552,17 @@ function adminSetGameFormSaveState_(form, state, message) {
       feedback.hidden = false;
       feedback.className = "admin-game-save-feedback is-saved";
       feedback.textContent = message || "Changes saved";
+    }
+    return;
+  }
+
+  if (state === "error") {
+    button.classList.add("is-error");
+    button.textContent = "SAVE FAILED";
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.className = "admin-game-save-feedback is-error";
+      feedback.textContent = message || "Could not save changes";
     }
     return;
   }
@@ -1580,6 +1625,17 @@ function adminShowGameFormSaved_(form, message) {
       adminSetGameFormSaveState_(form, "clean");
     }
   }, ADMIN_GAME_FORM_SAVED_RESET_MS);
+
+}
+
+function adminShowGameFormError_(form, message) {
+
+  if (!form) {
+    return;
+  }
+
+  form.dataset.dirty = "true";
+  adminSetGameFormSaveState_(form, "error", message || "Could not save changes");
 
 }
 
@@ -2008,7 +2064,7 @@ function renderAdminGameForm(
 
                 <label class="admin-field">
                   ${adminFieldLabel_("Contribution Weight", "Used only with Weighted Points. A weight of 2 makes this mini game count twice.")}
-                  <input name="parentContributionWeight" type="number" min="0" step="0.1" value="${escapeHtml_(game.parentContributionWeight === undefined ? 1 : game.parentContributionWeight)}" ${isMiniGame ? "" : "disabled"}>
+                  <input name="parentContributionWeight" type="number" min="0" step="0.05" value="${escapeHtml_(game.parentContributionWeight === undefined ? 1 : game.parentContributionWeight)}" ${isMiniGame ? "" : "disabled"}>
                 </label>
               </div>
 
@@ -3150,7 +3206,7 @@ async function adminSaveGameFromForm(
     if (setupWasSaved) {
       adminMarkGameFormClean_(form);
     } else {
-      adminMarkGameFormDirty(form);
+      adminShowGameFormError_(form, saveErrorMessage);
     }
 
     alert(
@@ -3162,7 +3218,7 @@ async function adminSaveGameFromForm(
     // Reload the live Manage Games state after a blocked publish. The setup
     // was saved inactive and locked, so leaving the requested Active checkbox
     // checked on screen would incorrectly imply that the game went live.
-    if (setupWasSaved && options.navigateAfterSave !== false) {
+    if (setupWasSaved && options.navigateAfterSave === true) {
       await navigate("admin-games", { skipUnsavedCheck: true });
     }
 
@@ -3190,7 +3246,7 @@ async function adminSaveGameFromForm(
     alert(successMessage);
   }
 
-  if (options.navigateAfterSave !== false) {
+  if (options.navigateAfterSave === true) {
     await new Promise(function(resolve) {
       window.setTimeout(resolve, 1200);
     });
