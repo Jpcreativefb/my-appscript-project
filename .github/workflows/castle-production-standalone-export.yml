@@ -1,0 +1,40 @@
+name: Castle Production Art Standalone Export
+
+on:
+  push:
+    branches:
+      - feature/castle-special-card-pack-r1
+    paths:
+      - '.github/workflows/castle-production-standalone-export.yml'
+      - 'tools/export_castle_production_standalone.py'
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/castle-special-card-pack-r1
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pillow
+      - name: Export standalone Castle Production Art
+        run: python tools/export_castle_production_standalone.py
+      - name: Remove one-time export tooling
+        run: |
+          rm -f tools/export_castle_production_standalone.py
+          rm -f .github/workflows/castle-production-standalone-export.yml
+      - name: Commit standalone runtime assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Export Castle production art as standalone runtime WebP"
+          git push origin HEAD:feature/castle-special-card-pack-r1
