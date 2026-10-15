@@ -135,6 +135,55 @@ function adminGamesApplyFilter_(filter) {
 }
 
 
+/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_START */
+function adminManageGamesFocusTargetR2_() {
+  if (typeof window === "undefined") return "";
+  return String(window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 || "").trim().toLowerCase();
+}
+
+function adminManageGamesApplyFocusR2_() {
+  const target = adminManageGamesFocusTargetR2_();
+  if (!target) return true;
+
+  let node = null;
+  let card = null;
+
+  if (target === "confidence" || target === "survivor") {
+    card = document.querySelector('[data-admin-game-filterable="true"][data-admin-game-type="' + target + '"]');
+    node = card && card.querySelector('[data-admin-manager-section="' + target + '"]');
+    if (!node) return false;
+    card.open = true;
+    const settings = card.querySelector(".admin-game-settings-shell");
+    if (settings) settings.open = true;
+    node.open = true;
+  } else if (target === "playoff-race") {
+    node = document.getElementById("pattcNflPlayoffRaceTimingAdmin");
+    if (!node) return false;
+    node.open = true;
+  } else if (target === "nfl-cup") {
+    node = document.getElementById("pattcCupControlR1");
+    if (!node) return false;
+  } else {
+    window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 = "";
+    return true;
+  }
+
+  window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 = "";
+  if (node && typeof node.scrollIntoView === "function") {
+    window.setTimeout(function() { node.scrollIntoView({ block: "start" }); }, 0);
+  }
+  return true;
+}
+
+function adminManageGamesScheduleFocusR2_(attempt) {
+  attempt = Number(attempt || 0);
+  if (adminManageGamesApplyFocusR2_()) return;
+  if (!adminManageGamesFocusTargetR2_() || attempt >= 20) return;
+  window.setTimeout(function() { adminManageGamesScheduleFocusR2_(attempt + 1); }, 100);
+}
+/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_END */
+
+
 /* ADMIN_GAMES_DESIGN_R1_START */
 function adminManageGamesR1Text_(value) {
   return String(value == null ? "" : value).trim();
@@ -294,6 +343,7 @@ async function renderAdminGamesPage() {
   const html = await renderAdminGamesPanel();
   if (typeof window !== "undefined") {
     window.setTimeout(adminManageGamesApplyCleanupR1_, 0);
+    window.setTimeout(function() { adminManageGamesScheduleFocusR2_(0); }, 0);
   }
   // RC24G source compatibility contract: return renderAdminGamesPanel();
   return html;
@@ -2879,7 +2929,7 @@ async function adminPermanentPurgeAttemptDelete_() {
 
 /* PATTC NFL SPORTS PACK R1 — Manage Games builder */
 (function(root){"use strict";function nflSeasonPackAdminCard_(){const year=new Date().getFullYear();return `<section class="card admin-card" style="margin-bottom:12px;border:1px solid rgba(68,223,105,.42);background:linear-gradient(180deg,rgba(5,36,58,.96),rgba(2,19,31,.96));"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><div style="font-size:11px;font-weight:950;color:#55eb76">NFL SPORTS PACK</div><div class="admin-sub">Build NFL Cup + Playoff Race + Full League Forecast + Bottom Dwellers as Draft games. Safe to run again.</div></div><div style="display:flex;gap:7px;align-items:center"><input id="nflSeasonPackYear" class="input admin-input" type="number" min="2020" max="2100" value="${year}" style="width:92px"><button id="nflSeasonPackBuildButton" class="admin-small-button" type="button" onclick="nflSeasonPackAdminBuild_()">Build / Repair NFL Pack</button></div></div><div style="height:7px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden"><div id="nflSeasonPackProgress" style="height:100%;width:0;background:#45e76b;transition:width .18s ease"></div></div><div id="nflSeasonPackStatus" class="admin-sub" style="margin-top:6px">Creates Draft setup only. Nothing is published Live automatically.</div></section>`;}function nflPlayoffRaceTimingAdminCard_(){
-  return `<details class="card admin-card admin-collapsible-card" open style="margin-bottom:12px;border:1px solid rgba(68,202,255,.38)">
+  return `<details id="pattcNflPlayoffRaceTimingAdmin" data-admin-manager-section="playoff-race" class="card admin-card admin-collapsible-card" open style="margin-bottom:12px;border:1px solid rgba(68,202,255,.38)">
     <summary class="admin-card-summary"><div><h2 style="margin:0;color:#7ee7ff">NFL Playoff Race Timing</h2><div class="admin-sub">Season timing and forecast adjustment controls.</div></div><span class="admin-collapse-icon">▾</span></summary>
     <div class="admin-collapsible-body">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px">
