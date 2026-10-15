@@ -724,6 +724,10 @@ const APP_PAGE_MODULES = {
   "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
   "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],
+  "admin-nfl-cup": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
+  "admin-nfl-season-setup": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
+  "admin-playoff-race": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
+  "admin-sports-engine": ["admin", "adminUi", "adminSportsManagersR3"],
   "admin-appearance": ["admin", "adminUi", "adminAppearance"],
   "profile": ["profile"],
   "notifications": ["notifications"],
@@ -1632,7 +1636,8 @@ function setActiveNav(page) {
 
   if (page === "profile" || page === "notifications" || page === "leagues" || page === "trophy-room" || page === "more" ||
       page === "admin" || page === "admin-games" || page === "admin-awards" ||
-      page === "admin-reality-tv" || page === "admin-appearance" ||
+      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-nfl-cup" ||
+      page === "admin-nfl-season-setup" || page === "admin-playoff-race" || page === "admin-sports-engine" ||
       page.indexOf("admin-game-setup:") === 0 || page === "hub:general") {
     navPage = "more";
   }
@@ -2366,6 +2371,26 @@ async function renderPage(page) {
     case "admin-team-fantasy":
       if (typeof renderAdminTeamFantasyPage !== "function") throw new Error("Team Fantasy admin script is not loaded.");
       app.innerHTML = await renderAdminTeamFantasyPage();
+      break;
+
+    case "admin-nfl-cup":
+      if (typeof renderAdminNflCupPage !== "function") throw new Error("NFL Cup admin script is not loaded.");
+      app.innerHTML = await renderAdminNflCupPage();
+      break;
+
+    case "admin-nfl-season-setup":
+      if (typeof renderAdminNflSeasonSetupPage !== "function") throw new Error("NFL season setup admin script is not loaded.");
+      app.innerHTML = await renderAdminNflSeasonSetupPage();
+      break;
+
+    case "admin-playoff-race":
+      if (typeof renderAdminPlayoffRacePage !== "function") throw new Error("Playoff Race admin script is not loaded.");
+      app.innerHTML = await renderAdminPlayoffRacePage();
+      break;
+
+    case "admin-sports-engine":
+      if (typeof renderAdminSportsEnginePage !== "function") throw new Error("Sports Engine admin script is not loaded.");
+      app.innerHTML = await renderAdminSportsEnginePage();
       break;
 
     case "admin-reality-tv":
