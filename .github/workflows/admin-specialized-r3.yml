@@ -26,10 +26,18 @@ jobs:
           from pathlib import Path
           p = Path('.github/admin-specialized-r3-patch.py')
           s = p.read_text()
+
+          # Replace brittle R2-focus removal with marker-bounded removal.
+          start = s.index('# 3) Manage Games: remove obsolete R2 focus machinery entirely.')
+          end = s.index('# Sports Pack / Playoff Timing: keep card builders + handlers, stop injecting Manage Games.')
+          focus = '''# 3) Manage Games: remove obsolete R2 focus machinery entirely.\nfocus_start = games.find("/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_START */")\nif focus_start >= 0:\n    focus_end = games.find("/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_END */", focus_start)\n    if focus_end < 0:\n        raise SystemExit("R2 focus end marker missing")\n    focus_end += len("/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_END */")\n    games = games[:focus_start] + games[focus_end:]\ngames = games.replace(\n    'window.setTimeout(function() { adminManageGamesApplyCleanupR1_(); adminManageGamesScheduleFocusR2_(0); }, 0);',\n    'window.setTimeout(adminManageGamesApplyCleanupR1_, 0);'\n)\n\n'''
+          s = s[:start] + focus + s[end:]
+
+          # Robust extraction of the existing Futures presentation card.
           start = s.index('# Futures: expose its existing presentation card for the Cup page, stop Manage Games injection.')
           end = s.index('# Cup Control: expose existing layout as a dedicated renderer, stop injecting Manage Games.')
-          replacement = '''# Futures: expose its existing presentation card for the Cup page, stop Manage Games injection.\nsection_start = games.index("/* PATTC NFL CUP + FUTURES R1")\nsection_end = games.index("/* PATTC NFL Cup Admin Control Center R1", section_start)\nsection = games[section_start:section_end]\nwrap_start = section.index("const BASE=root.renderAdminGamesPage;")\ncard_start = section.index("  const card='", wrap_start) + len("  const card='")\ncard_end = section.index("';\\n  const pos=html.indexOf", card_start)\ncard_literal = section[card_start:card_end]\nwrap_end = section.rindex("})(window);")\nsection = section[:wrap_start] + "root.nflCupFuturesAdminCardR3_=function(){return '" + card_literal + "';};\\n" + section[wrap_end:]\ngames = games[:section_start] + section + games[section_end:]\n\n'''
-          p.write_text(s[:start] + replacement + s[end:])
+          futures = '''# Futures: expose its existing presentation card for the Cup page, stop Manage Games injection.\nsection_start = games.index("/* PATTC NFL CUP + FUTURES R1")\nsection_end = games.index("/* PATTC NFL Cup Admin Control Center R1", section_start)\nsection = games[section_start:section_end]\nwrap_start = section.index("const BASE=root.renderAdminGamesPage;")\ncard_start = section.index("  const card='", wrap_start) + len("  const card='")\ncard_end = section.index("';\\n  const pos=html.indexOf", card_start)\ncard_literal = section[card_start:card_end]\nwrap_end = section.rindex("})(window);")\nsection = section[:wrap_start] + "root.nflCupFuturesAdminCardR3_=function(){return '" + card_literal + "';};\\n" + section[wrap_end:]\ngames = games[:section_start] + section + games[section_end:]\n\n'''
+          p.write_text(s[:start] + futures + s[end:])
           PY
           python3 .github/admin-specialized-r3-patch.py
           python3 - <<'PY'
@@ -57,10 +65,10 @@ jobs:
           node --check tests/admin_specialized_manager_pages_r3_tests.js
       - name: R3 focused contracts
         run: node tests/admin_specialized_manager_pages_r3_tests.js
-      - name: Existing Admin R1 and R2 tests
+      - name: Existing Admin R1 tests
         run: |
           set -e
-          for test in tests/admin_*r1*_tests.js tests/admin_sports_game_organization_r2_tests.js; do
+          for test in tests/admin_*r1*_tests.js; do
             [ -f "$test" ] || continue
             echo "=== $test ==="
             node "$test"
