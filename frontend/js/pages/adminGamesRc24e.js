@@ -135,53 +135,7 @@ function adminGamesApplyFilter_(filter) {
 }
 
 
-/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_START */
-function adminManageGamesFocusTargetR2_() {
-  if (typeof window === "undefined") return "";
-  return String(window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 || "").trim().toLowerCase();
-}
 
-function adminManageGamesApplyFocusR2_() {
-  const target = adminManageGamesFocusTargetR2_();
-  if (!target) return true;
-
-  let node = null;
-  let card = null;
-
-  if (target === "confidence" || target === "survivor") {
-    card = document.querySelector('[data-admin-game-filterable="true"][data-admin-game-type="' + target + '"]');
-    node = card && card.querySelector('[data-admin-manager-section="' + target + '"]');
-    if (!node) return false;
-    card.open = true;
-    const settings = card.querySelector(".admin-game-settings-shell");
-    if (settings) settings.open = true;
-    node.open = true;
-  } else if (target === "playoff-race") {
-    node = document.getElementById("pattcNflPlayoffRaceTimingAdmin");
-    if (!node) return false;
-    node.open = true;
-  } else if (target === "nfl-cup") {
-    node = document.getElementById("pattcCupControlR1");
-    if (!node) return false;
-  } else {
-    window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 = "";
-    return true;
-  }
-
-  window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 = "";
-  if (node && typeof node.scrollIntoView === "function") {
-    window.setTimeout(function() { node.scrollIntoView({ block: "start" }); }, 0);
-  }
-  return true;
-}
-
-function adminManageGamesScheduleFocusR2_(attempt) {
-  attempt = Number(attempt || 0);
-  if (adminManageGamesApplyFocusR2_()) return;
-  if (!adminManageGamesFocusTargetR2_() || attempt >= 20) return;
-  window.setTimeout(function() { adminManageGamesScheduleFocusR2_(attempt + 1); }, 100);
-}
-/* ADMIN_SPORTS_GAME_ORGANIZATION_R2_FOCUS_END */
 
 
 /* ADMIN_GAMES_DESIGN_R1_START */
@@ -343,7 +297,6 @@ async function renderAdminGamesPage() {
   const html = await renderAdminGamesPanel();
   if (typeof window !== "undefined") {
     window.setTimeout(adminManageGamesApplyCleanupR1_, 0);
-    window.setTimeout(function() { adminManageGamesScheduleFocusR2_(0); }, 0);
   }
   // RC24G source compatibility contract: return renderAdminGamesPanel();
   return html;
@@ -2983,7 +2936,7 @@ root.nflPlayoffRaceAdminSave_=async function(){
   }catch(err){if(bar)bar.style.width="0";if(status)status.textContent=err&&err.message?err.message:"Could not save timing.";}
   finally{if(button)button.disabled=false;}
 };
-root.nflSeasonPackAdminBuild_=async function(){const yearNode=document.getElementById("nflSeasonPackYear"),button=document.getElementById("nflSeasonPackBuildButton"),status=document.getElementById("nflSeasonPackStatus"),bar=document.getElementById("nflSeasonPackProgress"),year=Math.max(2020,Math.min(2100,Number(yearNode&&yearNode.value)||new Date().getFullYear()));let cursor=0,guard=0;if(button)button.disabled=true;try{while(guard++<30){if(status)status.textContent="Building NFL Sports Pack… "+cursor;const res=await api("adminBuildNflSeasonPack",{year:year,cursor:cursor,batchSize:10});if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"NFL Sports Pack setup failed.");cursor=Number(res.nextCursor)||0;if(bar)bar.style.width=Math.max(0,Math.min(100,Number(res.percent)||0))+"%";if(status)status.textContent=res.message||("NFL setup "+cursor+" / "+res.total);if(res.done){if(status)status.textContent="NFL Sports Pack ready in Draft · NFL Cup + 3 ranking mini-games.";if(button)button.textContent="NFL Pack Ready ✓";return;}}throw new Error("NFL Sports Pack setup did not finish within the safety loop.");}catch(err){if(status)status.textContent=err&&err.message?err.message:"NFL Sports Pack setup failed.";if(button)button.disabled=false;}};const base=root.renderAdminGamesPage;if(typeof base==="function"){root.renderAdminGamesPage=async function(){const html=String(await base()),card=nflSeasonPackAdminCard_(),timing=nflPlayoffRaceTimingAdminCard_(),match=html.match(/<div class="page[^>]*>/);setTimeout(function(){if(root.nflPlayoffRaceAdminLoad_)root.nflPlayoffRaceAdminLoad_();},300);return match?html.replace(match[0],match[0]+card+timing):card+timing+html;};}})(window);
+root.nflSeasonPackAdminBuild_=async function(){const yearNode=document.getElementById("nflSeasonPackYear"),button=document.getElementById("nflSeasonPackBuildButton"),status=document.getElementById("nflSeasonPackStatus"),bar=document.getElementById("nflSeasonPackProgress"),year=Math.max(2020,Math.min(2100,Number(yearNode&&yearNode.value)||new Date().getFullYear()));let cursor=0,guard=0;if(button)button.disabled=true;try{while(guard++<30){if(status)status.textContent="Building NFL Sports Pack… "+cursor;const res=await api("adminBuildNflSeasonPack",{year:year,cursor:cursor,batchSize:10});if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"NFL Sports Pack setup failed.");cursor=Number(res.nextCursor)||0;if(bar)bar.style.width=Math.max(0,Math.min(100,Number(res.percent)||0))+"%";if(status)status.textContent=res.message||("NFL setup "+cursor+" / "+res.total);if(res.done){if(status)status.textContent="NFL Sports Pack ready in Draft · NFL Cup + 3 ranking mini-games.";if(button)button.textContent="NFL Pack Ready ✓";return;}}throw new Error("NFL Sports Pack setup did not finish within the safety loop.");}catch(err){if(status)status.textContent=err&&err.message?err.message:"NFL Sports Pack setup failed.";if(button)button.disabled=false;}};root.nflSeasonPackAdminCardR3_=nflSeasonPackAdminCard_;root.nflPlayoffRaceTimingAdminCardR3_=nflPlayoffRaceTimingAdminCard_;})(window);
 
 
 /* PATTC NFL CUP + FUTURES R1 — progressive Draft-only admin builder */
@@ -3005,13 +2958,7 @@ root.nflCupFuturesAdminBuild_=async function(){
   catch(err){if(status)status.textContent=err&&err.message?err.message:'Build failed. Retry is safe.';}
   finally{if(button)button.disabled=false;}
 };
-const BASE=root.renderAdminGamesPage;
-if(typeof BASE==='function'){root.renderAdminGamesPage=async function(){
-  const html=String(await BASE());
-  const card='<section class="card admin-card" style="padding:12px;border:1px solid #2a7da8;margin-bottom:12px;background:#05263c;color:#d8f1ff"><h2 style="margin:0;font-size:16px">🏆 NFL CUP + FUTURES 2026</h2><p class="admin-sub">Link existing Confidence / Survivor / Fantasy / Playoff Race. Create 13 team Futures markets as a locked Draft. Does not publish or unlock any game.</p><button type="button" id="nflCupFuturesBuildButton" class="admin-small-button" onclick="nflCupFuturesAdminBuild_()">Prepare Cup + Futures Draft</button><div style="height:6px;margin-top:8px;background:#13374f;border-radius:4px;overflow:hidden"><div id="nflCupFuturesProgress" style="width:0;height:100%;background:#5fe88b"></div></div><div id="nflCupFuturesStatus" class="admin-sub" style="margin-top:6px">Review multipliers and preflight before setting Live.</div></section>';
-  const pos=html.indexOf('<div class="page');if(pos<0)return card+html;
-  const end=html.indexOf('>',pos);return html.slice(0,end+1)+card+html.slice(end+1);
-};}
+root.nflCupFuturesAdminCardR3_=function(){return '<section class="card admin-card" style="padding:12px;border:1px solid #2a7da8;margin-bottom:12px;background:#05263c;color:#d8f1ff"><h2 style="margin:0;font-size:16px">🏆 NFL CUP + FUTURES 2026</h2><p class="admin-sub">Link existing Confidence / Survivor / Fantasy / Playoff Race. Create 13 team Futures markets as a locked Draft. Does not publish or unlock any game.</p><button type="button" id="nflCupFuturesBuildButton" class="admin-small-button" onclick="nflCupFuturesAdminBuild_()">Prepare Cup + Futures Draft</button><div style="height:6px;margin-top:8px;background:#13374f;border-radius:4px;overflow:hidden"><div id="nflCupFuturesProgress" style="width:0;height:100%;background:#5fe88b"></div></div><div id="nflCupFuturesStatus" class="admin-sub" style="margin-top:6px">Review multipliers and preflight before setting Live.</div></section>';};
 })(window);
 
 
@@ -3161,19 +3108,10 @@ if(typeof BASE==='function'){root.renderAdminGamesPage=async function(){
     } else note(g.name + ' published LIVE and verified.');
     refreshRow(saved);
   });};
-  const BASE = root.renderAdminGamesPage;
-  if (typeof BASE === 'function') root.renderAdminGamesPage = async function () {
-    const [html, response] = await Promise.all([BASE(), apiAdminGetGames()]);
-    if (resultError(response)) return String(html);
-    const card = layout(response.games || []);
-    if (!card) return String(html);
-    const markup = String(html);
-    const old = markup.indexOf('id="nflCupFuturesBuildButton"');
-    if (old >= 0) {const end = markup.indexOf('</section>', old);if (end >= 0) return markup.slice(0,end+10)+card+markup.slice(end+10);}
-    const start = markup.indexOf('<div class="page');
-    if (start < 0) return card+markup;
-    const tagEnd = markup.indexOf('>', start);
-    return markup.slice(0, tagEnd+1) + card + markup.slice(tagEnd+1);
+  root.pattcCupControlAdminCardR3_ = async function () {
+    const response = await apiAdminGetGames();
+    if (resultError(response)) return '';
+    return layout(response.games || []);
   };
 })(window);
 
@@ -3245,8 +3183,8 @@ if(typeof BASE==='function'){root.renderAdminGamesPage=async function(){
    if(message)message.textContent='Weekly and season settings saved and verified. Reload Manage Games for current standings.';
   }catch(e){if(message)message.textContent=e.message||String(e);}finally{btn.disabled=false;}
  };
- var BASE=root.renderAdminGamesPage;
- if(typeof BASE==='function')root.renderAdminGamesPage=async function(){
+ var BASE=root.pattcCupControlAdminCardR3_;
+ if(typeof BASE==='function')root.pattcCupControlAdminCardR3_=async function(){
    var html=String(await BASE());var response=await apiAdminGetGames();if(!response||response.success===false)return html;
    var games=response.games||[],parent=games.find(function(g){return g.gameId===CUP;});if(!parent)return html;
    var markup=widget(parent,games);if(!markup)return html;

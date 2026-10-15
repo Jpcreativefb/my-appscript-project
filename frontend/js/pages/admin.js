@@ -1,13 +1,3 @@
-var ADMIN_SPORTS_MANAGE_GAMES_TARGET_R2_ = "";
-
-function adminOpenSportsManageGamesR2_(target) {
-  target = String(target || "").trim().toLowerCase();
-  if (["confidence", "survivor", "playoff-race", "nfl-cup"].indexOf(target) === -1) return;
-  ADMIN_SPORTS_MANAGE_GAMES_TARGET_R2_ = target;
-  if (typeof window !== "undefined") window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 = target;
-  navigate("admin-games");
-}
-
 async function renderAdminPage() {
 
   setPageLoadStep(50, "Loading administrator dashboard…");
@@ -73,11 +63,12 @@ async function renderAdminPage() {
               <div class="admin-list" style="margin-top:10px;">
                 <div class="admin-list-row"><div><strong>Sports → NFL → 2026</strong><div class="admin-sub">Confidence, Survivor, Team Fantasy Football, Playoff Race, and Cups / Combined Competitions.</div></div></div>
                 <div class="admin-actions" data-admin-nfl-2026-r2="1">
-                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('confidence')">Confidence</button>
-                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('survivor')">Survivor</button>
+                  <button class="button admin-button" onclick="navigate('admin-games')">Confidence</button>
+                  <button class="button admin-button" onclick="navigate('admin-games')">Survivor</button>
                   <button class="button admin-button" onclick="navigate('admin-team-fantasy')">Team Fantasy Football</button>
-                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('playoff-race')">Playoff Race</button>
-                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('nfl-cup')">Cups / Combined Competitions → NFL Cup</button>
+                  <button class="button admin-button" onclick="navigate('admin-playoff-race')">Playoff Race</button>
+                  <button class="button admin-button" onclick="navigate('admin-nfl-cup')">Cups / Combined Competitions → NFL Cup</button>
+                  <button class="button admin-button secondary" onclick="navigate('admin-nfl-season-setup')">Season / Sports Setup → NFL Sports Pack</button>
                   <button class="button admin-button secondary" onclick="navigate('admin-games')">NFL 2026 Shared Game Settings</button>
                 </div>
                 <div class="admin-sub">A Cup references existing authoritative Game IDs. One game record; no copied games. R2 does not migrate Cup schema or generalize scoring ownership.</div>
@@ -85,10 +76,8 @@ async function renderAdminPage() {
                   <strong>Sports Operations</strong><div class="admin-sub">Existing sports tools stay on their current routes and APIs.</div>
                   <div class="admin-actions">
                     <button class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores &amp; Game Builder</button>
-                    <button class="button admin-button secondary" onclick="adminOpenSportsControls()">Sports Engine Controls</button>
+                    <button class="button admin-button secondary" onclick="navigate('admin-sports-engine')">Sports Engine Controls</button>
                   </div>
-                  <div id="adminSportsControlMessage" class="admin-message"></div>
-                  <div id="adminSportsControlPanel" class="admin-list"></div>
                 </div>
                 <div class="admin-list-row"><div><strong>Reality</strong><div class="admin-sub">Show/season managers such as The Traitors and DWTS remain in the existing Reality TV Manager.</div></div></div>
                 <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager. Emmys belongs under Awards, not General.</div></div></div>
