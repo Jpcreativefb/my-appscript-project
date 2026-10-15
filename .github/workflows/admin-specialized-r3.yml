@@ -32,6 +32,21 @@ jobs:
           p.write_text(s[:start] + replacement + s[end:])
           PY
           python3 .github/admin-specialized-r3-patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/admin_specialized_manager_pages_r3_tests.js')
+          s = p.read_text()
+          replacements = {
+            'assert(admin.includes("navigate(\'admin-team-fantasy\')">Team Fantasy Football"));': 'assert(admin.includes(`navigate(\'admin-team-fantasy\')">Team Fantasy Football`));',
+            'assert(admin.includes("navigate(\'admin-playoff-race\')">Playoff Race"));': 'assert(admin.includes(`navigate(\'admin-playoff-race\')">Playoff Race`));',
+            'assert(admin.includes("navigate(\'admin-nfl-cup\')">Cups / Combined Competitions → NFL Cup"));': 'assert(admin.includes(`navigate(\'admin-nfl-cup\')">Cups / Combined Competitions → NFL Cup`));',
+            'assert(admin.includes("navigate(\'admin-nfl-season-setup\')">Season / Sports Setup → NFL Sports Pack"));': 'assert(admin.includes(`navigate(\'admin-nfl-season-setup\')">Season / Sports Setup → NFL Sports Pack`));',
+            'assert(admin.includes("navigate(\'admin-sports-engine\')">Sports Engine Controls"));': 'assert(admin.includes(`navigate(\'admin-sports-engine\')">Sports Engine Controls`));'
+          }
+          for old, new in replacements.items():
+            s = s.replace(old, new)
+          p.write_text(s)
+          PY
           rm -f .github/admin-specialized-r3-patch.py .github/workflows/admin-specialized-r3.yml
       - name: Syntax checks
         run: |
