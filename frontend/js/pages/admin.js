@@ -1,3 +1,13 @@
+var ADMIN_SPORTS_MANAGE_GAMES_TARGET_R2_ = "";
+
+function adminOpenSportsManageGamesR2_(target) {
+  target = String(target || "").trim().toLowerCase();
+  if (["confidence", "survivor", "playoff-race", "nfl-cup"].indexOf(target) === -1) return;
+  ADMIN_SPORTS_MANAGE_GAMES_TARGET_R2_ = target;
+  if (typeof window !== "undefined") window.PATTC_ADMIN_MANAGE_GAMES_TARGET_R2 = target;
+  navigate("admin-games");
+}
+
 async function renderAdminPage() {
 
   setPageLoadStep(50, "Loading administrator dashboard…");
@@ -57,14 +67,28 @@ async function renderAdminPage() {
             <span class="admin-collapse-icon">▾</span>
           </summary>
           <div class="admin-collapsible-body">
-            <div class="admin-category-card" data-admin-games-design-r1="1">
-              <div class="admin-sub"><strong>Admin → Games &amp; Design</strong></div>
-              <div class="admin-sub">Choose the primary Hub → League → Season → Game. One authoritative game record may gain additional placements later; R1 does not duplicate game rows or migrate schema.</div>
+            <div class="admin-category-card" data-admin-games-design-r1="1" data-admin-sports-organization-r2="1">
+              <div class="admin-sub"><strong>Admin → Games &amp; Design → Sports</strong></div>
+              <div class="admin-sub">Organize sports administration by League → Season → Game / Cup / Sports Operations. Existing managers, routes, APIs, and game records remain authoritative.</div>
               <div class="admin-list" style="margin-top:10px;">
-                <div class="admin-list-row"><div><strong>Sports → NFL → 2026</strong><div class="admin-sub">Confidence, Survivor, Team Fantasy Football, Playoff Race, and NFL Cup belong here.</div></div></div>
-                <div class="admin-actions" data-admin-games-design-team-fantasy="1">
+                <div class="admin-list-row"><div><strong>Sports → NFL → 2026</strong><div class="admin-sub">Confidence, Survivor, Team Fantasy Football, Playoff Race, and Cups / Combined Competitions.</div></div></div>
+                <div class="admin-actions" data-admin-nfl-2026-r2="1">
+                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('confidence')">Confidence</button>
+                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('survivor')">Survivor</button>
                   <button class="button admin-button" onclick="navigate('admin-team-fantasy')">Team Fantasy Football</button>
+                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('playoff-race')">Playoff Race</button>
+                  <button class="button admin-button" onclick="adminOpenSportsManageGamesR2_('nfl-cup')">Cups / Combined Competitions → NFL Cup</button>
                   <button class="button admin-button secondary" onclick="navigate('admin-games')">NFL 2026 Shared Game Settings</button>
+                </div>
+                <div class="admin-sub">A Cup references existing authoritative Game IDs. One game record; no copied games. R2 does not migrate Cup schema or generalize scoring ownership.</div>
+                <div class="admin-category-card" data-admin-sports-operations-r2="1" style="margin-top:10px;">
+                  <strong>Sports Operations</strong><div class="admin-sub">Existing sports tools stay on their current routes and APIs.</div>
+                  <div class="admin-actions">
+                    <button class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores &amp; Game Builder</button>
+                    <button class="button admin-button secondary" onclick="adminOpenSportsControls()">Sports Engine Controls</button>
+                  </div>
+                  <div id="adminSportsControlMessage" class="admin-message"></div>
+                  <div id="adminSportsControlPanel" class="admin-list"></div>
                 </div>
                 <div class="admin-list-row"><div><strong>Reality</strong><div class="admin-sub">Show/season managers such as The Traitors and DWTS remain in the existing Reality TV Manager.</div></div></div>
                 <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager. Emmys belongs under Awards, not General.</div></div></div>
@@ -79,11 +103,7 @@ async function renderAdminPage() {
               <button class="button admin-button secondary" onclick="navigate('admin-appearance')">Appearance Manager</button>
               <button class="button admin-button secondary" onclick="navigate('admin-awards')">Awards Manager</button>
               <button class="button admin-button secondary" onclick="navigate('admin-reality-tv')">Reality TV Manager</button>
-              <button class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores & Game Builder</button>
-              <button class="button admin-button secondary" onclick="adminOpenSportsControls()">Sports Engine Controls</button>
             </div>
-            <div id="adminSportsControlMessage" class="admin-message"></div>
-            <div id="adminSportsControlPanel" class="admin-list"></div>
           </div>
         </details>
 
@@ -1898,6 +1918,7 @@ function renderAdminGameForm(
       data-admin-game-filterable="${isNew ? "false" : "true"}"
       data-admin-game-id="${escapeHtml_(rawGameId)}"
       data-admin-game-name="${escapeHtml_(game.name || rawGameId)}"
+      data-admin-game-type="${escapeHtml_(canonicalType)}"
       data-admin-game-status="${escapeHtml_(workflowStatus)}"
       data-admin-game-active="${game.active === true ? "true" : "false"}"
       data-admin-game-archived="${game.archived === true ? "true" : "false"}"
@@ -2111,7 +2132,7 @@ function renderAdminGameForm(
             </div>
           </details>
 
-          <details class="admin-form-section admin-form-section-details" data-game-types="survivor" ${canonicalType === "survivor" ? "open" : "hidden"}>
+          <details class="admin-form-section admin-form-section-details" data-admin-manager-section="survivor" data-game-types="survivor" ${canonicalType === "survivor" ? "open" : "hidden"}>
             <summary class="admin-section-heading admin-form-section-summary">
               <div>
                 <h4>Survivor / Elimination Rules</h4>
@@ -2362,7 +2383,7 @@ function renderAdminGameForm(
             </div>
           </details>
 
-          <details class="admin-form-section admin-form-section-details" data-game-types="confidence mixed" data-hybrid-feature-section="confidenceEnabled" ${(canonicalType === "confidence" || (canonicalType === "mixed" && game.confidenceEnabled)) ? "" : "hidden"}>
+          <details class="admin-form-section admin-form-section-details" data-admin-manager-section="confidence" data-game-types="confidence mixed" data-hybrid-feature-section="confidenceEnabled" ${(canonicalType === "confidence" || (canonicalType === "mixed" && game.confidenceEnabled)) ? "" : "hidden"}>
             <summary class="admin-section-heading admin-form-section-summary">
               <div>
                 <h4>Confidence Scoring</h4>
