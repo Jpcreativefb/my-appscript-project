@@ -19,21 +19,32 @@
   }
 
   function escape_(value) {
-    if (typeof window.adminRealityTvEscape_ === "function") return window.adminRealityTvEscape_(value);
+    if (typeof adminRealityTvEscape_ === "function") return adminRealityTvEscape_(value);
     return String(value === undefined || value === null ? "" : value)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
   }
 
+  function selectorEscape_(value) {
+    const text = String(value === undefined || value === null ? "" : value);
+    if (typeof CSS !== "undefined" && CSS && typeof CSS.escape === "function") return CSS.escape(text);
+    return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  function dashboard_() {
+    if (typeof ADMIN_REALITY_TV_DASHBOARD !== "undefined") return ADMIN_REALITY_TV_DASHBOARD;
+    return window.ADMIN_REALITY_TV_DASHBOARD || null;
+  }
+
   function bundle_(seasonId) {
-    const dashboard = window.ADMIN_REALITY_TV_DASHBOARD;
+    const dashboard = dashboard_();
     return dashboard && (dashboard.seasons || []).find(function(item) {
       return item && item.season && String(item.season.SeasonId || "") === String(seasonId || "");
     }) || null;
   }
 
   function currentEpisode_(bundle) {
-    if (typeof window.adminRealityTvCurrentEpisode_ === "function") return window.adminRealityTvCurrentEpisode_(bundle || {});
+    if (typeof adminRealityTvCurrentEpisode_ === "function") return adminRealityTvCurrentEpisode_(bundle || {});
     const episodes = bundle && bundle.episodes || [];
     return episodes.slice().sort(function(a, b) { return Number(b.EpisodeNumber || 0) - Number(a.EpisodeNumber || 0); })[0] || null;
   }
@@ -93,11 +104,12 @@
     (bundle && bundle.questionTemplates || []).forEach(function(row) {
       templateById[String(row.TemplateId || "")] = row;
     });
-    container.querySelectorAll('.rt-season-question-type[data-season-id="' + CSS.escape(String(seasonId)) + '"]').forEach(function(enabledBox) {
+    const seasonSelector = selectorEscape_(seasonId);
+    container.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonSelector + '"]').forEach(function(enabledBox) {
       const templateId = String(enabledBox.value || "");
       const host = enabledBox.closest("label") || enabledBox.parentElement;
       const rowHost = enabledBox.closest(".reality-tv-question-pack-choice") || host && host.parentElement;
-      if (!rowHost || rowHost.querySelector('.rt-r6-template-flags[data-template-id="' + CSS.escape(templateId) + '"]')) return;
+      if (!rowHost || rowHost.querySelector('.rt-r6-template-flags[data-template-id="' + selectorEscape_(templateId) + '"]')) return;
       const template = templateById[templateId] || {};
       const flags = document.createElement("div");
       flags.className = "rt-r6-template-flags reality-tv-checkbox-row";
@@ -117,7 +129,7 @@
       const bundle = bundle_(seasonId);
       const section = grid.closest("details.reality-tv-config-section") || grid.parentElement;
       if (!section) return;
-      if (!section.querySelector('.reality-tv-r6-question-pool[data-r6-season-id="' + CSS.escape(seasonId) + '"]')) {
+      if (!section.querySelector('.reality-tv-r6-question-pool[data-r6-season-id="' + selectorEscape_(seasonId) + '"]')) {
         grid.insertAdjacentHTML("beforebegin", controlsHtml_(seasonId, bundle));
       }
       decorateTemplateRows_(section, seasonId, bundle);
@@ -125,11 +137,12 @@
   }
 
   function collect_(seasonId) {
-    const pool = document.querySelector('.reality-tv-r6-question-pool[data-r6-season-id="' + CSS.escape(String(seasonId)) + '"]');
+    const escapedSeasonId = selectorEscape_(seasonId);
+    const pool = document.querySelector('.reality-tv-r6-question-pool[data-r6-season-id="' + escapedSeasonId + '"]');
     if (!pool) return null;
     const required = [];
     const randomEligible = [];
-    document.querySelectorAll('.rt-r6-template-flags[data-season-id="' + CSS.escape(String(seasonId)) + '"]').forEach(function(row) {
+    document.querySelectorAll('.rt-r6-template-flags[data-season-id="' + escapedSeasonId + '"]').forEach(function(row) {
       const id = row.dataset.templateId || "";
       if (id && row.querySelector(".rt-r6-required:checked")) required.push(id);
       if (id && row.querySelector(".rt-r6-random-eligible:checked")) randomEligible.push(id);
@@ -144,7 +157,7 @@
   }
 
   function setMessage_(seasonId, text, isError) {
-    const node = document.querySelector('.reality-tv-r6-question-pool[data-r6-season-id="' + CSS.escape(String(seasonId)) + '"] .rt-r6-message');
+    const node = document.querySelector('.reality-tv-r6-question-pool[data-r6-season-id="' + selectorEscape_(seasonId) + '"] .rt-r6-message');
     if (!node) return;
     node.textContent = text || "";
     node.classList.toggle("error", !!isError);
