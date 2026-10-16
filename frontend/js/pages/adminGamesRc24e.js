@@ -143,78 +143,26 @@ function adminManageGamesR1Text_(value) {
   return String(value == null ? "" : value).trim();
 }
 
-function adminManageGamesR1Haystack_(game) {
-  game = game || {};
-  return [game.gameId, game.name, game.type, game.hubFamily, game.hubGroup, game.league, game.season]
-    .map(adminManageGamesR1Text_)
-    .join(" ")
-    .toLowerCase();
-}
-
-function adminManageGamesR1Slug_(value) {
-  return adminManageGamesR1Text_(value)
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 function adminManageGamesInferHubFamilyR1_(game) {
   game = game || {};
   const explicit = adminManageGamesR1Text_(game.hubFamily || game.hub || game.family);
-  const haystack = adminManageGamesR1Haystack_(game);
-  if (explicit) {
-    return /^general$/i.test(explicit) && /emmy/i.test(haystack) ? "Awards" : explicit;
-  }
-  if (/emmy|oscar|academy awards|golden globe|grammy|award/.test(haystack)) return "Awards";
-  if (/traitors|dancing with the stars|\bdwts\b|reality/.test(haystack)) return "Reality";
-  if (/\bnfl\b|\bmlb\b|\bnba\b|\bnhl\b|football|baseball|basketball|playoff race|team fantasy|confidence|nfl cup/.test(haystack)) return "Sports";
-  return explicit || "General";
+  return explicit || "Unassigned";
 }
 
 function adminManageGamesInferHubGroupR1_(game) {
   game = game || {};
   const explicit = adminManageGamesR1Text_(game.hubGroup || game.group || game.league);
-  if (explicit) return explicit;
-  const haystack = adminManageGamesR1Haystack_(game);
-  if (/emmy/.test(haystack)) return "Emmys";
-  if (/oscar|academy awards/.test(haystack)) return "Oscars";
-  if (/traitors/.test(haystack)) return "The Traitors";
-  if (/dancing with the stars|\bdwts\b/.test(haystack)) return "DWTS";
-  if (/\bnfl\b|football|playoff race|team fantasy|confidence|nfl cup/.test(haystack)) return "NFL";
-  if (/\bmlb\b|baseball/.test(haystack)) return "MLB";
-  if (/\bnba\b|basketball/.test(haystack)) return "NBA";
-  if (/\bnhl\b|hockey/.test(haystack)) return "NHL";
-  return "Unassigned";
+  return explicit || "Unassigned";
 }
 
-function adminManageGamesInferSeasonR1_(game, family) {
+function adminManageGamesInferSeasonR1_(game) {
   game = game || {};
-  const explicit = adminManageGamesR1Text_(game.season || game.seasonYear || game.year);
-  if (explicit) return explicit;
-  const source = [game.name, game.gameId].map(adminManageGamesR1Text_).join(" ");
-  if (family === "Reality") {
-    const match = source.match(/(?:season|s)\s*([0-9]{1,3})/i);
-    if (match) return "s" + match[1];
-  }
-  const year = source.match(/\b(20[0-9]{2}(?:-[0-9]{2})?)\b/);
-  return year ? year[1] : "";
+  return adminManageGamesR1Text_(game.season || game.seasonYear || game.year);
 }
 
 function adminManageGamesInferScopeR1_(game) {
   game = game || {};
-  const existing = adminManageGamesR1Text_(game.leagueSeasonScope || game.seasonScope || game.scopeId);
-  if (existing) return existing;
-  const family = adminManageGamesInferHubFamilyR1_(game);
-  const group = adminManageGamesInferHubGroupR1_(game);
-  let season = adminManageGamesInferSeasonR1_(game, family);
-  if (!season || group === "Unassigned" || family === "General") return "";
-  if (family === "Reality" && !/^s/i.test(season) && /^\d{1,3}$/.test(season)) season = "s" + season;
-  return [
-    adminManageGamesR1Slug_(family),
-    adminManageGamesR1Slug_(group === "The Traitors" ? "traitors" : group),
-    adminManageGamesR1Slug_(season)
-  ].join(":");
+  return adminManageGamesR1Text_(game.leagueSeasonScope || game.seasonScope || game.scopeId);
 }
 
 function adminManageGamesGameFromCardR1_(card) {
@@ -229,16 +177,23 @@ function adminManageGamesGameFromCardR1_(card) {
     type: field("type") || field("gameType"),
     year: field("year"),
     season: field("season"),
+    seasonYear: field("seasonYear"),
     hubFamily: field("hubFamily"),
+    hub: field("hub"),
+    family: field("family"),
     hubGroup: field("hubGroup"),
-    leagueSeasonScope: field("leagueSeasonScope")
+    group: field("group"),
+    league: field("league"),
+    leagueSeasonScope: field("leagueSeasonScope"),
+    seasonScope: field("seasonScope"),
+    scopeId: field("scopeId")
   };
 }
 
 function adminManageGamesBreadcrumbR1_(game) {
   const family = adminManageGamesInferHubFamilyR1_(game);
   const group = adminManageGamesInferHubGroupR1_(game);
-  const season = adminManageGamesInferSeasonR1_(game, family) || "Season";
+  const season = adminManageGamesInferSeasonR1_(game) || "Unassigned";
   const name = adminManageGamesR1Text_(game && (game.name || game.gameId)) || "Game";
   return ["Admin", "Games & Design", family, group, season, name].join(" → ");
 }
