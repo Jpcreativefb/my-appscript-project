@@ -151,7 +151,7 @@ const ADMIN_UI_HELP_EXACT = {
   "text vertical": "Moves the stacked city/team text block toward the top, middle, or bottom of the team button.",
   "score position": "Anchors the score independently from the city/team text. Use inline, center, or any card corner.",
   "confidence vertical": "Vertical alignment of the Confidence control/value within the matchup row.",
-  "status alignment": "Horizontal alignment for game time, live clock, or FINAL status inside the scoreboard/status strip.",
+  "status alignment": "Horizontal alignment of game time, live clock, or FINAL status inside the scoreboard/status strip.",
   "text alignment": "Horizontal alignment for the selected Home/Away text block when separate positioning is enabled.",
   "selected border": "Border shown around the player's selected team before the game is final.",
   "selected tint": "Background tint added to the selected team while keeping the team image visible.",
