@@ -48,14 +48,4 @@
   root.PATTC_NFL_WEEK_SURVIVOR_PLAYOFF_R1={inject:inject,load:load,save:save};
   if(typeof MutationObserver!=='undefined')new MutationObserver(inject).observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',inject);else setTimeout(inject,0);
-
-  /* Shared Game Builder Navigation Shell R2 is presentation-only and piggybacks
-     on this already-loaded NFL admin helper so app.html/release wiring stays untouched. */
-  if(!document.querySelector('script[data-shared-game-builder-navigation-shell-r2]')){
-    var shellScript=document.createElement('script');
-    shellScript.src='./js/adminGameBuilderNavigationShellR2.js?release=shared-game-builder-navigation-shell-r2';
-    shellScript.async=false;
-    shellScript.setAttribute('data-shared-game-builder-navigation-shell-r2','1');
-    document.head.appendChild(shellScript);
-  }
 })(window);
