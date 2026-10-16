@@ -151,7 +151,7 @@ const ADMIN_UI_HELP_EXACT = {
   "text vertical": "Moves the stacked city/team text block toward the top, middle, or bottom of the team button.",
   "score position": "Anchors the score independently from the city/team text. Use inline, center, or any card corner.",
   "confidence vertical": "Vertical alignment of the Confidence control/value within the matchup row.",
-  "status alignment": "Horizontal alignment of game time, live clock, or FINAL status inside the scoreboard/status strip.",
+  "status alignment": "Horizontal alignment for game time, live clock, or FINAL status inside the scoreboard/status strip.",
   "text alignment": "Horizontal alignment for the selected Home/Away text block when separate positioning is enabled.",
   "selected border": "Border shown around the player's selected team before the game is final.",
   "selected tint": "Background tint added to the selected team while keeping the team image visible.",
@@ -495,10 +495,34 @@ function adminUiEnhanceCards_(root) {
   });
 }
 
+function adminUiEnsureGameBuilderNavigationShellR2_(root) {
+  if (!root || !root.querySelector || !root.querySelector('[data-admin-games-design-r1="1"]')) return;
+
+  if (typeof window.pattcAdminGameBuilderNavigationShellR2Mount === "function") {
+    window.pattcAdminGameBuilderNavigationShellR2Mount();
+    return;
+  }
+
+  let script = document.querySelector('script[data-admin-game-builder-navigation-shell-r2="1"]');
+  if (script) return;
+
+  script = document.createElement("script");
+  script.src = "./js/adminGameBuilderNavigationShellR2.js?release=shared-game-builder-navigation-shell-r2";
+  script.async = false;
+  script.setAttribute("data-admin-game-builder-navigation-shell-r2", "1");
+  script.addEventListener("load", function() {
+    if (typeof window.pattcAdminGameBuilderNavigationShellR2Mount === "function") {
+      window.pattcAdminGameBuilderNavigationShellR2Mount();
+    }
+  }, { once: true });
+  document.head.appendChild(script);
+}
+
 function adminUiEnhancePage(root) {
   root = root || document;
   const page = root.querySelector ? root.querySelector(".admin-page") : null;
   if (!page) return;
+  adminUiEnsureGameBuilderNavigationShellR2_(root);
   adminUiEnhanceCards_(page);
   adminUiEnhanceButtons_(page);
   adminUiEnhanceHelp_(page);
