@@ -54,10 +54,10 @@ for (const route of [
 ]) {
   assert(shell.includes(route), 'authoritative route must remain preserved: ' + route);
 }
-assert(shell.includes('New Game stays available here until the R3 builder is accepted.'), 'New Game preservation must remain explicit');
+assert(shell.includes('Manage Games keeps its existing New Game capability.'), 'Manage Games New Game preservation must remain explicit during R3B');
+assert(shell.includes('apiAdminCreateGame(payload)'), 'R3B shell must orchestrate Draft creation through the authoritative create API');
 
 for (const forbidden of [
-  'apiAdminCreateGame(',
   'saveConfidencePicksBatch',
   'saveSurvivorPick',
   'sportsSurvivorSettle',
@@ -65,7 +65,7 @@ for (const forbidden of [
   'apiAdminSaveGame',
   'apiAdminRunSportsSurvivor'
 ]) {
-  assert(!shell.includes(forbidden), 'R2 shell must not add creation/scoring/backend behavior: ' + forbidden);
+  assert(!shell.includes(forbidden), 'shared shell must not add unauthorized gameplay/backend behavior: ' + forbidden);
 }
 
 function makeHost() {
