@@ -164,13 +164,44 @@ async function submit(context, form, choice) {
     for (const heading of ['1. Game Builder','2. Manage Existing Games','3. Competitions','4. League / Season Data','5. Operations']) {
       assert(html.includes(heading), 'R2 lifecycle group missing: ' + heading);
     }
-    for (const route of ['admin-games','admin-team-fantasy','admin-nfl-cup','admin-nfl-season-setup','admin-playoff-race','admin-sports-engine']) {
+    for (const route of ['admin-games','admin-nfl-cup','admin-nfl-season-setup','admin-sports-engine']) {
       assert(html.includes(route), 'preserved R2 route missing: ' + route);
     }
     assert(html.includes('Manage Games keeps its existing New Game capability.'), 'Manage Games New Game preservation must remain explicit');
     assert(html.includes('Playoff / Forecast'), 'Playoff / Forecast choice must remain visible');
+    assert(html.includes('Game Builder Workspace'), 'selected builder must use a dedicated full-width workspace');
+    assert(html.indexOf('data-admin-r3b-builder-host') > html.indexOf('5. Operations'), 'workspace must render after lifecycle navigation cards');
+    assert(!html.includes('Open Existing Team Fantasy Manager'), 'Team Fantasy manager action must not be duplicated permanently in navigation');
+    assert(!html.includes('Open Existing Playoff Race Configuration'), 'Playoff Race manager action must not be duplicated permanently in navigation');
     assert(!html.includes('value="playoff-race"') && !html.includes('value="forecast"'), 'unsupported Playoff / Forecast types must not be emitted');
+
+    state.context.pattcAdminGameBuilderR2Select_('other', 'builder');
+    const otherHtml = state.host.innerHTML;
+    for (const [value, label] of [
+      ['prediction', 'Prediction'],
+      ['head-to-head', 'Head-to-Head'],
+      ['staked-prediction', 'Staked Prediction'],
+      ['wager', 'Wager'],
+      ['racing-wager', 'Racing Wager'],
+      ['mixed', 'Mixed'],
+      ['voting', 'Voting'],
+      ['ranking', 'Ranking']
+    ]) {
+      assert(otherHtml.includes(`value="${value}"`), 'Other Game value missing: ' + value);
+      assert(otherHtml.includes(`>${label}</option>`), 'Other Game human label missing: ' + label);
+    }
+
+    state.context.pattcAdminGameBuilderR2Select_('playoff-forecast', 'builder');
+    const playoffHtml = state.host.innerHTML;
+    assert(playoffHtml.includes('New game creation is not available here yet.'), 'Playoff workspace must use admin-facing wording');
+    assert(playoffHtml.includes('Open Playoff Race Configuration'), 'Playoff workspace must expose one existing-manager action');
+    assert(!playoffHtml.includes('canonical Games type'), 'Playoff workspace must not expose backend implementation terminology');
+
+    state.context.pattcAdminGameBuilderR2Select_('team-fantasy', 'builder');
+    const teamFantasyHtml = state.host.innerHTML;
+    assert(teamFantasyHtml.includes('Selected Builder — Team Fantasy'), 'Team Fantasy must render in selected workspace');
+    assert(teamFantasyHtml.includes('Open Existing Team Fantasy Manager'), 'Team Fantasy selected workspace must offer one existing-manager action');
   }
 
-  console.log('PASS sports game builder orchestration R3B behavior');
+  console.log('PASS sports game builder orchestration R3B behavior and Preview polish');
 })().catch(err => { console.error(err); process.exit(1); });

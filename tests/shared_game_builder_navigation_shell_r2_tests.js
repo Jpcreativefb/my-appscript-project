@@ -46,7 +46,7 @@ for (const dataArea of ['Teams', 'Schedule', 'Scores', 'Standings', 'Odds', 'Sea
 for (const route of [
   "navigate('admin-games')",
   "navigate('admin-team-fantasy')",
-  "navigate('admin-playoff-race')",
+  'navigate("admin-playoff-race")',
   "navigate('admin-nfl-cup')",
   "navigate('admin-nfl-season-setup')",
   "navigate('admin-sports-engine')",
@@ -96,6 +96,13 @@ vm.runInContext(shell, context);
 assert.strictEqual(typeof context.window.pattcAdminGameBuilderNavigationShellR2Mount, 'function', 'shell must expose one shared Admin mount hook');
 assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount when Sports/NFL/2026 Admin host is rendered');
 assert(currentHost.innerHTML.includes('1. Game Builder'), 'mounted shell must contain lifecycle presentation');
+assert(currentHost.innerHTML.includes('Game Builder Workspace'), 'mounted shell must expose a separate builder workspace');
+assert(
+  currentHost.innerHTML.indexOf('data-admin-r3b-builder-host') > currentHost.innerHTML.indexOf('5. Operations'),
+  'builder workspace must render after the lifecycle cards instead of inside the Game Builder card'
+);
+assert(!currentHost.innerHTML.includes('Existing manager remains authoritative.'), 'navigation card must not carry the old Team Fantasy note');
+assert(!currentHost.innerHTML.includes('Opens existing Playoff Race configuration; it does not create a game.'), 'navigation card must not carry the old Playoff note');
 assert.strictEqual(currentHost.getAttribute('data-shared-game-builder-navigation-shell-r2'), '1', 'mounted host must be marked');
 
 const firstHtml = currentHost.innerHTML;
@@ -110,4 +117,4 @@ assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(),
 assert(currentHost.innerHTML.includes('5. Operations'), 'shell must remain available after normal Admin navigation away and back');
 assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), false, 'revisited Admin host must also remain duplicate-safe');
 
-console.log('PASS shared game builder navigation shell R2 lifecycle ownership and mount coverage');
+console.log('PASS shared game builder navigation shell R2 lifecycle ownership, polish, and mount coverage');

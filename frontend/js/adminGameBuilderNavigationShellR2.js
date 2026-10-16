@@ -16,6 +16,16 @@
     "voting",
     "ranking"
   ]);
+  const OTHER_GAME_TYPE_LABELS_R3B = Object.freeze({
+    prediction: "Prediction",
+    "head-to-head": "Head-to-Head",
+    "staked-prediction": "Staked Prediction",
+    wager: "Wager",
+    "racing-wager": "Racing Wager",
+    mixed: "Mixed",
+    voting: "Voting",
+    ranking: "Ranking"
+  });
   const DEDICATED_GAME_TYPES_R3B = Object.freeze({
     confidence: "confidence",
     survivor: "survivor",
@@ -52,7 +62,8 @@
 
   function otherTypeOptionsR3B_() {
     return OTHER_GAME_TYPES_R3B.map(function (type) {
-      return `<option value="${escapeHtml_(type)}">${escapeHtml_(type)}</option>`;
+      const label = OTHER_GAME_TYPE_LABELS_R3B[type] || type;
+      return `<option value="${escapeHtml_(type)}">${escapeHtml_(label)}</option>`;
     }).join("");
   }
 
@@ -61,13 +72,12 @@
     if (choice === "playoff-forecast") {
       return `
         <div class="admin-r3b-builder-card" data-admin-r3b-builder="playoff-forecast">
-          <h4>Playoff / Forecast</h4>
+          <h4>Selected Builder — Playoff / Forecast</h4>
           <div class="admin-sub">
-            This does not create a new game. The canonical Games type for a new Playoff Race / Forecast game is not established here.
-            Use the existing Playoff Race configuration surface instead.
+            New game creation is not available here yet. Use the existing Playoff Race configuration instead.
           </div>
           <div class="admin-actions" style="margin-top:10px">
-            <button type="button" class="button admin-button" onclick="pattcAdminGameBuilderR3BOpenPlayoffRace_()">Open Existing Playoff Race Configuration</button>
+            <button type="button" class="button admin-button" onclick="pattcAdminGameBuilderR3BOpenPlayoffRace_()">Open Playoff Race Configuration</button>
           </div>
         </div>
       `;
@@ -78,21 +88,25 @@
     const label = shellChoiceLabel_(choice);
     const typeControl = choice === "other"
       ? `<label>Game Type<select name="gameType" required>${otherTypeOptionsR3B_()}</select></label>`
-      : `<div class="admin-sub">Canonical game type: <code>${escapeHtml_(type)}</code></div>`;
+      : `<div class="admin-r3b-type-note">Game type: <code>${escapeHtml_(type)}</code></div>`;
+    const existingManagerAction = choice === "team-fantasy"
+      ? `<button type="button" class="button admin-button secondary" onclick="navigate('admin-team-fantasy')">Open Existing Team Fantasy Manager</button>`
+      : "";
 
     return `
       <form class="admin-r3b-builder-card" data-admin-r3b-builder="${escapeHtml_(choice)}"
         onsubmit="pattcAdminGameBuilderR3BSubmit_(event,'${escapeHtml_(choice)}'); return false;">
-        <h4>Create ${escapeHtml_(label)} Draft</h4>
-        <div class="admin-sub">Creates only the authoritative Draft game. Further configuration stays on the existing manager.</div>
+        <h4>Selected Builder — ${escapeHtml_(label)}</h4>
+        <div class="admin-sub">Create the authoritative Draft game here. Further setup stays on the existing manager.</div>
         <div class="admin-r3b-form-grid">
           <label>Game Name<input name="gameName" type="text" required autocomplete="off"></label>
           <label>Game ID<input name="gameId" type="text" required autocomplete="off"></label>
           <label>Year<input name="year" type="number" min="2000" max="2100" step="1" required></label>
           ${typeControl}
         </div>
-        <div class="admin-actions" style="margin-top:10px">
+        <div class="admin-actions admin-r3b-workspace-actions">
           <button type="submit" class="button admin-button" data-admin-r3b-submit>Create Draft Game</button>
+          ${existingManagerAction}
         </div>
         <div class="admin-message" data-admin-r3b-status aria-live="polite"></div>
       </form>
@@ -238,7 +252,7 @@
     if (kind === "builder") showBuilderR3B_(choice);
   };
 
-  function builderChoice_(key, label, note) {
+  function builderChoice_(key, label) {
     return `
       <button type="button" class="button admin-button secondary"
         data-admin-r2-shell-choice="${escapeHtml_(key)}"
@@ -246,7 +260,6 @@
         onclick="pattcAdminGameBuilderR2Select_('${escapeHtml_(key)}','builder')">
         ${escapeHtml_(label)}
       </button>
-      ${note ? `<span class="admin-sub">${escapeHtml_(note)}</span>` : ""}
     `;
   }
 
@@ -265,15 +278,22 @@
     return `
       <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1">
         <style>
-          [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:12px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; align-items:start; }
           [${MOUNTED_ATTR}="1"] .admin-r2-destination { border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; min-width:0; }
           [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4 { margin:0 0 6px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-choice-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-choice-grid .admin-button { flex:1 1 150px; }
           [${MOUNTED_ATTR}="1"] [data-admin-r2-shell-choice][aria-pressed="true"] { outline:2px solid currentColor; outline-offset:2px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-rule { margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(148,163,184,.10); }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card { margin-top:12px; padding:12px; border:1px solid rgba(148,163,184,.28); border-radius:12px; }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-top:10px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card { margin:0; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:10px; align-items:end; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid label { display:grid; gap:4px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-type-note { align-self:end; padding:8px 0; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace-actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+          @media (max-width:720px) {
+            [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { grid-template-columns:1fr; }
+          }
         </style>
 
         <div class="admin-sub"><strong>Admin → Games &amp; Design → Sports → NFL → 2026</strong></div>
@@ -282,20 +302,13 @@
         <div class="admin-r2-lifecycle-grid">
           <section class="admin-r2-destination" data-admin-r2-destination="game-builder">
             <h3>1. Game Builder</h3>
-            <div class="admin-sub">Choose a small Draft builder. Existing managers own all further setup and publication.</div>
+            <div class="admin-sub">Choose what you want to create. The selected builder opens in the workspace below.</div>
             <div class="admin-r2-choice-grid">
               ${builderChoice_("confidence", "Confidence")}
               ${builderChoice_("survivor", "Survivor")}
-              ${builderChoice_("team-fantasy", "Team Fantasy", "Existing manager remains authoritative.")}
-              ${builderChoice_("playoff-forecast", "Playoff / Forecast", "Opens existing Playoff Race configuration; it does not create a game.")}
+              ${builderChoice_("team-fantasy", "Team Fantasy")}
+              ${builderChoice_("playoff-forecast", "Playoff / Forecast")}
               ${builderChoice_("other", "Other Game")}
-            </div>
-            <div data-admin-r3b-builder-host>
-              <div class="admin-sub" style="margin-top:10px">Select a builder above to establish a Draft game or open the existing Playoff Race configuration.</div>
-            </div>
-            <div class="admin-actions" style="margin-top:10px">
-              <button type="button" class="button admin-button secondary" onclick="navigate('admin-team-fantasy')">Open Existing Team Fantasy Manager</button>
-              <button type="button" class="button admin-button secondary" onclick="navigate('admin-playoff-race')">Open Existing Playoff Race Configuration</button>
             </div>
           </section>
 
@@ -334,6 +347,11 @@
             <div class="admin-actions"><button type="button" class="button admin-button" onclick="navigate('admin-sports-engine')">Sports Engine Controls</button></div>
           </section>
         </div>
+
+        <section class="admin-r3b-workspace" data-admin-r3b-builder-host>
+          <div class="admin-sub"><strong>Game Builder Workspace</strong></div>
+          <div class="admin-sub">Select Confidence, Survivor, Team Fantasy, Playoff / Forecast, or Other Game above.</div>
+        </section>
 
         <div class="admin-message" data-admin-r2-selection-message>Select a Game Builder, Competition, or League / Season Data destination.</div>
 
