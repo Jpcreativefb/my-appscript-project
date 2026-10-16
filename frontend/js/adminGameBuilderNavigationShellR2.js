@@ -216,20 +216,4 @@
   }
 
   window.pattcAdminGameBuilderNavigationShellR2Mount = mountShell_;
-
-  function scheduleMount_() {
-    window.setTimeout(mountShell_, 0);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", scheduleMount_, { once: true });
-  } else {
-    scheduleMount_();
-  }
-
-  const root = document.getElementById("app");
-  if (root && typeof MutationObserver !== "undefined") {
-    const observer = new MutationObserver(scheduleMount_);
-    observer.observe(root, { childList: true, subtree: true });
-  }
 })();
