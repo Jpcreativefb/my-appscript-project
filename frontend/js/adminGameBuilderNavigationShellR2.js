@@ -1,5 +1,6 @@
-/* PATTC Shared Game Builder Navigation Shell R2 + Orchestration R3B
- * R2 lifecycle/navigation remains intact. R3B only orchestrates authoritative Draft game creation.
+/* PATTC Shared Game Builder Navigation Shell R2 + Orchestration R3B + Competition Builder R5
+ * Builders create authoritative Draft games. Managers edit. Engines support. Scope defines context.
+ * R5 competitions only orchestrate proven authoritative competition surfaces; they never create shadow Games.
  */
 (function () {
   "use strict";
@@ -48,8 +49,9 @@
       "team-fantasy": "Team Fantasy",
       "playoff-forecast": "Playoff / Forecast",
       other: "Other Game",
+      cup: "Cup",
       series: "Series",
-      tournaments: "Tournaments",
+      tournament: "Tournament",
       teams: "Teams",
       schedule: "Schedule",
       scores: "Scores",
@@ -73,14 +75,11 @@
       return `
         <div class="admin-r3b-builder-card" data-admin-r3b-builder="playoff-forecast">
           <h4>Selected Builder — Playoff / Forecast</h4>
-          <div class="admin-sub">
-            New game creation is not available here yet. Use the existing Playoff Race configuration instead.
-          </div>
+          <div class="admin-sub">New game creation is not available here yet. Use the existing Playoff Race configuration instead.</div>
           <div class="admin-actions" style="margin-top:10px">
             <button type="button" class="button admin-button" onclick="pattcAdminGameBuilderR3BOpenPlayoffRace_()">Open Playoff Race Configuration</button>
           </div>
-        </div>
-      `;
+        </div>`;
     }
 
     const type = DEDICATED_GAME_TYPES_R3B[choice] || "";
@@ -109,8 +108,38 @@
           ${existingManagerAction}
         </div>
         <div class="admin-message" data-admin-r3b-status aria-live="polite"></div>
-      </form>
-    `;
+      </form>`;
+  }
+
+  function competitionWorkspaceHtmlR5_(choice) {
+    choice = String(choice || "cup");
+    if (choice === "cup") {
+      return `
+        <div class="admin-r5-competition-card" data-admin-r5-competition="cup">
+          <h4>Selected Competition — Cup</h4>
+          <div class="admin-sub">Cup groups existing authoritative games. Cup configuration, parent/child relationships, qualification, weighting, Futures setup, and publication remain owned by the existing NFL Cup Control Center.</div>
+          <div class="admin-actions admin-r3b-workspace-actions">
+            <button type="button" class="button admin-button" onclick="navigate('admin-nfl-cup')">Open NFL Cup Control Center</button>
+          </div>
+        </div>`;
+    }
+    if (choice === "series") {
+      return `
+        <div class="admin-r5-competition-card" data-admin-r5-competition="series">
+          <h4>Selected Competition — Series</h4>
+          <div class="admin-sub">Series combines existing authoritative games.</div>
+          <div class="admin-sub"><strong>Competition creation is not available yet.</strong> This shell does not create Games rows or persist a Series container.</div>
+        </div>`;
+    }
+    if (choice === "tournament") {
+      return `
+        <div class="admin-r5-competition-card" data-admin-r5-competition="tournament">
+          <h4>Selected Competition — Tournament</h4>
+          <div class="admin-sub">Tournament combines existing authoritative games.</div>
+          <div class="admin-sub"><strong>Competition creation is not available yet.</strong> This shell does not create Games rows or persist a Tournament container.</div>
+        </div>`;
+    }
+    return "";
   }
 
   function showBuilderR3B_(choice) {
@@ -119,6 +148,15 @@
     const host = shell.querySelector("[data-admin-r3b-builder-host]");
     if (!host) return false;
     host.innerHTML = builderFormHtmlR3B_(choice);
+    return true;
+  }
+
+  function showCompetitionR5_(choice) {
+    const shell = document.querySelector("[" + MOUNTED_ATTR + '="1"]');
+    if (!shell) return false;
+    const host = shell.querySelector("[data-admin-r5-competition-host]");
+    if (!host) return false;
+    host.innerHTML = competitionWorkspaceHtmlR5_(choice);
     return true;
   }
 
@@ -160,9 +198,7 @@
     let type = DEDICATED_GAME_TYPES_R3B[String(choice || "")] || "";
     if (choice === "other") {
       type = readFormValueR3B_(form, "gameType");
-      if (OTHER_GAME_TYPES_R3B.indexOf(type) === -1) {
-        throw new Error("Unsupported Other Game type.");
-      }
+      if (OTHER_GAME_TYPES_R3B.indexOf(type) === -1) throw new Error("Unsupported Other Game type.");
     }
     if (!type) throw new Error("This builder does not create games.");
 
@@ -208,9 +244,7 @@
     try {
       if (typeof apiAdminCreateGame !== "function") throw new Error("Authoritative game creation API is unavailable.");
       const response = await apiAdminCreateGame(payload);
-      if (!response || response.success !== true) {
-        throw new Error(response && response.message ? response.message : "Game creation failed.");
-      }
+      if (!response || response.success !== true) throw new Error(response && response.message ? response.message : "Game creation failed.");
 
       const duplicate = Boolean(response.result && response.result.duplicate === true);
       setStatusR3B_(form,
@@ -238,7 +272,7 @@
     const message = shell.querySelector("[data-admin-r2-selection-message]");
     if (message) {
       const prefix = kind === "competition"
-        ? "Competition shell selected"
+        ? "Competition selected"
         : kind === "season-data"
           ? "League / Season Data selected"
           : "Game Builder selected";
@@ -246,14 +280,17 @@
     }
 
     shell.querySelectorAll("[data-admin-r2-shell-choice]").forEach(function (control) {
-      if (control.tagName === "SELECT") {
+      if (control.tagName !== "SELECT") return;
+      const controlKind = control.getAttribute ? control.getAttribute("data-admin-r2-shell-choice") : "";
+      if ((kind === "builder" && controlKind === "game-builder") ||
+          (kind === "competition" && controlKind === "competition") ||
+          (kind === "season-data" && controlKind === "season-data")) {
         control.value = String(choice);
-      } else {
-        control.setAttribute("aria-pressed", control.getAttribute("data-admin-r2-shell-choice") === String(choice) ? "true" : "false");
       }
     });
 
     if (kind === "builder") showBuilderR3B_(choice);
+    if (kind === "competition") showCompetitionR5_(choice);
   };
 
   window.pattcAdminGameBuilderR3BBuilderSelect_ = function (select) {
@@ -270,28 +307,30 @@
     return true;
   };
 
+  window.pattcAdminCompetitionR5Select_ = function (select) {
+    const choice = String(select && select.value || "cup");
+    window.pattcAdminGameBuilderR2Select_(choice, "competition");
+    return true;
+  };
+
   function shellHtml_() {
     return `
-      <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1">
+      <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1" data-admin-competition-builder-r5="1">
         <style>
           [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; align-items:start; }
           [${MOUNTED_ATTR}="1"] .admin-r2-destination { border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; min-width:0; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4 { margin:0 0 6px; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-choice-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4, [${MOUNTED_ATTR}="1"] .admin-r5-competition-card h4 { margin:0 0 6px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-selector { display:grid; gap:6px; margin-top:10px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-selector select { width:100%; min-height:38px; }
-          [${MOUNTED_ATTR}="1"] [data-admin-r2-shell-choice][aria-pressed="true"] { outline:2px solid currentColor; outline-offset:2px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-rule { margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(148,163,184,.10); }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace, [${MOUNTED_ATTR}="1"] .admin-r5-competition-workspace { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card { margin:0; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:10px; align-items:end; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid label { display:grid; gap:4px; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-type-note { align-self:end; padding:8px 0; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-workspace-actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-secondary-links { display:grid; gap:8px; margin-top:12px; }
-          @media (max-width:720px) {
-            [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { grid-template-columns:1fr; }
-          }
+          @media (max-width:720px) { [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { grid-template-columns:1fr; } }
         </style>
 
         <div class="admin-sub"><strong>Admin → Games &amp; Design → Sports → NFL → 2026</strong></div>
@@ -321,13 +360,14 @@
 
           <section class="admin-r2-destination" data-admin-r2-destination="competitions">
             <h3>3. Competitions</h3>
-            <div class="admin-sub">Combine or organize existing authoritative Game IDs. Competitions do not duplicate the underlying games.</div>
-            <div class="admin-actions">
-              <button type="button" class="button admin-button" onclick="navigate('admin-nfl-cup')">Cups</button>
-              <button type="button" class="button admin-button secondary" data-admin-r2-shell-choice="series" aria-pressed="false" onclick="pattcAdminGameBuilderR2Select_('series','competition')">Series</button>
-              <button type="button" class="button admin-button secondary" data-admin-r2-shell-choice="tournaments" aria-pressed="false" onclick="pattcAdminGameBuilderR2Select_('tournaments','competition')">Tournaments</button>
-            </div>
-            <div class="admin-sub">NFL Cup keeps its dedicated page. Series and Tournaments remain visual destinations only.</div>
+            <div class="admin-sub">Combine existing authoritative games without duplicating them.</div>
+            <label class="admin-r2-selector">Competition Type
+              <select data-admin-r2-shell-choice="competition" onchange="pattcAdminCompetitionR5Select_(this)">
+                <option value="cup" selected>Cup</option>
+                <option value="series">Series</option>
+                <option value="tournament">Tournament</option>
+              </select>
+            </label>
           </section>
 
           <section class="admin-r2-destination" data-admin-r2-destination="league-season-data">
@@ -362,16 +402,18 @@
           <div class="admin-sub">Choose a game type above to create a Draft game or open the existing Playoff Race configuration.</div>
         </section>
 
-        <div class="admin-message" data-admin-r2-selection-message>Select a Game Builder, Competition, or League / Season Data destination.</div>
+        <section class="admin-r5-competition-workspace" data-admin-r5-competition-host>
+          ${competitionWorkspaceHtmlR5_("cup")}
+        </section>
 
-        <div class="admin-r2-rule admin-sub"><strong>Preserved R3 boundaries:</strong> NFL Cup stays dedicated; NFL Sports Pack stays outside ordinary Manage Games; Playoff Race configuration stays dedicated; Sports Engine Controls stays dedicated; Team Fantasy keeps its manager.</div>
+        <div class="admin-message" data-admin-r2-selection-message>Select a Game Builder, Competition, or League / Season Data destination.</div>
+        <div class="admin-r2-rule admin-sub"><strong>Preserved R3/R4 boundaries:</strong> NFL Cup stays dedicated; Manage Existing Games stays on admin-games; NFL Sports Pack stays dedicated; Playoff Race stays dedicated; Sports Engine Controls stays dedicated; Team Fantasy keeps its manager.</div>
 
         <div class="admin-list" style="margin-top:12px">
           <div class="admin-list-row"><div><strong>Reality</strong><div class="admin-sub">Show/season managers such as The Traitors and DWTS remain in the existing Reality TV Manager.</div></div></div>
           <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager.</div></div></div>
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
   function mountShell_() {
