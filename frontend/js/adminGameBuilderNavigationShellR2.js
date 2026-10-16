@@ -240,39 +240,35 @@
       const prefix = kind === "competition"
         ? "Competition shell selected"
         : kind === "season-data"
-          ? "League / Season Data shell selected"
+          ? "League / Season Data selected"
           : "Game Builder selected";
       message.textContent = prefix + ": " + label + ". Existing authoritative managers and APIs remain in control.";
     }
 
-    shell.querySelectorAll("[data-admin-r2-shell-choice]").forEach(function (button) {
-      button.setAttribute("aria-pressed", button.getAttribute("data-admin-r2-shell-choice") === String(choice) ? "true" : "false");
+    shell.querySelectorAll("[data-admin-r2-shell-choice]").forEach(function (control) {
+      if (control.tagName === "SELECT") {
+        control.value = String(choice);
+      } else {
+        control.setAttribute("aria-pressed", control.getAttribute("data-admin-r2-shell-choice") === String(choice) ? "true" : "false");
+      }
     });
 
     if (kind === "builder") showBuilderR3B_(choice);
   };
 
-  function builderChoice_(key, label) {
-    return `
-      <button type="button" class="button admin-button secondary"
-        data-admin-r2-shell-choice="${escapeHtml_(key)}"
-        aria-pressed="false"
-        onclick="pattcAdminGameBuilderR2Select_('${escapeHtml_(key)}','builder')">
-        ${escapeHtml_(label)}
-      </button>
-    `;
-  }
+  window.pattcAdminGameBuilderR3BBuilderSelect_ = function (select) {
+    const choice = String(select && select.value || "");
+    if (!choice) return false;
+    window.pattcAdminGameBuilderR2Select_(choice, "builder");
+    return true;
+  };
 
-  function seasonChoice_(key, label) {
-    return `
-      <button type="button" class="button admin-button secondary"
-        data-admin-r2-shell-choice="${escapeHtml_(key)}"
-        aria-pressed="false"
-        onclick="pattcAdminGameBuilderR2Select_('${escapeHtml_(key)}','season-data')">
-        ${escapeHtml_(label)}
-      </button>
-    `;
-  }
+  window.pattcAdminGameBuilderR3BSeasonSelect_ = function (select) {
+    const choice = String(select && select.value || "");
+    if (!choice) return false;
+    window.pattcAdminGameBuilderR2Select_(choice, "season-data");
+    return true;
+  };
 
   function shellHtml_() {
     return `
@@ -282,7 +278,8 @@
           [${MOUNTED_ATTR}="1"] .admin-r2-destination { border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; min-width:0; }
           [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4 { margin:0 0 6px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-choice-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-choice-grid .admin-button { flex:1 1 150px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-selector { display:grid; gap:6px; margin-top:10px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-selector select { width:100%; min-height:38px; }
           [${MOUNTED_ATTR}="1"] [data-admin-r2-shell-choice][aria-pressed="true"] { outline:2px solid currentColor; outline-offset:2px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-rule { margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(148,163,184,.10); }
           [${MOUNTED_ATTR}="1"] .admin-r3b-workspace { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
@@ -291,6 +288,7 @@
           [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid label { display:grid; gap:4px; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-type-note { align-self:end; padding:8px 0; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-workspace-actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-secondary-links { display:grid; gap:8px; margin-top:12px; }
           @media (max-width:720px) {
             [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { grid-template-columns:1fr; }
           }
@@ -303,13 +301,16 @@
           <section class="admin-r2-destination" data-admin-r2-destination="game-builder">
             <h3>1. Game Builder</h3>
             <div class="admin-sub">Choose what you want to create. The selected builder opens in the workspace below.</div>
-            <div class="admin-r2-choice-grid">
-              ${builderChoice_("confidence", "Confidence")}
-              ${builderChoice_("survivor", "Survivor")}
-              ${builderChoice_("team-fantasy", "Team Fantasy")}
-              ${builderChoice_("playoff-forecast", "Playoff / Forecast")}
-              ${builderChoice_("other", "Other Game")}
-            </div>
+            <label class="admin-r2-selector">Game Type
+              <select data-admin-r2-shell-choice="game-builder" onchange="pattcAdminGameBuilderR3BBuilderSelect_(this)">
+                <option value="">Choose a game type…</option>
+                <option value="confidence">Confidence</option>
+                <option value="survivor">Survivor</option>
+                <option value="team-fantasy">Team Fantasy</option>
+                <option value="playoff-forecast">Playoff / Forecast</option>
+                <option value="other">Other Game</option>
+              </select>
+            </label>
           </section>
 
           <section class="admin-r2-destination" data-admin-r2-destination="manage-existing-games">
@@ -332,12 +333,20 @@
           <section class="admin-r2-destination" data-admin-r2-destination="league-season-data">
             <h3>4. League / Season Data</h3>
             <div class="admin-sub">Shared NFL season context used by games and competitions. Existing Sports data tooling remains authoritative.</div>
-            <div class="admin-r2-choice-grid">
-              ${seasonChoice_("teams", "Teams")}${seasonChoice_("schedule", "Schedule")}${seasonChoice_("scores", "Scores")}${seasonChoice_("standings", "Standings")}${seasonChoice_("odds", "Odds")}${seasonChoice_("season-timing", "Season Timing")}
-            </div>
-            <div class="admin-actions" style="margin-top:10px">
-              <button type="button" class="button admin-button secondary" onclick="window.location.href='./sports.html'">Open Sports Scores &amp; Game Builder</button>
-              <button type="button" class="button admin-button secondary" onclick="navigate('admin-nfl-season-setup')">Open Existing NFL Sports Pack Setup</button>
+            <label class="admin-r2-selector">Season Data Tool
+              <select data-admin-r2-shell-choice="season-data" onchange="pattcAdminGameBuilderR3BSeasonSelect_(this)">
+                <option value="">Choose a season data tool…</option>
+                <option value="teams">Teams</option>
+                <option value="schedule">Schedule</option>
+                <option value="scores">Scores</option>
+                <option value="standings">Standings</option>
+                <option value="odds">Odds</option>
+                <option value="season-timing">Season Timing</option>
+              </select>
+            </label>
+            <div class="admin-r2-secondary-links">
+              <button type="button" class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores &amp; Game Builder</button>
+              <button type="button" class="button admin-button secondary" onclick="navigate('admin-nfl-season-setup')">NFL Sports Pack Setup</button>
             </div>
           </section>
 
@@ -350,7 +359,7 @@
 
         <section class="admin-r3b-workspace" data-admin-r3b-builder-host>
           <div class="admin-sub"><strong>Game Builder Workspace</strong></div>
-          <div class="admin-sub">Select Confidence, Survivor, Team Fantasy, Playoff / Forecast, or Other Game above.</div>
+          <div class="admin-sub">Choose a game type above to create a Draft game or open the existing Playoff Race configuration.</div>
         </section>
 
         <div class="admin-message" data-admin-r2-selection-message>Select a Game Builder, Competition, or League / Season Data destination.</div>
