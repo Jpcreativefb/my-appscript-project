@@ -24,6 +24,13 @@
     return String(value === undefined || value === null ? "" : value).trim();
   }
 
+  function normalizeGameId_(value) {
+    return text_(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
+
   function escape_(value) {
     return String(value === undefined || value === null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -65,7 +72,7 @@
 
     return {
       name: text_(input.name),
-      gameId: text_(input.gameId),
+      gameId: normalizeGameId_(input.gameId),
       year: text_(input.year),
       type: type,
       active: false,
@@ -124,7 +131,7 @@
   }
 
   function inject_() {
-    if (!document || !document.querySelector) return false;
+    if (typeof document === "undefined" || !document.querySelector) return false;
     if (document.querySelector('[data-admin-awards-adaptation-r7="1"]')) return true;
 
     const sportsCard = document.querySelector('.admin-page [data-admin-games-design-r1="1"]');
@@ -148,9 +155,9 @@
       );
     }
 
-    const wanted = text_(gameId).toLowerCase();
+    const wanted = normalizeGameId_(gameId);
     const duplicate = (Array.isArray(result.games) ? result.games : []).some(function(game) {
-      return text_(game && (game.gameId || game.id)).toLowerCase() === wanted;
+      return normalizeGameId_(game && (game.gameId || game.id)) === wanted;
     });
 
     return !duplicate;
