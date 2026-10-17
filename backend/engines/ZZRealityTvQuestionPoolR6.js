@@ -204,11 +204,21 @@ function realityTvR6AssertRegenerateSafe_(season, episode) {
     throw new Error("This episode is " + status + ". Regenerate is not allowed.");
   }
   var rows = realityTvR6EpisodeQuestions_(season.SeasonId, episode.EpisodeId);
+  var protectedState = null;
   var blocked = rows.find(function(row) {
-    return typeof realityTvEpisodeQuestionHasProtectedState_ === "function" && realityTvEpisodeQuestionHasProtectedState_(season, row);
+    if (typeof realityTvEpisodeQuestionHasProtectedState_ !== "function") return false;
+    var state = realityTvEpisodeQuestionHasProtectedState_(season, row);
+    if (state && state.blocked === true) {
+      protectedState = state;
+      return true;
+    }
+    return false;
   });
   if (blocked) {
-    throw new Error("This question set has protected picks, wagers, results, or review history and cannot be regenerated.");
+    var reason = String(protectedState && protectedState.reason || "").trim();
+    throw new Error(reason
+      ? "This question set cannot be regenerated: " + reason
+      : "This question set has protected picks, wagers, results, or review history and cannot be regenerated.");
   }
   return rows;
 }
