@@ -61,6 +61,20 @@ assert.deepStrictEqual(ids(call('realityTvR6SelectForEpisode_(__season,__episode
 assert(source.includes('realityTvEpisodeQuestionsForSeason_'));
 assert(source.includes('TemplateId'));
 
+const changedTemplates = templates.map(row => Object.assign({}, row, {
+  Enabled: row.TemplateId === 'random-c' || row.TemplateId === 'random-d'
+    ? false
+    : row.Enabled
+}));
+set('__changedTemplates', changedTemplates);
+set('realityTvQuestionTemplatesForSeason_', () => changedTemplates);
+set('__seasonAfterDefaultsChange', { SeasonId:'s1', QuestionPoolEnabled:true, RandomQuestionCount:1, AvoidRepeatEpisodes:0 });
+const savedSelectionAfterDefaultsChange = ids(call('realityTvR6SelectForEpisode_(__seasonAfterDefaultsChange,__episode,{regenerate:false,rng:__zeroRng})'));
+assert.deepStrictEqual(savedSelectionAfterDefaultsChange, ['random-c']);
+const regeneratedAfterDefaultsChange = ids(call('realityTvR6SelectForEpisode_(__seasonAfterDefaultsChange,__episode,{regenerate:true,rng:__zeroRng})'));
+assert.deepStrictEqual(regeneratedAfterDefaultsChange, ['core-a','random-b']);
+assert(!regeneratedAfterDefaultsChange.includes('random-c'));
+
 set('realityTvEpisodeQuestionHasProtectedState_', () => ({ blocked:false, reason:'' }));
 let deletedQuestionCount = 0;
 set('realityTvDeleteEpisodeQuestionForPlan_', () => { deletedQuestionCount += 1; return true; });
