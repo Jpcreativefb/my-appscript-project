@@ -108,7 +108,7 @@ function makeHarness(options = {}) {
     assert.deepStrictEqual(JSON.parse(JSON.stringify(defaultPayload)), {
       name: '2027 Oscars Pool',
       gameId: 'oscars-2027',
-      year: '2027',
+      year: 2027,
       type: 'prediction',
       active: false,
       archived: false,
@@ -116,6 +116,17 @@ function makeHarness(options = {}) {
       status: 'Draft',
       lockAllPicks: true
     }, 'Awards builder must create an ordinary locked inactive Draft game');
+
+    assert.strictEqual(defaultPayload.year, 2027, 'valid Awards year must be numeric');
+    assert.strictEqual(typeof defaultPayload.year, 'number', 'valid Awards year payload must be a Number');
+
+    for (const invalidYear of ['', 'twenty', '27', '2027.0', '1999', '2101']) {
+      assert.throws(
+        () => h.window.adminAwardsR7BuildCreatePayload_({ name: 'Test', gameId: 'test', year: invalidYear }),
+        /four-digit number from 2000 to 2100/,
+        'invalid Awards year must be rejected: ' + String(invalidYear)
+      );
+    }
 
     for (const forbiddenType of ['awards', 'oscars', 'emmys', 'grammys', 'survivor', 'season-cup']) {
       assert.throws(
@@ -167,7 +178,15 @@ function makeHarness(options = {}) {
     const h = makeHarness({
       createGame: async function(payload) {
         h.state.createCalls.push(payload);
-        return { success: true, duplicate: true, gameId: payload.gameId };
+        return {
+          success: true,
+          gameId: 'oscars-2027',
+          result: {
+            success: true,
+            duplicate: true,
+            gameId: 'oscars-2027'
+          }
+        };
       }
     });
     const result = await h.window.adminAwardsR7CreateGame();
@@ -208,7 +227,7 @@ function makeHarness(options = {}) {
     assert.deepStrictEqual(JSON.parse(JSON.stringify(h.state.createCalls[0])), {
       name: '2027 Oscars Pool',
       gameId: 'oscars-2027',
-      year: '2027',
+      year: 2027,
       type: 'confidence',
       active: false,
       archived: false,

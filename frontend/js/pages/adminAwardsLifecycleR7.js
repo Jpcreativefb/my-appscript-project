@@ -31,6 +31,20 @@
       .replace(/^-|-$/g, "");
   }
 
+  function parseYear_(value) {
+    const raw = text_(value);
+    if (!/^\d{4}$/.test(raw)) {
+      throw new Error("Year must be a four-digit number from 2000 to 2100.");
+    }
+
+    const year = Number(raw);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      throw new Error("Year must be a four-digit number from 2000 to 2100.");
+    }
+
+    return year;
+  }
+
   function escape_(value) {
     return String(value === undefined || value === null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -73,7 +87,7 @@
     return {
       name: text_(input.name),
       gameId: normalizeGameId_(input.gameId),
-      year: text_(input.year),
+      year: parseYear_(input.year),
       type: type,
       active: false,
       archived: false,
@@ -215,7 +229,7 @@
         return result || { success: false };
       }
 
-      if (result.duplicate === true) {
+      if (result.duplicate === true || (result.result && result.result.duplicate === true)) {
         setMessage_("Game ID already exists. Choose a different Game ID; nothing was created or changed.", true);
         return Object.assign({}, result, { success: false });
       }

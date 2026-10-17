@@ -1681,6 +1681,33 @@ function adminSaveGame(payload) {
 
   try {
 
+    if (payload.createOnly === true) {
+
+      const createPayload =
+        Object.assign(
+          {},
+          payload,
+          {
+            gameId: gameId
+          }
+        );
+
+      delete createPayload.createOnly;
+
+      const createResult =
+        adminCreateGame(
+          createPayload
+        );
+
+      return {
+        success: true,
+        message: "Game created",
+        gameId: gameId,
+        result: createResult
+      };
+
+    }
+
     adminEnsureGameOptionalHeaders_();
 
     const sh =

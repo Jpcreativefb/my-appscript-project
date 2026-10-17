@@ -1911,7 +1911,8 @@ async function apiAdminCreateGame(payload) {
     "adminSaveGame",
     Object.assign(
       {},
-      payload || {}
+      payload || {},
+      { createOnly: true }
     )
   );
 
