@@ -1,6 +1,7 @@
-/* PATTC Shared Game Builder Navigation Shell R2 + Orchestration R3B + Competition Builder R5
+/* PATTC Shared Game Builder Navigation Shell R2 + Orchestration R3B + Competition Builder R5 + General / Custom R8 R2
  * Builders create authoritative Draft games. Managers edit. Engines support. Scope defines context.
  * R5 competitions only orchestrate proven authoritative competition surfaces; they never create shadow Games.
+ * R8 R2 adds a General / Custom entry point using only the existing generic creator and canonical types.
  */
 (function () {
   "use strict";
@@ -109,6 +110,31 @@
         </div>
         <div class="admin-message" data-admin-r3b-status aria-live="polite"></div>
       </form>`;
+  }
+
+  function generalCustomWorkspaceHtmlR8R2_() {
+    return `
+      <section class="admin-r8r2-general-custom" data-admin-general-custom-r8-r2="1">
+        <div class="admin-sub"><strong>Admin → Games &amp; Design → General / Custom</strong></div>
+        <div class="admin-sub">Create an ordinary PATTC Draft game with the existing generic creator and canonical game types. Existing managers remain authoritative after creation.</div>
+        <div class="admin-r8r2-general-grid">
+          <section class="admin-r2-destination" data-admin-r8r2-destination="game-builder">
+            <h3>Game Builder</h3>
+            ${builderFormHtmlR3B_("other")}
+          </section>
+          <section class="admin-r2-destination" data-admin-r8r2-destination="manage-existing-games">
+            <h3>Manage Existing Games</h3>
+            <div class="admin-sub">Open the existing Manage Games surface for authoritative editing and lifecycle controls.</div>
+            <div class="admin-actions"><button type="button" class="button admin-button" onclick="navigate('admin-games')">Manage Existing Games</button></div>
+          </section>
+          <section class="admin-r2-destination" data-admin-r8r2-destination="custom-configuration">
+            <h3>Custom Configuration</h3>
+            <div class="admin-sub">New generic games continue into the existing game setup authority at <code>admin-game-setup:&lt;gameId&gt;</code>.</div>
+            <div class="admin-actions"><button type="button" class="button admin-button secondary" onclick="navigate('admin-games')">Open Existing Game Configuration</button></div>
+          </section>
+        </div>
+        <div class="admin-r2-rule admin-sub"><strong>Canonical General / Custom types:</strong> prediction · head-to-head · staked-prediction · wager · racing-wager · voting · ranking · mixed.</div>
+      </section>`;
   }
 
   function competitionWorkspaceHtmlR5_(choice) {
@@ -315,22 +341,23 @@
 
   function shellHtml_() {
     return `
-      <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1" data-admin-competition-builder-r5="1">
+      <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1" data-admin-competition-builder-r5="1" data-admin-general-custom-r8-r2-shell="1">
         <style>
-          [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; align-items:start; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; align-items:start; }
           [${MOUNTED_ATTR}="1"] .admin-r2-destination { border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; min-width:0; }
           [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4, [${MOUNTED_ATTR}="1"] .admin-r5-competition-card h4 { margin:0 0 6px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-selector { display:grid; gap:6px; margin-top:10px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-selector select { width:100%; min-height:38px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-rule { margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(148,163,184,.10); }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace, [${MOUNTED_ATTR}="1"] .admin-r5-competition-workspace { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace, [${MOUNTED_ATTR}="1"] .admin-r5-competition-workspace, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-custom { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card { margin:0; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:10px; align-items:end; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid label { display:grid; gap:4px; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-type-note { align-self:end; padding:8px 0; }
           [${MOUNTED_ATTR}="1"] .admin-r3b-workspace-actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
           [${MOUNTED_ATTR}="1"] .admin-r2-secondary-links { display:grid; gap:8px; margin-top:12px; }
-          @media (max-width:720px) { [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid { grid-template-columns:1fr; } }
+          [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid [data-admin-r8r2-destination="game-builder"] { grid-column:1 / -1; }
+          @media (max-width:720px) { [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid { grid-template-columns:1fr; } }
         </style>
 
         <div class="admin-sub"><strong>Admin → Games &amp; Design → Sports → NFL → 2026</strong></div>
@@ -409,6 +436,8 @@
         <div class="admin-message" data-admin-r2-selection-message>Select a Game Builder, Competition, or League / Season Data destination.</div>
         <div class="admin-r2-rule admin-sub"><strong>Preserved R3/R4 boundaries:</strong> NFL Cup stays dedicated; Manage Existing Games stays on admin-games; NFL Sports Pack stays dedicated; Playoff Race stays dedicated; Sports Engine Controls stays dedicated; Team Fantasy keeps its manager.</div>
 
+        ${generalCustomWorkspaceHtmlR8R2_()}
+
         <div class="admin-list" style="margin-top:12px">
           <div class="admin-list-row"><div><strong>Reality</strong><div class="admin-sub">Show/season managers such as The Traitors and DWTS remain in the existing Reality TV Manager.</div></div></div>
           <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager.</div></div></div>
@@ -425,5 +454,6 @@
   }
 
   window.PATTC_ADMIN_OTHER_GAME_TYPES_R3B = OTHER_GAME_TYPES_R3B.slice();
+  window.PATTC_ADMIN_GENERAL_CUSTOM_TYPES_R8_R2 = OTHER_GAME_TYPES_R3B.slice();
   window.pattcAdminGameBuilderNavigationShellR2Mount = mountShell_;
 })();
