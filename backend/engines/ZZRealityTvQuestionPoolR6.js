@@ -186,7 +186,7 @@ function realityTvR6SelectForEpisode_(season, episode, options) {
       var existingMap = {};
       existingIds.forEach(function(id) { existingMap[id] = true; });
       return realityTvR6UniqueTemplates_(templates.filter(function(row) {
-        return existingMap[realityTvR6Key_(row.TemplateId)] && realityTvR6Bool_(row.Enabled);
+        return existingMap[realityTvR6Key_(row.TemplateId)];
       }));
     }
   }
