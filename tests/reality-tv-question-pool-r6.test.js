@@ -61,19 +61,23 @@ assert.deepStrictEqual(ids(call('realityTvR6SelectForEpisode_(__season,__episode
 assert(source.includes('realityTvEpisodeQuestionsForSeason_'));
 assert(source.includes('TemplateId'));
 
-set('realityTvEpisodeQuestionHasProtectedState_', () => false);
-set('realityTvDeleteEpisodeQuestionForPlan_', () => true);
-assert.doesNotThrow(() => call('realityTvR6AssertRegenerateSafe_(__season,__episode)'));
+set('realityTvEpisodeQuestionHasProtectedState_', () => ({ blocked:false, reason:'' }));
+let deletedQuestionCount = 0;
+set('realityTvDeleteEpisodeQuestionForPlan_', () => { deletedQuestionCount += 1; return true; });
+const openUnprotectedRows = call('realityTvR6AssertRegenerateSafe_(__season,__episode)');
+assert.strictEqual(openUnprotectedRows.length, 1);
+assert.strictEqual(call('realityTvR6DeleteExistingSelection_(__season,__episode)'), 1);
+assert.strictEqual(deletedQuestionCount, 1);
+
 for (const status of ['LOCKED','FINAL','CLOSED']) {
   set('__blockedEpisode', { EpisodeId:'ep-5', EpisodeNumber:5, Status:status });
   assert.throws(() => call('realityTvR6AssertRegenerateSafe_(__season,__blockedEpisode)'), /not allowed/);
 }
-for (const reason of ['picks','bets','results','review']) {
-  set('__reason', reason);
-  set('realityTvEpisodeQuestionHasProtectedState_', () => true);
-  assert.throws(() => call('realityTvR6AssertRegenerateSafe_(__season,__episode)'), /protected picks, wagers, results, or review history/);
-}
+
+set('realityTvEpisodeQuestionHasProtectedState_', () => ({ blocked:true, reason:'saved picks' }));
+assert.throws(() => call('realityTvR6AssertRegenerateSafe_(__season,__episode)'), /saved picks/);
 assert(source.includes('realityTvEpisodeQuestionHasProtectedState_'));
+assert(source.includes('.blocked === true'));
 assert(source.includes('realityTvDeleteEpisodeQuestionForPlan_'));
 
 assert(source.includes('Math.random'));
