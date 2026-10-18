@@ -127,6 +127,7 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
   function listPositionsByPlayer(playerId) { return readRows("positions").filter(function(r){return predictionMarketR2String_(r.PlayerId)===playerId;}).map(positionFromSheet); }
   function listPositionsByPlayerMarket(playerId,marketId) { return readRows("positions").filter(function(r){return predictionMarketR2String_(r.PlayerId)===playerId&&predictionMarketR2String_(r.MarketId)===marketId;}).map(positionFromSheet); }
   function savePosition(p) { var key=predictionMarketR2PositionKey_(p.playerId,p.marketId,p.outcome); var rows=readRows("positions"), found=null; for(var i=0;i<rows.length;i+=1){if(predictionMarketR2PositionKey_(rows[i].PlayerId,rows[i].MarketId,rows[i].Outcome)===key){found=rows[i];break;}} var sh=getSheet("positions"),headers=headersFor(sh),values=headers.map(function(h){return positionToSheet(p)[h];}); if(found)sh.getRange(found.__rowNumber,1,1,headers.length).setValues([values]); else sh.appendRow(values); return p; }
+  function deletePosition(playerId,marketId,outcome) { var key=predictionMarketR2PositionKey_(playerId,marketId,outcome); var rows=readRows("positions"); for(var i=0;i<rows.length;i+=1){if(predictionMarketR2PositionKey_(rows[i].PlayerId,rows[i].MarketId,rows[i].Outcome)===key){getSheet("positions").deleteRow(rows[i].__rowNumber);return true;}} return false; }
   function getSettlement(key) { var r=findRow("settlements","SettlementKey",key); return r?settlementFromSheet(r):null; }
   function saveSettlement(s) { return writeRecord("settlements","SettlementKey",s.settlementKey,s,settlementToSheet); }
 
@@ -143,7 +144,7 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
       return payload.transaction;
     } catch (err) {
       try { if (oldWallet) saveWallet(oldWallet); } catch(ignore1) {}
-      try { if (oldPosition) savePosition(oldPosition); } catch(ignore2) {}
+      try { if (oldPosition) savePosition(oldPosition); else deletePosition(payload.position.playerId,payload.position.marketId,payload.position.outcome); } catch(ignore2) {}
       try { deleteRecord("transactions","TransactionId",payload.transaction.transactionId); } catch(ignore3) {}
       throw err;
     }
@@ -182,13 +183,13 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
       return payload.settlement;
     } catch (err) {
       try { if(oldWallet)saveWallet(oldWallet); } catch(ignore1) {}
-      oldPositions.forEach(function(p){ try{ if(p)savePosition(p); }catch(ignore2){} });
+      payload.positions.forEach(function(p,index){ try{ if(oldPositions[index])savePosition(oldPositions[index]); else deletePosition(p.playerId,p.marketId,p.outcome); }catch(ignore2){} });
       try { deleteRecord("settlements","SettlementKey",payload.settlement.settlementKey); } catch(ignore3) {}
       throw err;
     }
   }
 
-  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,saveTransaction:saveTransaction,getPosition:getPosition,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
+  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,saveTransaction:saveTransaction,getPosition:getPosition,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
 }
 
 if (typeof module !== "undefined" && module.exports) {
