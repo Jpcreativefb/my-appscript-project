@@ -70,11 +70,16 @@ for (const forbidden of [
 
 function makeHost() {
   const attrs = {};
+  const workspaceHost = { innerHTML: '', scrollIntoView() {} };
   return {
     innerHTML: '',
+    workspaceHost,
     getAttribute(name) { return attrs[name] || null; },
     setAttribute(name, value) { attrs[name] = String(value); },
-    querySelector() { return null; },
+    querySelector(selector) {
+      if (selector === '[data-admin-go-live-workspace-host]') return workspaceHost;
+      return null;
+    },
     querySelectorAll() { return []; }
   };
 }
@@ -90,19 +95,24 @@ const context = {
     }
   }
 };
+context.window = context;
 vm.createContext(context);
 vm.runInContext(shell, context);
 
 assert.strictEqual(typeof context.window.pattcAdminGameBuilderNavigationShellR2Mount, 'function', 'shell must expose one shared Admin mount hook');
-assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount when Sports/NFL/2026 Admin host is rendered');
-assert(currentHost.innerHTML.includes('1. Game Builder'), 'mounted shell must contain lifecycle presentation');
-assert(currentHost.innerHTML.includes('Game Builder Workspace'), 'mounted shell must expose a separate builder workspace');
+assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount when Games & Design Admin host is rendered');
+assert(currentHost.innerHTML.includes('data-admin-go-live-destination="sports"'), 'mounted shell must present the Sports destination first');
+assert(currentHost.innerHTML.includes('data-admin-go-live-destination="general-custom"'), 'mounted shell must present the General / Custom destination first');
+assert.strictEqual(context.window.pattcAdminGamesDesignOpenR2_('sports'), true, 'Sports destination must open its existing lifecycle workspace');
+const sportsHtml = currentHost.workspaceHost.innerHTML;
+assert(sportsHtml.includes('1. Game Builder'), 'Sports workspace must contain lifecycle presentation');
+assert(sportsHtml.includes('Game Builder Workspace'), 'Sports workspace must expose a separate builder workspace');
 assert(
-  currentHost.innerHTML.indexOf('data-admin-r3b-builder-host') > currentHost.innerHTML.indexOf('5. Operations'),
+  sportsHtml.indexOf('data-admin-r3b-builder-host') > sportsHtml.indexOf('5. Operations'),
   'builder workspace must render after the lifecycle cards instead of inside the Game Builder card'
 );
-assert(!currentHost.innerHTML.includes('Existing manager remains authoritative.'), 'navigation card must not carry the old Team Fantasy note');
-assert(!currentHost.innerHTML.includes('Opens existing Playoff Race configuration; it does not create a game.'), 'navigation card must not carry the old Playoff note');
+assert(!sportsHtml.includes('Existing manager remains authoritative.'), 'navigation card must not carry the old Team Fantasy note');
+assert(!sportsHtml.includes('Opens existing Playoff Race configuration; it does not create a game.'), 'navigation card must not carry the old Playoff note');
 assert.strictEqual(currentHost.getAttribute('data-shared-game-builder-navigation-shell-r2'), '1', 'mounted host must be marked');
 
 const firstHtml = currentHost.innerHTML;
@@ -113,8 +123,10 @@ currentHost = null;
 assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), false, 'navigation away from Admin must be a no-op');
 
 currentHost = makeHost();
-assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'returning to Admin must mount into the newly rendered Sports/NFL/2026 host');
-assert(currentHost.innerHTML.includes('5. Operations'), 'shell must remain available after normal Admin navigation away and back');
+assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'returning to Admin must mount into the newly rendered Games & Design host');
+assert(currentHost.innerHTML.includes('data-admin-go-live-workspace="hub"'), 'destination hub must remain available after normal Admin navigation away and back');
+assert.strictEqual(context.window.pattcAdminGamesDesignOpenR2_('sports'), true, 'Sports workspace must still open after returning to Admin');
+assert(currentHost.workspaceHost.innerHTML.includes('5. Operations'), 'Sports lifecycle must remain available after normal Admin navigation away and back');
 assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), false, 'revisited Admin host must also remain duplicate-safe');
 
 console.log('PASS shared game builder navigation shell R2 lifecycle ownership, polish, and mount coverage');
