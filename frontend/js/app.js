@@ -1133,6 +1133,8 @@ function appPageSnapshotStorageKey_(key) {
 function appPageSnapshotHtmlValid_(page, html) {
   html = String(html || "");
   if (!html) return false;
+  // A transient Home read failure must not survive reload/login as a snapshot.
+  if (String(page || "") === "dashboard" && html.indexOf("Could not load games") !== -1) return false;
   const invalidMarkers = [
     "Page failed to load",
     "Could not load Team Fantasy.",
