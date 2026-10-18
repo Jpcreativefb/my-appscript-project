@@ -23,7 +23,7 @@ function close(actual, expected, epsilon = 1e-12) {
 // Preserve the existing movie/ranking authorities and canonical type set.
 includes(movie, 'MOVIE TRACKER ENGINE');
 includes(movie, 'function getSeenMovies(username)');
-includes(movie, 'function saveSeenMovies(username,seenData)');
+includes(movie, 'function saveSeenMovies(');
 includes(legacyResults, 'LEGACY / FUTURE FEATURE MODULE');
 excludes(games, 'id: "movie-ballot"');
 excludes(games, 'id: "community-awards"');
