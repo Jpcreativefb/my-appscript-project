@@ -1,7 +1,7 @@
 # PATTC Prediction Market R9 — Engine / Persistence R2
 
-**Status:** isolated engine implementation; not wired to production player/Admin UX  
-**Starting R1:** `0d4988b3ea1727ce75c7cb7d6394c439e6e548c2`  
+**Status:** isolated engine implementation; not wired to production player/Admin UX
+**Starting R1:** `0d4988b3ea1727ce75c7cb7d6394c439e6e548c2`
 **Branch:** `feature/prediction-market-r9-engine-r2`
 
 This document implements the R2 layer behind `docs/PREDICTION_MARKET_R9_ARCHITECTURE_R1.md`. Prediction Market remains a separate Games & Design product area. It is not registered in `GamesEngine`, does not modify the eight accepted General / Custom canonical types, and does not replace `BettingEngine` or `SportsWagerEngine`.
