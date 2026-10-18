@@ -22,7 +22,7 @@ for (const value of ['teams','schedule','scores','standings','odds','season-timi
 }
 assert(!shellSource.includes('function seasonChoice_'), 'League / Season Data must not render the old six-button stack');
 assert(shellSource.includes('Sports Scores &amp; Game Builder'), 'Sports Scores & Game Builder must remain a separate destination');
-assert(shellSource.includes('NFL Sports Pack Setup'), 'NFL Sports Pack Setup must remain a separate destination');
+assert(shellSource.includes('NFL Season / Sports Setup'), 'NFL Season / Sports Setup must remain a separate destination');
 
 const builderHost = { innerHTML: '' };
 const message = { textContent: '' };
