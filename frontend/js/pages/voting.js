@@ -8,7 +8,9 @@ var VOTING_PAGE_STATE = VOTING_PAGE_STATE || {
   selectedEntryIds: [],
   effectiveUi: "arrows",
   uploadedImageUrl: "",
-  uploadedImageFileId: ""
+  uploadedImageFileId: "",
+  evaluatedEntryIds: [],
+  criteriaScoresByEntry: {}
 };
 
 function votingPageEscape_(value) {
@@ -161,12 +163,85 @@ function votingPageResolveUi_(requested) {
   return "drag";
 }
 
+function votingPageIsEvaluated_(entryId) {
+  return VOTING_PAGE_STATE.evaluatedEntryIds.indexOf(String(entryId || "")) !== -1;
+}
+
+function votingPageEligibleEntries_(payload) {
+  payload = payload || VOTING_PAGE_STATE.payload || {};
+  var entries = Array.isArray(payload.entries) ? payload.entries : [];
+  var settings = payload.settings || {};
+  if (!settings.evaluatedOnly) return entries.slice();
+  return entries.filter(function(entry) { return votingPageIsEvaluated_(entry.entryId); });
+}
+
+function votingPageBallotLimit_(payload) {
+  payload = payload || VOTING_PAGE_STATE.payload || {};
+  var settings = payload.settings || {};
+  if (settings.judgingMode === "criteria") return 0;
+  var count = votingPageEligibleEntries_(payload).length;
+  if (settings.votingMethod === "favorite") return Math.min(1, count);
+  if (settings.votingMethod === "rank-all") return count;
+  return Math.min(Math.max(1, Number(settings.rankLimit || 1)), count);
+}
+
+function votingPageCriteriaControls_(entry, settings) {
+  var criteria = Array.isArray(settings.criteria) ? settings.criteria : [];
+  if (!criteria.length || (settings.judgingMode !== "criteria" && settings.judgingMode !== "combined")) return "";
+  var scores = VOTING_PAGE_STATE.criteriaScoresByEntry[entry.entryId] || {};
+  return '<div class="voting-criteria-grid">' + criteria.map(function(criterion) {
+    var value = Object.prototype.hasOwnProperty.call(scores, criterion.id) ? scores[criterion.id] : '';
+    return '<label class="voting-form-field"><span>' + votingPageEscape_(criterion.label) + ' (' + votingPageEscape_(criterion.minScore) + '–' + votingPageEscape_(criterion.maxScore) + ')</span><input type="number" min="' + votingPageEscape_(criterion.minScore) + '" max="' + votingPageEscape_(criterion.maxScore) + '" step="any" value="' + votingPageEscape_(value) + '" onchange="votingCriterionChanged_(\'' + votingPageEscape_(entry.entryId) + '\',\'' + votingPageEscape_(criterion.id) + '\',this.value)"></label>';
+  }).join('') + '</div>';
+}
+
+function votingPageEvaluationWorkspace_(payload) {
+  var settings = payload.settings || {};
+  var enabled = settings.evaluatedOnly || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === "criteria" || settings.judgingMode === "combined";
+  if (!enabled) return "";
+  var minimum = Number(settings.minimumEvaluatedEntries || 0);
+  return '<div class="voting-evaluation-workspace"><div class="voting-evaluation-heading"><h3>Tasted / Evaluated</h3><p>Mark the entries you actually evaluated.' + (minimum ? ' At least ' + minimum + ' are required before submission.' : '') + '</p></div><div class="voting-entry-grid">' + (payload.entries || []).map(function(entry) {
+    var checked = votingPageIsEvaluated_(entry.entryId);
+    var controls = '<label class="voting-evaluated-toggle"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="votingEvaluationChanged_(\'' + votingPageEscape_(entry.entryId) + '\',this.checked)"><span>' + (checked ? 'Evaluated ✓' : 'Mark evaluated') + '</span></label>' + votingPageCriteriaControls_(entry, settings);
+    return votingPageEntryCard_(entry, settings, controls);
+  }).join('') + '</div><div id="votingEvaluationMessage" class="voting-inline-message"></div></div>';
+}
+
+async function votingSaveEvaluationState_() {
+  if (!VOTING_PAGE_STATE.payload || !VOTING_PAGE_STATE.payload.votingOpen) return;
+  var message = document.getElementById('votingEvaluationMessage');
+  try {
+    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, evaluationOnly: true, evaluatedEntryIds: VOTING_PAGE_STATE.evaluatedEntryIds.slice(), criteriaScoresByEntry: VOTING_PAGE_STATE.criteriaScoresByEntry });
+    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save evaluated entries.');
+    if (message) { message.textContent = 'Evaluation state saved ✓'; message.classList.remove('error'); }
+  } catch (err) {
+    if (message) { message.textContent = err && err.message ? err.message : 'Could not save evaluated entries.'; message.classList.add('error'); }
+  }
+}
+
+function votingEvaluationChanged_(entryId, checked) {
+  entryId = String(entryId || '');
+  VOTING_PAGE_STATE.evaluatedEntryIds = VOTING_PAGE_STATE.evaluatedEntryIds.filter(function(id) { return id !== entryId; });
+  if (checked) VOTING_PAGE_STATE.evaluatedEntryIds.push(entryId);
+  if (!checked && VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.settings && VOTING_PAGE_STATE.payload.settings.evaluatedOnly) VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return id !== entryId; });
+  votingRenderBallotWorkspace_();
+  votingSaveEvaluationState_();
+}
+
+function votingCriterionChanged_(entryId, criterionId, value) {
+  entryId = String(entryId || ''); criterionId = String(criterionId || '');
+  var scores = Object.assign({}, VOTING_PAGE_STATE.criteriaScoresByEntry[entryId] || {});
+  if (value === '' || value === null || value === undefined) delete scores[criterionId]; else scores[criterionId] = Number(value);
+  VOTING_PAGE_STATE.criteriaScoresByEntry[entryId] = scores;
+  votingSaveEvaluationState_();
+}
+
 function votingPageNumberedWorkspace_(payload) {
   var settings = payload.settings || {};
-  var limit = Number(payload.ballotLimit || 0);
+  var limit = votingPageBallotLimit_(payload);
   var byId = {};
   (payload.ballot || []).forEach(function(row) { byId[row.entryId] = Number(row.rank || 0); });
-  return '<div class="voting-numbered-grid">' + (payload.entries || []).map(function(entry) {
+  return '<div class="voting-numbered-grid">' + votingPageEligibleEntries_(payload).map(function(entry) {
     var selected = byId[entry.entryId] || 0;
     var options = ['<option value="">Not ranked</option>'];
     for (var rank = 1; rank <= limit; rank++) {
@@ -180,7 +255,9 @@ function votingPageNumberedWorkspace_(payload) {
 function votingPageOrderWorkspaceHtml_() {
   var payload = VOTING_PAGE_STATE.payload || {};
   var settings = payload.settings || {};
-  var limit = Number(payload.ballotLimit || 0);
+  var limit = votingPageBallotLimit_(payload);
+  var eligibleIds = votingPageEligibleEntries_(payload).map(function(entry) { return entry.entryId; });
+  VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return eligibleIds.indexOf(id) !== -1; });
   var selected = VOTING_PAGE_STATE.selectedEntryIds.slice(0, limit);
   var selectedSet = {};
   selected.forEach(function(id) { selectedSet[id] = true; });
@@ -200,7 +277,7 @@ function votingPageOrderWorkspaceHtml_() {
     '</div>';
   }).join('');
 
-  var availableHtml = (payload.entries || []).filter(function(entry) { return !selectedSet[entry.entryId]; }).map(function(entry) {
+  var availableHtml = votingPageEligibleEntries_(payload).filter(function(entry) { return !selectedSet[entry.entryId]; }).map(function(entry) {
     var controls = selected.length < limit ? '<button class="button secondary voting-add-button" type="button" onclick="votingBallotAdd_(\'' + votingPageEscape_(entry.entryId) + '\')">Add to Ballot</button>' : '<span class="voting-limit-note">Ballot full</span>';
     return votingPageEntryCard_(entry, settings, controls);
   }).join('');
@@ -225,18 +302,13 @@ function votingRenderBallotWorkspace_() {
 function votingPageVotingCard_(payload) {
   var settings = payload.settings || {};
   var entries = Array.isArray(payload.entries) ? payload.entries : [];
-  if (!entries.length) {
-    return '<section class="card voting-ballot-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Voting</span><h2>No published entries yet</h2></div></div><p>Approved participant entries will appear here automatically.</p></section>';
-  }
-  var limit = Number(payload.ballotLimit || 0);
-  var title = settings.votingMethod === "favorite" ? "Choose Your Favorite" : (settings.votingMethod === "rank-all" ? "Rank Every Entry" : "Rank Your Top " + limit);
-  var status = payload.votingOpen ? "Voting Open" : "Voting Closed";
-  return '<section class="card voting-ballot-card">' +
-    '<div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' +
-    '<div class="voting-method-note">Voting style: <strong>' + votingPageEscape_(VOTING_PAGE_STATE.effectiveUi === 'drag' ? 'Drag & Drop' : (VOTING_PAGE_STATE.effectiveUi === 'numbered' ? 'Numbered' : 'Up / Down Arrows')) + '</strong></div>' +
-    '<div id="votingBallotWorkspace">' + (VOTING_PAGE_STATE.effectiveUi === "numbered" ? votingPageNumberedWorkspace_(payload) : votingPageOrderWorkspaceHtml_()) + '</div>' +
-    (payload.votingOpen ? '<div class="voting-save-row"><button class="button" type="button" onclick="votingSaveBallot_()">Save Ballot</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') +
-  '</section>';
+  if (!entries.length) return '<section class="card voting-ballot-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Voting</span><h2>No published entries yet</h2></div></div><p>Approved participant entries will appear here automatically.</p></section>';
+  var limit = votingPageBallotLimit_(payload);
+  var judgingMode = settings.judgingMode || 'rank';
+  var title = judgingMode === 'criteria' ? 'Score the Entries You Evaluated' : (judgingMode === 'combined' ? 'Rank + Score Your Evaluated Entries' : (settings.votingMethod === "favorite" ? "Choose Your Favorite" : (settings.votingMethod === "rank-all" ? "Rank Every Eligible Entry" : "Rank Your Top " + limit)));
+  var status = payload.votingOpen ? "Voting Open" : (payload.votingDeadlinePassed ? "Deadline Passed" : "Voting Closed");
+  var rankingWorkspace = judgingMode === 'criteria' ? '' : '<div class="voting-method-note">Ranking style: <strong>' + votingPageEscape_(VOTING_PAGE_STATE.effectiveUi === 'drag' ? 'Drag & Drop' : (VOTING_PAGE_STATE.effectiveUi === 'numbered' ? 'Numbered' : 'Up / Down Arrows')) + '</strong></div><div id="votingBallotWorkspace">' + (VOTING_PAGE_STATE.effectiveUi === "numbered" ? votingPageNumberedWorkspace_(payload) : votingPageOrderWorkspaceHtml_()) + '</div>';
+  return '<section class="card voting-ballot-card">' + '<div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
 }
 
 function votingPageResultsCard_(payload) {
@@ -362,8 +434,9 @@ async function votingSaveParticipant_() {
 }
 
 function votingBallotAdd_(entryId) {
-  var limit = Number(VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.ballotLimit || 0);
-  if (!entryId || VOTING_PAGE_STATE.selectedEntryIds.indexOf(entryId) !== -1 || VOTING_PAGE_STATE.selectedEntryIds.length >= limit) return;
+  var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
+  var eligible = votingPageEligibleEntries_(VOTING_PAGE_STATE.payload).some(function(entry) { return entry.entryId === entryId; });
+  if (!eligible || !entryId || VOTING_PAGE_STATE.selectedEntryIds.indexOf(entryId) !== -1 || VOTING_PAGE_STATE.selectedEntryIds.length >= limit) return;
   VOTING_PAGE_STATE.selectedEntryIds.push(entryId);
   votingRenderBallotWorkspace_();
 }
@@ -426,15 +499,16 @@ function votingCollectBallot_() {
 
 async function votingSaveBallot_() {
   var message = document.getElementById('votingBallotMessage');
+  var settings = VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.settings || {};
   var rankings = votingCollectBallot_();
-  var limit = Number(VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.ballotLimit || 0);
-  if (rankings.length !== limit) {
+  var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
+  if (settings.judgingMode !== 'criteria' && rankings.length !== limit) {
     if (message) { message.textContent = 'Rank exactly ' + limit + (limit === 1 ? ' entry.' : ' entries.'); message.classList.add('error'); }
     return;
   }
   if (message) { message.textContent = 'Saving ballot…'; message.classList.remove('error'); }
   try {
-    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, rankings: rankings });
+    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, rankings: rankings, evaluatedEntryIds: VOTING_PAGE_STATE.evaluatedEntryIds.slice(), criteriaScoresByEntry: VOTING_PAGE_STATE.criteriaScoresByEntry });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save ballot.');
     if (message) message.textContent = 'Ballot saved ✓';
     window.setTimeout(function() { navigate('voting', { skipUnsavedCheck: true }); }, 400);
@@ -448,19 +522,10 @@ async function renderVotingPage() {
   if (!gameId) return '<div class="page"><div class="card error-card">Choose a Voting / Competition game first.</div></div>';
   setPageLoadStep(55, 'Loading competition entries and your ballot…');
   var payload = await apiGetVotingCompetitionState(gameId);
-  if (!payload || payload.success === false) {
-    return '<div class="page"><div class="card error-card">' + votingPageEscape_(payload && (payload.error || payload.message) || 'Could not load Voting / Competition game.') + '</div></div>';
-  }
-  VOTING_PAGE_STATE.gameId = gameId;
-  VOTING_PAGE_STATE.payload = payload;
-  VOTING_PAGE_STATE.effectiveUi = votingPageResolveUi_(payload.settings && payload.settings.rankingUi);
-  VOTING_PAGE_STATE.selectedEntryIds = (payload.ballot || []).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
-
-  return '<div class="page voting-page">' +
-    '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div>' +
-      '<button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' +
-    votingPageParticipantCard_(payload) +
-    votingPageVotingCard_(payload) +
-    votingPageResultsCard_(payload) +
-  '</div>';
+  if (!payload || payload.success === false) return '<div class="page"><div class="card error-card">' + votingPageEscape_(payload && (payload.error || payload.message) || 'Could not load Voting / Competition game.') + '</div></div>';
+  VOTING_PAGE_STATE.gameId = gameId; VOTING_PAGE_STATE.payload = payload; VOTING_PAGE_STATE.effectiveUi = votingPageResolveUi_(payload.settings && payload.settings.rankingUi);
+  VOTING_PAGE_STATE.selectedEntryIds = (payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
+  VOTING_PAGE_STATE.evaluatedEntryIds = []; VOTING_PAGE_STATE.criteriaScoresByEntry = {};
+  (payload.evaluations || []).forEach(function(row) { if (row.evaluated) VOTING_PAGE_STATE.evaluatedEntryIds.push(row.entryId); VOTING_PAGE_STATE.criteriaScoresByEntry[row.entryId] = Object.assign({}, row.criteriaScores || {}); });
+  return '<div class="page voting-page">' + '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div><button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' + votingPageParticipantCard_(payload) + votingPageVotingCard_(payload) + votingPageResultsCard_(payload) + '</div>';
 }

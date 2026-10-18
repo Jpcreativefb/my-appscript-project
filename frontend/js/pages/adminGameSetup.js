@@ -1234,6 +1234,15 @@ function adminVotingChecked_(id) {
   return Boolean(el && el.checked);
 }
 
+function adminVotingParseCriteria_() {
+  var text = adminVotingValue_("adminVotingCriteria");
+  if (!text) return [];
+  return text.split(/\r?\n/).map(function(line) {
+    var parts = String(line || "").split("|").map(function(value) { return String(value || "").trim(); });
+    return { id: parts[0] || "", label: parts[1] || "", minScore: Number(parts[2]), maxScore: Number(parts[3]), weight: Number(parts[4]) };
+  }).filter(function(item) { return item.id || item.label; });
+}
+
 async function adminVotingSaveSettings_(gameId) {
   var message = document.getElementById("adminVotingMessage");
   var points = adminVotingValue_("adminVotingPointValues").split(",").map(function(value) { return Number(String(value || "").trim()); }).filter(function(value) { return Number.isFinite(value) && value >= 0; });
@@ -1252,6 +1261,14 @@ async function adminVotingSaveSettings_(gameId) {
       rankLimit: Number(adminVotingValue_("adminVotingRankLimit") || 5),
       scoringMode: adminVotingValue_("adminVotingScoringMode"),
       pointValues: points,
+      evaluatedOnly: adminVotingChecked_("adminVotingEvaluatedOnly"),
+      minimumEvaluatedEntries: Number(adminVotingValue_("adminVotingMinimumEvaluated") || 0),
+      judgingMode: adminVotingValue_("adminVotingJudgingMode"),
+      criteria: adminVotingParseCriteria_(),
+      combinedRankWeight: Number(adminVotingValue_("adminVotingCombinedRankWeight") || 0),
+      combinedCriteriaWeight: Number(adminVotingValue_("adminVotingCombinedCriteriaWeight") || 0),
+      ballotWeighting: adminVotingValue_("adminVotingBallotWeighting"),
+      votingDeadline: adminVotingValue_("adminVotingDeadline"),
       resultsVisibility: adminVotingValue_("adminVotingResultsVisibility"),
       showParticipantNames: adminVotingChecked_("adminVotingShowParticipantNames"),
       showPhoto: adminVotingChecked_("adminVotingShowPhoto"),
@@ -1390,6 +1407,27 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
         <h3>Additional Participant Fields</h3>
         <div id="adminVotingCustomFields" class="admin-voting-custom-fields">${fields.map(adminVotingFieldRow_).join("")}</div>
         <button type="button" class="admin-small-button secondary" onclick="adminVotingAddCustomField_()">+ Add Participant Field</button>
+
+
+        <h3>Cookoff V1 Controls</h3>
+        <div class="admin-control-grid admin-cookoff-controls">
+          <label class="admin-field"><span>Cookoff Scoring Mode</span><select id="adminVotingJudgingMode">
+            <option value="rank" ${settings.judgingMode !== "criteria" && settings.judgingMode !== "combined" ? "selected" : ""}>Rank / Favorite</option>
+            <option value="criteria" ${settings.judgingMode === "criteria" ? "selected" : ""}>Criteria</option>
+            <option value="combined" ${settings.judgingMode === "combined" ? "selected" : ""}>Combined Rank + Criteria</option>
+          </select></label>
+          <label class="admin-checkbox-field"><input id="adminVotingEvaluatedOnly" type="checkbox" ${settings.evaluatedOnly ? "checked" : ""}><span>Only evaluated/tasted entries are eligible to rank or score</span></label>
+          <label class="admin-field"><span>Minimum Evaluated Entries</span><input id="adminVotingMinimumEvaluated" type="number" min="0" step="1" value="${adminSetupEscapeHtml(settings.minimumEvaluatedEntries || 0)}"></label>
+          <label class="admin-field"><span>Ballot Weighting</span><select id="adminVotingBallotWeighting">
+            <option value="equal" ${settings.ballotWeighting !== "coverage" ? "selected" : ""}>Equal — every valid ballot contributes equally</option>
+            <option value="coverage" ${settings.ballotWeighting === "coverage" ? "selected" : ""}>Coverage — sqrt(evaluated / published)</option>
+          </select></label>
+          <label class="admin-field"><span>Combined Rank Weight</span><input id="adminVotingCombinedRankWeight" type="number" min="0" step="0.01" value="${adminSetupEscapeHtml(settings.combinedRankWeight == null ? 0.5 : settings.combinedRankWeight)}"></label>
+          <label class="admin-field"><span>Combined Criteria Weight</span><input id="adminVotingCombinedCriteriaWeight" type="number" min="0" step="0.01" value="${adminSetupEscapeHtml(settings.combinedCriteriaWeight == null ? 0.5 : settings.combinedCriteriaWeight)}"></label>
+          <label class="admin-field"><span>Voting Deadline</span><input id="adminVotingDeadline" type="datetime-local" value="${adminSetupEscapeHtml(adminSetupFormatDateTimeLocal(settings.votingDeadline || ""))}"></label>
+        </div>
+        <label class="admin-field admin-cookoff-criteria-field"><span>Judging Criteria</span><textarea id="adminVotingCriteria" rows="5" placeholder="taste|Taste|1|10|40&#10;texture|Texture|1|10|25">${adminSetupEscapeHtml((settings.criteria || []).map(function(item) { return [item.id, item.label, item.minScore, item.maxScore, item.weight].join("|"); }).join("\n"))}</textarea><small class="admin-field-note">One criterion per line: stable-id | label | minimum | maximum | weight. Weights are normalized by the server.</small></label>
+        <p class="admin-field-note">After the first valid ballot is accepted, Cookoff scoring mode, criteria/weights, evaluated minimum, ballot weighting, and incompatible rank-size changes are server locked.</p>
 
         <h3>Voting Method</h3>
         <div class="admin-control-grid">
