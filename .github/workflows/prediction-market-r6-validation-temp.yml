@@ -1,0 +1,31 @@
+name: Prediction Market R6 Validation Temp
+
+on:
+  push:
+    branches:
+      - test/prediction-market-r9-release-validation-r6
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Accepted R2 tests
+        run: node tests/prediction_market_engine_r2_tests.js
+      - name: Accepted R3 tests
+        run: node tests/prediction_market_admin_r3_tests.js
+      - name: Accepted R4 tests
+        run: node tests/prediction_market_player_r4_tests.js
+      - name: Accepted R5 tests
+        run: node tests/prediction_market_reference_providers_r5_tests.js
+      - name: Prediction Market R6 tests
+        run: node tests/prediction_market_release_validation_r6_tests.js
+      - name: Explicit diff check
+        run: git diff --check ae7fcb09addb619a22ec67a01e93a6f849a29591...HEAD
+      - name: Full production checks
+        run: bash tools/run_production_checks.sh
