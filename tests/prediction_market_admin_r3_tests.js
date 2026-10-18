@@ -33,10 +33,10 @@ assert(appSource.includes('case "admin-prediction-markets"'));
 assert(appSource.includes('renderAdminPredictionMarketsPage'));
 assert(adminSource.includes("onclick=\"navigate('admin-games')\">Confidence</button>"));
 assert(adminSource.includes("onclick=\"navigate('admin-games')\">Survivor</button>"));
-assert(adminSource.includes("navigate('admin-team-fantasy')">Team Fantasy Football"));
-assert(adminSource.includes("navigate('admin-playoff-race')">Playoff Race"));
-assert(adminSource.includes("navigate('admin-nfl-cup')">Cups / Combined Competitions → NFL Cup"));
-assert(adminSource.includes("navigate('admin-sports-engine')">Sports Engine Controls"));
+assert(adminSource.includes(`navigate('admin-team-fantasy')">Team Fantasy Football`));
+assert(adminSource.includes(`navigate('admin-playoff-race')">Playoff Race`));
+assert(adminSource.includes(`navigate('admin-nfl-cup')">Cups / Combined Competitions → NFL Cup`));
+assert(adminSource.includes(`navigate('admin-sports-engine')">Sports Engine Controls`));
 assert(!adminSource.includes('adminOpenSportsManageGamesR2_'));
 
 // 2/3 — canonical General / Custom registry is exactly the accepted eight.
