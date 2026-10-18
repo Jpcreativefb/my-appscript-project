@@ -2,6 +2,7 @@
  * Builders create authoritative Draft games. Managers edit. Engines support. Scope defines context.
  * R5 competitions only orchestrate proven authoritative competition surfaces; they never create shadow Games.
  * R8 R2 adds a General / Custom entry point using only the existing generic creator and canonical types.
+ * Go-Live Admin Organization R2 presents destinations first without changing any manager authority.
  */
 (function () {
   "use strict";
@@ -115,8 +116,13 @@
   function generalCustomWorkspaceHtmlR8R2_() {
     return `
       <section class="admin-r8r2-general-custom" data-admin-general-custom-r8-r2="1">
-        <div class="admin-sub"><strong>Admin → Games &amp; Design → General / Custom</strong></div>
-        <div class="admin-sub">Create an ordinary PATTC Draft game with the existing generic creator and canonical game types. Existing managers remain authoritative after creation.</div>
+        <div class="admin-r2-workspace-head">
+          <div>
+            <div class="admin-sub"><strong>Admin → Games &amp; Design → General / Custom</strong></div>
+            <div class="admin-sub">Create an ordinary PATTC Draft game with the existing generic creator and canonical game types. Existing managers remain authoritative after creation.</div>
+          </div>
+          <button type="button" class="button admin-button secondary" onclick="pattcAdminGamesDesignOpenR2_('hub')">Back to Games &amp; Design</button>
+        </div>
         <div class="admin-r8r2-general-grid">
           <section class="admin-r2-destination" data-admin-r8r2-destination="game-builder">
             <h3>Game Builder</h3>
@@ -339,29 +345,16 @@
     return true;
   };
 
-  function shellHtml_() {
+  function sportsWorkspaceHtmlR2_() {
     return `
-      <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1" data-admin-competition-builder-r5="1" data-admin-general-custom-r8-r2-shell="1">
-        <style>
-          [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; align-items:start; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-destination { border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; min-width:0; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4, [${MOUNTED_ATTR}="1"] .admin-r5-competition-card h4 { margin:0 0 6px; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-selector { display:grid; gap:6px; margin-top:10px; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-selector select { width:100%; min-height:38px; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-rule { margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(148,163,184,.10); }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace, [${MOUNTED_ATTR}="1"] .admin-r5-competition-workspace, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-custom { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card { margin:0; }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:10px; align-items:end; }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid label { display:grid; gap:4px; }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-type-note { align-self:end; padding:8px 0; }
-          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace-actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
-          [${MOUNTED_ATTR}="1"] .admin-r2-secondary-links { display:grid; gap:8px; margin-top:12px; }
-          [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid [data-admin-r8r2-destination="game-builder"] { grid-column:1 / -1; }
-          @media (max-width:720px) { [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid { grid-template-columns:1fr; } }
-        </style>
-
-        <div class="admin-sub"><strong>Admin → Games &amp; Design → Sports → NFL → 2026</strong></div>
-        <div class="admin-sub">One lifecycle, five destinations. Builders create Draft games. Managers edit. Engines support. Scope defines context. Competitions combine existing games.</div>
+      <section data-admin-go-live-workspace="sports">
+        <div class="admin-r2-workspace-head">
+          <div>
+            <div class="admin-sub"><strong>Admin → Games &amp; Design → Sports → NFL → 2026</strong></div>
+            <div class="admin-sub">One lifecycle, five destinations. Builders create Draft games. Managers edit. Engines support. Scope defines context. Competitions combine existing games.</div>
+          </div>
+          <button type="button" class="button admin-button secondary" onclick="pattcAdminGamesDesignOpenR2_('hub')">Back to Games &amp; Design</button>
+        </div>
 
         <div class="admin-r2-lifecycle-grid">
           <section class="admin-r2-destination" data-admin-r2-destination="game-builder">
@@ -377,6 +370,10 @@
                 <option value="other">Other Game</option>
               </select>
             </label>
+            <div class="admin-r2-secondary-links">
+              <button type="button" class="button admin-button secondary" onclick="navigate('admin-team-fantasy')">Team Fantasy Football</button>
+              <button type="button" class="button admin-button secondary" onclick="navigate('admin-playoff-race')">Playoff Race</button>
+            </div>
           </section>
 
           <section class="admin-r2-destination" data-admin-r2-destination="manage-existing-games">
@@ -413,7 +410,7 @@
             </label>
             <div class="admin-r2-secondary-links">
               <button type="button" class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores &amp; Game Builder</button>
-              <button type="button" class="button admin-button secondary" onclick="navigate('admin-nfl-season-setup')">NFL Sports Pack Setup</button>
+              <button type="button" class="button admin-button secondary" onclick="navigate('admin-nfl-season-setup')">NFL Season / Sports Setup</button>
             </div>
           </section>
 
@@ -434,16 +431,76 @@
         </section>
 
         <div class="admin-message" data-admin-r2-selection-message>Select a Game Builder, Competition, or League / Season Data destination.</div>
-        <div class="admin-r2-rule admin-sub"><strong>Preserved R3/R4 boundaries:</strong> NFL Cup stays dedicated; Manage Existing Games stays on admin-games; NFL Sports Pack stays dedicated; Playoff Race stays dedicated; Sports Engine Controls stays dedicated; Team Fantasy keeps its manager.</div>
+        <div class="admin-r2-rule admin-sub"><strong>Preserved R3/R4 boundaries:</strong> NFL Cup stays dedicated; Manage Existing Games stays on admin-games; NFL Season / Sports Setup stays dedicated; Playoff Race stays dedicated; Sports Engine Controls stays dedicated; Team Fantasy Football keeps its manager.</div>
+      </section>`;
+  }
 
-        ${generalCustomWorkspaceHtmlR8R2_()}
+  function destinationCardHtmlR2_(key, title, text, action, buttonLabel) {
+    return `
+      <section class="admin-r2-destination admin-go-live-destination" data-admin-go-live-destination="${escapeHtml_(key)}">
+        <h3>${escapeHtml_(title)}</h3>
+        <div class="admin-sub">${escapeHtml_(text)}</div>
+        <div class="admin-actions"><button type="button" class="button admin-button" onclick="${action}">${escapeHtml_(buttonLabel)}</button></div>
+      </section>`;
+  }
 
-        <div class="admin-list" style="margin-top:12px">
-          <div class="admin-list-row"><div><strong>Reality</strong><div class="admin-sub">Show/season managers such as The Traitors and DWTS remain in the existing Reality TV Manager.</div></div></div>
-          <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager.</div></div></div>
+  function hubWorkspaceHtmlR2_() {
+    return `
+      <section data-admin-go-live-workspace="hub">
+        <div class="admin-sub"><strong>Admin → Games &amp; Design</strong></div>
+        <div class="admin-sub">Choose the area you want to administer. Each destination keeps its existing authoritative manager, builder, or visual-design surface.</div>
+        <div class="admin-go-live-hub-grid">
+          ${destinationCardHtmlR2_("sports", "Sports", "NFL games, competitions, league/season data, and Sports operations.", "pattcAdminGamesDesignOpenR2_('sports')", "Open Sports")}
+          ${destinationCardHtmlR2_("reality", "Reality TV", "Shows, seasons, casts, episodes, and Reality game configuration stay in the Reality TV Manager.", "navigate('admin-reality-tv')", "Open Reality TV")}
+          ${destinationCardHtmlR2_("awards", "Awards", "Awards games, categories/questions, and explicit result sources stay in the Awards Manager.", "navigate('admin-awards')", "Open Awards")}
+          ${destinationCardHtmlR2_("general-custom", "General / Custom", "Create ordinary Draft games from the approved canonical types without mixing them into Sports.", "pattcAdminGamesDesignOpenR2_('general-custom')", "Open General / Custom")}
+          ${destinationCardHtmlR2_("appearance", "Appearance / Visual Design", "Visual Studio and Appearance tools remain separate from gameplay and game creation.", "navigate('admin-appearance')", "Open Appearance")}
         </div>
+      </section>`;
+  }
+
+  function shellHtml_() {
+    return `
+      <div ${MOUNTED_ATTR}="1" data-admin-sports-organization-r2="1" data-admin-competition-builder-r5="1" data-admin-general-custom-r8-r2-shell="1" data-admin-go-live-organization-r2="1">
+        <style>
+          [${MOUNTED_ATTR}="1"] { padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px)); }
+          [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid, [${MOUNTED_ATTR}="1"] .admin-go-live-hub-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; align-items:start; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-destination { border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; min-width:0; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-destination h3, [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card h4, [${MOUNTED_ATTR}="1"] .admin-r5-competition-card h4 { margin:0 0 6px; }
+          [${MOUNTED_ATTR}="1"] .admin-go-live-destination .admin-actions { margin-top:12px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-workspace-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-selector { display:grid; gap:6px; margin-top:10px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-selector select { width:100%; min-height:38px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-rule { margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(148,163,184,.10); }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace, [${MOUNTED_ATTR}="1"] .admin-r5-competition-workspace, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-custom { margin-top:12px; border:1px solid rgba(148,163,184,.32); border-radius:14px; padding:14px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-builder-card { margin:0; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:10px; align-items:end; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-form-grid label { display:grid; gap:4px; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-type-note { align-self:end; padding:8px 0; }
+          [${MOUNTED_ATTR}="1"] .admin-r3b-workspace-actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+          [${MOUNTED_ATTR}="1"] .admin-r2-secondary-links { display:grid; gap:8px; margin-top:12px; }
+          [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid [data-admin-r8r2-destination="game-builder"] { grid-column:1 / -1; }
+          @media (max-width:720px) {
+            [${MOUNTED_ATTR}="1"] .admin-r2-lifecycle-grid, [${MOUNTED_ATTR}="1"] .admin-r8r2-general-grid, [${MOUNTED_ATTR}="1"] .admin-go-live-hub-grid { grid-template-columns:1fr; }
+            [${MOUNTED_ATTR}="1"] .admin-r2-workspace-head .button { width:100%; }
+          }
+        </style>
+        <div data-admin-go-live-workspace-host>${hubWorkspaceHtmlR2_()}</div>
       </div>`;
   }
+
+  window.pattcAdminGamesDesignOpenR2_ = function (destination) {
+    const shell = document.querySelector("[" + MOUNTED_ATTR + '="1"]');
+    if (!shell) return false;
+    const host = shell.querySelector("[data-admin-go-live-workspace-host]");
+    if (!host) return false;
+    const key = String(destination || "hub");
+    if (key === "sports") host.innerHTML = sportsWorkspaceHtmlR2_();
+    else if (key === "general-custom") host.innerHTML = generalCustomWorkspaceHtmlR8R2_();
+    else host.innerHTML = hubWorkspaceHtmlR2_();
+    if (typeof host.scrollIntoView === "function") host.scrollIntoView({ block: "start" });
+    return true;
+  };
 
   function mountShell_() {
     const host = document.querySelector(SHELL_SELECTOR);
