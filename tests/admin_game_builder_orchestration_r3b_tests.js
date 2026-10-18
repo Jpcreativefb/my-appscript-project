@@ -13,6 +13,7 @@ function makeContext(apiImpl) {
   const host = { innerHTML: '', attrs: {}, getAttribute(k) { return this.attrs[k] || ''; }, setAttribute(k,v) { this.attrs[k] = String(v); } };
   const shell = {
     querySelector(selector) {
+      if (selector === '[data-admin-go-live-workspace-host]') return host;
       if (selector === '[data-admin-r3b-builder-host]') return host;
       if (selector === '[data-admin-r2-selection-message]') return { textContent: '' };
       return null;
@@ -160,6 +161,15 @@ async function submit(context, form, choice) {
   {
     const state = makeContext();
     assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'R2 shell should mount');
+
+    const landingHtml = state.host.innerHTML;
+    for (const heading of ['Sports','Reality TV','Awards','General / Custom','Appearance / Visual Design']) {
+      assert(landingHtml.includes(heading), 'Games & Design destination missing: ' + heading);
+    }
+    assert(!landingHtml.includes('1. Game Builder'), 'Sports lifecycle must not be permanently stacked on the Games & Design landing page');
+    assert(!landingHtml.includes('Selected Builder — Other Game'), 'General / Custom builder must not be permanently stacked on the Games & Design landing page');
+
+    assert.strictEqual(state.context.pattcAdminGamesDesignOpenR2_('sports'), true, 'Sports destination should open');
     const html = state.host.innerHTML;
     for (const heading of ['1. Game Builder','2. Manage Existing Games','3. Competitions','4. League / Season Data','5. Operations']) {
       assert(html.includes(heading), 'R2 lifecycle group missing: ' + heading);
@@ -203,5 +213,5 @@ async function submit(context, form, choice) {
     assert(teamFantasyHtml.includes('Open Existing Team Fantasy Manager'), 'Team Fantasy selected workspace must offer one existing-manager action');
   }
 
-  console.log('PASS sports game builder orchestration R3B behavior and Preview polish');
+  console.log('PASS sports game builder orchestration R3B behavior and Games & Design organization');
 })().catch(err => { console.error(err); process.exit(1); });
