@@ -1,0 +1,102 @@
+name: Prediction Market R5 Wire Temp
+
+on:
+  push:
+    branches:
+      - feature/prediction-market-r9-reference-providers-r5
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wire R5 provider authority and Admin refresh
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); s=p.read_text(); c=s.count(old)
+              if c != 1:
+                  raise SystemExit(f'{path}: expected one marker, found {c}: {old!r}')
+              p.write_text(s.replace(old, new, 1))
+
+          # R2 gains one vendor-neutral Admin authority for accepting a normalized reference snapshot.
+          engine='backend/engines/PredictionMarketEngineR2.js'
+          marker='  function setManualPrice(context, marketId, yesPrice, noPrice, asOf) {\n'
+          generic='''  function setReferencePrice(context, marketId, snapshot) {\n    assertAdmin(context);\n    snapshot = snapshot || {};\n    return repository.criticalSection(function() {\n      var market = repository.getMarket(marketId);\n      if (!market) throw new Error("Prediction Market not found");\n      var status = predictionMarketR2Status_(market.status);\n      if (status === "RESOLVED" || status === "VOID") throw new Error("Cannot price a terminal Prediction Market");\n      var yes = predictionMarketR2Price_(snapshot.referenceYesPrice, "referenceYesPrice");\n      var no = predictionMarketR2Price_(snapshot.referenceNoPrice, "referenceNoPrice");\n      if (Math.abs((yes + no) - 1) > 0.000001) throw new Error("Binary reference YES and NO prices must sum to 1");\n      var providerKind = predictionMarketR2RequireId_(snapshot.providerKind, "providerKind").toUpperCase();\n      var providerId = predictionMarketR2RequireId_(snapshot.providerId, "providerId");\n      var externalMarketId = predictionMarketR2RequireId_(snapshot.externalMarketId, "externalMarketId");\n      if (typeof snapshot.trusted !== "boolean") throw new Error("trusted must be explicit");\n      market.referenceYesPrice = yes;\n      market.referenceNoPrice = no;\n      market.referencePriceAsOf = predictionMarketR2Iso_(snapshot.referencePriceAsOf);\n      market.referencePriceTrusted = snapshot.trusted;\n      market.providerKind = providerKind;\n      market.providerId = providerId;\n      market.externalMarketId = externalMarketId;\n      market.sourceUrl = predictionMarketR2String_(snapshot.sourceUrl);\n      market.providerMetadata = snapshot.providerMetadata && typeof snapshot.providerMetadata === "object" ? snapshot.providerMetadata : {};\n      market.updatedAt = nowIso();\n      market.updatedBy = predictionMarketR2String_((context || {}).playerId || (context || {}).username || "SYSTEM");\n      return repository.saveMarket(predictionMarketR2NormalizeMarket_(market));\n    });\n  }\n'''
+          replace_once(engine, marker, generic + marker)
+          replace_once(engine,
+              '    setup: setup, createMarket: createMarket, editDraftMarket: editDraftMarket, setManualPrice: setManualPrice,\n',
+              '    setup: setup, createMarket: createMarket, editDraftMarket: editDraftMarket, setManualPrice: setManualPrice, setReferencePrice: setReferencePrice,\n')
+
+          # R3 service gets provider refresh, but only R2 applies an accepted snapshot.
+          admin='backend/admin/AdminPredictionMarketsR3.js'
+          replace_once(admin,
+              '  return Object.assign({}, market, {\n    allowedAdminActions: predictionMarketAdminR3AllowedActions_(market.status),\n    tradingAvailable: predictionMarketAdminR3String_(market.status).toUpperCase() === "OPEN"\n  });\n',
+              '  var allowed = predictionMarketAdminR3AllowedActions_(market.status).slice();\n  var status = predictionMarketAdminR3String_(market.status).toUpperCase();\n  var providerKind = predictionMarketAdminR3String_(market.providerKind || "MANUAL").toUpperCase();\n  if (providerKind !== "MANUAL" && status !== "RESOLVED" && status !== "VOID") allowed.push("REFRESH_PROVIDER");\n  return Object.assign({}, market, {\n    allowedAdminActions: allowed,\n    tradingAvailable: status === "OPEN",\n    providerRefreshAvailable: allowed.indexOf("REFRESH_PROVIDER") !== -1\n  });\n')
+          replace_once(admin,
+              '  var engine = options.engine;\n  if (!engine) throw new Error("Prediction Market R2 engine is required");\n',
+              '  var engine = options.engine;\n  var providerRegistry = options.providerRegistry || null;\n  if (!engine) throw new Error("Prediction Market R2 engine is required");\n')
+          refresh='''  function refreshReference(username, payload) {\n    payload = payload || {};\n    var ctx = actor(username);\n    if (!providerRegistry || typeof providerRegistry.fetchReference !== "function") throw new Error("Prediction Market provider registry is unavailable");\n    var marketId = predictionMarketAdminR3String_(payload.marketId);\n    var current = (engine.getMarkets() || []).filter(function(row) { return predictionMarketAdminR3String_(row.marketId) === marketId; })[0];\n    if (!current) throw new Error("Prediction Market not found");\n    if (predictionMarketAdminR3String_(current.providerKind || "MANUAL").toUpperCase() === "MANUAL") {\n      return { success:false, providerStatus:"UNAVAILABLE", message:"MANUAL markets use Update Price rather than external refresh.", market:predictionMarketAdminR3MarketView_(current) };\n    }\n    var fetched = providerRegistry.fetchReference(current);\n    if (!fetched || fetched.success !== true || !fetched.snapshot) {\n      return { success:false, providerStatus:(fetched && fetched.providerStatus) || "PROVIDER_ERROR", message:(fetched && fetched.message) || "Provider refresh failed", market:predictionMarketAdminR3MarketView_(current) };\n    }\n    var snapshot = fetched.snapshot;\n    var prospective = Object.assign({}, current, {\n      referenceYesPrice:snapshot.referenceYesPrice, referenceNoPrice:snapshot.referenceNoPrice,\n      referencePriceAsOf:snapshot.referencePriceAsOf, referencePriceTrusted:snapshot.trusted,\n      providerKind:snapshot.providerKind, providerId:snapshot.providerId, externalMarketId:snapshot.externalMarketId,\n      sourceUrl:snapshot.sourceUrl, providerMetadata:snapshot.providerMetadata || {}\n    });\n    try {\n      engine.validatePriceState(prospective, new Date().toISOString());\n    } catch (err) {\n      var msg = err && err.message ? err.message : "Provider reference failed R2 validation";\n      var providerStatus = /stale/i.test(msg) ? "STALE" : "INVALID";\n      return { success:false, providerStatus:providerStatus, message:msg, proposed:snapshot, market:predictionMarketAdminR3MarketView_(current) };\n    }\n    var applied = engine.setReferencePrice(ctx, marketId, snapshot);\n    return { success:true, providerStatus:"FRESH", proposed:snapshot, market:predictionMarketAdminR3MarketView_(applied) };\n  }\n'''
+          replace_once(admin,
+              '  function open(username, payload) {\n',
+              refresh + '  function open(username, payload) {\n')
+          replace_once(admin,
+              '  return { list:list, create:create, edit:edit, price:price, open:open, lock:lock, resolve:resolve, voidMarket:voidMarket };\n',
+              '  return { list:list, create:create, edit:edit, price:price, refreshReference:refreshReference, open:open, lock:lock, resolve:resolve, voidMarket:voidMarket };\n')
+          replace_once(admin,
+              '  var engine = predictionMarketR2CreateEngine({ repository: repository });\n  return predictionMarketAdminR3CreateService({ engine: engine });\n',
+              '  var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });\n  var providerRegistry = predictionMarketReferenceProvidersR5CreateRegistry({ maxAgeMs: PREDICTION_MARKET_R2_CONFIG.maxReferencePriceAgeMs });\n  return predictionMarketAdminR3CreateService({ engine: engine, providerRegistry: providerRegistry });\n')
+          replace_once(admin,
+              '    case "adminSetPredictionMarketPrice": return service.price(username, payload);\n',
+              '    case "adminSetPredictionMarketPrice": return service.price(username, payload);\n    case "adminRefreshPredictionMarketReference": return service.refreshReference(username, payload);\n')
+
+          # R4 validates external-provider market snapshots using the same accepted R2 gate.
+          player='backend/player/PredictionMarketPlayerR4.js'
+          replace_once(player,
+              '  var engine = predictionMarketR2CreateEngine({ repository: repository });\n',
+              '  var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });\n')
+
+          # Existing Admin API dispatch list gains only the R5 Admin refresh action.
+          api='backend/Api.js'
+          p=Path(api); s=p.read_text()
+          needle='action === "adminSetPredictionMarketPrice"'
+          idx=s.find(needle)
+          if idx < 0: raise SystemExit('backend/Api.js: Prediction Market Admin dispatch anchor missing')
+          # Add alongside the existing condition without touching unrelated admin actions.
+          line_end=s.find('\n', idx)
+          line=s[idx:line_end]
+          if 'adminRefreshPredictionMarketReference' not in s:
+              if '||' in line:
+                  s=s[:line_end] + '\n        action === "adminRefreshPredictionMarketReference" ||' + s[line_end:]
+              else:
+                  s=s[:line_end] + ' ||\n        action === "adminRefreshPredictionMarketReference"' + s[line_end:]
+          p.write_text(s)
+
+          # R3 Admin UI: external provider refresh button and result/failure messaging.
+          ui='frontend/js/pages/adminPredictionMarketsR3.js'
+          replace_once(ui,
+              '    if (has("SET_PRICE")) out.push(\'<button class="button admin-button secondary" onclick="predictionMarketAdminR3SetPrice_(\\\'\'+esc(row.marketId)+\'\\\')">Update Price</button>\');\n',
+              '    if (has("SET_PRICE")) out.push(\'<button class="button admin-button secondary" onclick="predictionMarketAdminR3SetPrice_(\\\'\'+esc(row.marketId)+\'\\\')">Update Price</button>\');\n    if (has("REFRESH_PROVIDER")) out.push(\'<button class="button admin-button secondary" onclick="predictionMarketAdminR5RefreshProvider_(\\\'\'+esc(row.marketId)+\'\\\')">Refresh Reference Price</button>\');\n')
+          refresh_ui='''  root.predictionMarketAdminR5RefreshProvider_ = async function(id) {\n    var row=market(id); if(!row) return false;\n    message("Refreshing "+s(row.providerKind)+" reference price…","working");\n    try {\n      var res=await call("adminRefreshPredictionMarketReference",{marketId:id});\n      var proposed=res.proposed||{};\n      message("Reference price refreshed: YES "+s(proposed.referenceYesPrice)+" / NO "+s(proposed.referenceNoPrice)+" · "+s(proposed.referencePriceAsOf),"success");\n      await load(); return true;\n    } catch(err) {\n      message(err&&err.message?err.message:"Provider refresh failed. Last accepted price was retained.","error");\n      await load(); return false;\n    }\n  };\n\n'''
+          replace_once(ui,
+              '  root.predictionMarketAdminR3Lifecycle_ = async function(action,id) {\n',
+              refresh_ui + '  root.predictionMarketAdminR3Lifecycle_ = async function(action,id) {\n')
+          replace_once(ui,
+              'Create and operate binary Prediction Markets through the accepted R2 engine. Player trading, external ingestion, and direct storage editing are not part of this manager.',
+              'Create and operate binary Prediction Markets through the accepted R2 engine. External providers are reference-only; Admin-triggered refresh never bypasses R2 price authority or edits storage directly.')
+          PY
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/engines/PredictionMarketEngineR2.js backend/admin/AdminPredictionMarketsR3.js backend/player/PredictionMarketPlayerR4.js backend/Api.js frontend/js/pages/adminPredictionMarketsR3.js
+          git commit -m "Wire Prediction Market R5 provider refresh authority"
+          git push origin HEAD:feature/prediction-market-r9-reference-providers-r5
