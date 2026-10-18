@@ -1,82 +1,27 @@
-name: Prediction Market R4 Wire Temp
+name: Prediction Market R4 Validation Temp
 
 on:
   push:
     branches:
       - feature/prediction-market-r9-player-trading-r4
 
-permissions:
-  contents: write
-
 jobs:
-  wire:
-    if: github.actor != 'github-actions[bot]'
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Wire R4 player route and API
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_first(path, old, new):
-              p=Path(path); s=p.read_text()
-              if old not in s: raise SystemExit(f'{path}: marker not found: {old!r}')
-              p.write_text(s.replace(old,new,1))
-
-          replace_first('backend/core/ApiSecurity.js',
-              'saveBet: true, removeBet: true,',
-              'saveBet: true, removeBet: true, executePredictionMarketTrade: true,')
-
-          replace_first('backend/Api.js',
-              '    // PLAYER WRITES\n    // =========================\n\n',
-              '    // PLAYER WRITES\n    // =========================\n\n'
-              '    if (action === "getPredictionMarketPlayerState" || action === "getPredictionMarketPlayerDetail" ||\n'
-              '        action === "bootstrapPredictionMarketWallet" || action === "executePredictionMarketTrade" ||\n'
-              '        action === "getPredictionMarketLeaderboard") {\n'
-              '      return json(apiPredictionMarketPlayerR4Dispatch(action, body));\n'
-              '    }\n\n')
-
-          for path in ['frontend/js/api.js','frontend/api.js']:
-              replace_first(path,
-                  '/* ======================\n   TEAM FANTASY POST BRIDGE — v1.2.18j2\n',
-                  'function apiPredictionMarketPlayerR4(action, payload = {}) {\n'
-                  '  return api(action, payload || {});\n'
-                  '}\n\n'
-                  '/* ======================\n   TEAM FANTASY POST BRIDGE — v1.2.18j2\n')
-
-          for path in ['frontend/js/app.js','frontend/app.js']:
-              replace_first(path,
-                  '  "betting": ["betting"],\n',
-                  '  "betting": ["betting"],\n  "prediction-markets": ["predictionMarketsR4"],\n')
-              replace_first(path,
-                  '    page === "betting" ||\n',
-                  '    page === "betting" ||\n    page === "prediction-markets" ||\n')
-              replace_first(path,
-                  '    "betting": "Wagers",\n',
-                  '    "betting": "Wagers",\n    "prediction-markets": "Prediction Markets",\n')
-              replace_first(path,
-                  '    case "betting":\n',
-                  '    case "prediction-markets":\n'
-                  '      if (typeof renderPredictionMarketsPage !== "function") throw new Error("Prediction Markets player script is not loaded.");\n'
-                  '      app.innerHTML = await renderPredictionMarketsPage();\n'
-                  '      break;\n\n'
-                  '    case "betting":\n')
-
-          replace_first('frontend/app.html',
-              '  <button data-page="more" onclick="navigate(\'more\')">\n',
-              '  <button data-page="prediction-markets" onclick="navigate(\'prediction-markets\')">\n'
-              '    <span class="bottom-nav-icon">◐</span>\n'
-              '    <span class="bottom-nav-label">Markets</span>\n'
-              '  </button>\n\n'
-              '  <button data-page="more" onclick="navigate(\'more\')">\n')
-          PY
-          git diff --check
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add backend/Api.js backend/core/ApiSecurity.js frontend/js/api.js frontend/api.js frontend/js/app.js frontend/app.js frontend/app.html
-          git commit -m "Wire Prediction Market R4 player trading"
-          git push origin HEAD:feature/prediction-market-r9-player-trading-r4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Accepted R2 tests
+        run: node tests/prediction_market_engine_r2_tests.js
+      - name: Accepted R3 tests
+        run: node tests/prediction_market_admin_r3_tests.js
+      - name: Prediction Market R4 tests
+        run: node tests/prediction_market_player_r4_tests.js
+      - name: Explicit diff check
+        run: git diff --check f6713195e0e6354fd421cf5082bdf8b76c5b676b...HEAD
+      - name: Full production checks
+        run: bash tools/run_production_checks.sh
