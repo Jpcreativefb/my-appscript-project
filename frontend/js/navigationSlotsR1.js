@@ -215,7 +215,7 @@
     if (dest === 'hub:sports' && ['team-fantasy','survivor','betting'].indexOf(String(page || '')) !== -1) return true;
     if (dest === 'more') {
       return page === 'profile' || page === 'notifications' || page === 'admin' || page === 'admin-games' ||
-        page === 'admin-awards' || page === 'admin-reality-tv' || page === 'admin-appearance' ||
+        page === 'admin-awards' || page === 'admin-reality-tv' || page === 'admin-appearance' || page === 'admin-prediction-markets' ||
         String(page || '').indexOf('admin-game-setup:') === 0;
     }
     return false;

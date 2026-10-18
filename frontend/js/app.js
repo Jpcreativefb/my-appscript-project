@@ -254,6 +254,7 @@ function isAdminPage_(page) {
     page === "admin-games" ||
     page === "admin-awards" ||
     page === "admin-reality-tv" ||
+    page === "admin-prediction-markets" ||
     page.indexOf("admin-game-setup:") === 0;
 }
 
@@ -724,6 +725,7 @@ const APP_PAGE_MODULES = {
   "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
   "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],
+  "admin-prediction-markets": ["admin", "adminUi", "adminPredictionMarketsR3"],
   "admin-nfl-cup": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
   "admin-nfl-season-setup": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
   "admin-playoff-race": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
@@ -1636,7 +1638,7 @@ function setActiveNav(page) {
 
   if (page === "profile" || page === "notifications" || page === "leagues" || page === "trophy-room" || page === "more" ||
       page === "admin" || page === "admin-games" || page === "admin-awards" ||
-      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-nfl-cup" ||
+      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-prediction-markets" || page === "admin-nfl-cup" ||
       page === "admin-nfl-season-setup" || page === "admin-playoff-race" || page === "admin-sports-engine" ||
       page.indexOf("admin-game-setup:") === 0 || page === "hub:general") {
     navPage = "more";
@@ -2371,6 +2373,11 @@ async function renderPage(page) {
     case "admin-team-fantasy":
       if (typeof renderAdminTeamFantasyPage !== "function") throw new Error("Team Fantasy admin script is not loaded.");
       app.innerHTML = await renderAdminTeamFantasyPage();
+      break;
+
+    case "admin-prediction-markets":
+      if (typeof renderAdminPredictionMarketsPage !== "function") throw new Error("Prediction Market admin script is not loaded.");
+      app.innerHTML = await renderAdminPredictionMarketsPage();
       break;
 
     case "admin-nfl-cup":

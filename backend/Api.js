@@ -1544,6 +1544,13 @@ function doGet(e) {
       return json(apiAdminBuildNflSeasonPack(params));
     }
 
+    if (action === "adminGetPredictionMarkets" || action === "adminCreatePredictionMarket" ||
+        action === "adminEditPredictionMarket" || action === "adminSetPredictionMarketPrice" ||
+        action === "adminOpenPredictionMarket" || action === "adminLockPredictionMarket" ||
+        action === "adminResolvePredictionMarket" || action === "adminVoidPredictionMarket") {
+      return json(apiAdminPredictionMarketR3Dispatch(action, params));
+    }
+
     if (action === "adminGetGames") {
 
       return json(
