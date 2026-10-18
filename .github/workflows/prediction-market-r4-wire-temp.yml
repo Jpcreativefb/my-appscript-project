@@ -27,12 +27,10 @@ jobs:
               if c!=1: raise SystemExit(f'{path}: expected one marker, found {c}: {old!r}')
               p.write_text(s.replace(old,new,1))
 
-          # POST-only mutation security. Session username is already rewritten server-side.
           replace_once('backend/core/ApiSecurity.js',
-              '  saveSeasonAnchorPick: true, saveBet: true, removeBet: true,\n',
-              '  saveSeasonAnchorPick: true, saveBet: true, removeBet: true, executePredictionMarketTrade: true,\n')
+              '  saveSurvivorPick: true, saveSportsSurvivorAutoPickPreference: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true,\n',
+              '  saveSurvivorPick: true, saveSportsSurvivorAutoPickPreference: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true, executePredictionMarketTrade: true,\n')
 
-          # Player R4 actions all travel through authenticated POST in the current frontend.
           replace_once('backend/Api.js',
               '    if (action === "saveEditableProfile") {\n',
               '    if (action === "getPredictionMarketPlayerState" || action === "getPredictionMarketPlayerDetail" ||\n'
@@ -42,7 +40,6 @@ jobs:
               '    }\n\n'
               '    if (action === "saveEditableProfile") {\n')
 
-          # Frontend API compatibility copies.
           for path in ['frontend/js/api.js','frontend/api.js']:
               replace_once(path,
                   '/* ======================\n   TEAM FANTASY POST BRIDGE — v1.2.18j2\n',
@@ -51,7 +48,6 @@ jobs:
                   '}\n\n'
                   '/* ======================\n   TEAM FANTASY POST BRIDGE — v1.2.18j2\n')
 
-          # Player route in both app compatibility copies.
           for path in ['frontend/js/app.js','frontend/app.js']:
               replace_once(path,
                   '  "betting": ["betting"],\n',
@@ -73,7 +69,6 @@ jobs:
                   + marker,1)
               p.write_text(s)
 
-          # Dedicated player-facing navigation destination; existing five destinations remain unchanged.
           replace_once('frontend/app.html',
               '  <button data-page="more" onclick="navigate(\'more\')">\n',
               '  <button data-page="prediction-markets" onclick="navigate(\'prediction-markets\')">\n'
