@@ -254,6 +254,7 @@ function isAdminPage_(page) {
     page === "admin-games" ||
     page === "admin-awards" ||
     page === "admin-reality-tv" ||
+    page === "admin-prediction-markets" ||
     page.indexOf("admin-game-setup:") === 0;
 }
 
@@ -714,6 +715,7 @@ const APP_PAGE_MODULES = {
   "ranking": ["ranking", "rankingSportsR1"],
   "game-hub": ["gameModeHub"],
   "betting": ["betting"],
+  "prediction-markets": ["predictionMarketsR4"],
   "team-fantasy": ["teamFantasy"],
   "leaderboard": ["leaderboard"],
   "season-hub": ["seasonHub", "nflCupR1"],
@@ -724,6 +726,7 @@ const APP_PAGE_MODULES = {
   "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
   "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],
+  "admin-prediction-markets": ["admin", "adminUi", "adminPredictionMarketsR3"],
   "admin-nfl-cup": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
   "admin-nfl-season-setup": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
   "admin-playoff-race": ["admin", "adminUi", "adminGamesRc24e", "adminSportsManagersR3"],
@@ -1093,6 +1096,7 @@ function appPageSnapshotEligible_(page) {
     page === "ranking" ||
     page === "team-fantasy" ||
     page === "betting" ||
+    page === "prediction-markets" ||
     page === "leaderboard" ||
     page === "season-hub" ||
     page === "trophy-room" ||
@@ -1348,6 +1352,7 @@ function appProgressiveRouteLabel_(page) {
     "ranking": "Ranking",
     "team-fantasy": "Team Fantasy",
     "betting": "Wagers",
+    "prediction-markets": "Prediction Markets",
     "leaderboard": "Leaderboard",
     "season-hub": "Season Hub",
     "trophy-room": "Trophy Room",
@@ -1636,7 +1641,7 @@ function setActiveNav(page) {
 
   if (page === "profile" || page === "notifications" || page === "leagues" || page === "trophy-room" || page === "more" ||
       page === "admin" || page === "admin-games" || page === "admin-awards" ||
-      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-nfl-cup" ||
+      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-prediction-markets" || page === "admin-nfl-cup" ||
       page === "admin-nfl-season-setup" || page === "admin-playoff-race" || page === "admin-sports-engine" ||
       page.indexOf("admin-game-setup:") === 0 || page === "hub:general") {
     navPage = "more";
@@ -2301,6 +2306,11 @@ async function renderPage(page) {
       app.innerHTML = await renderTeamFantasyPage();
       break;
 
+    case "prediction-markets":
+      if (typeof renderPredictionMarketsPage !== "function") throw new Error("Prediction Markets player script is not loaded.");
+      app.innerHTML = await renderPredictionMarketsPage();
+      break;
+
     case "betting":
 
       app.innerHTML =
@@ -2371,6 +2381,11 @@ async function renderPage(page) {
     case "admin-team-fantasy":
       if (typeof renderAdminTeamFantasyPage !== "function") throw new Error("Team Fantasy admin script is not loaded.");
       app.innerHTML = await renderAdminTeamFantasyPage();
+      break;
+
+    case "admin-prediction-markets":
+      if (typeof renderAdminPredictionMarketsPage !== "function") throw new Error("Prediction Market admin script is not loaded.");
+      app.innerHTML = await renderAdminPredictionMarketsPage();
       break;
 
     case "admin-nfl-cup":

@@ -119,6 +119,12 @@ function doPost(e) {
     // PLAYER WRITES
     // =========================
 
+    if (action === "getPredictionMarketPlayerState" || action === "getPredictionMarketPlayerDetail" ||
+        action === "bootstrapPredictionMarketWallet" || action === "executePredictionMarketTrade" ||
+        action === "getPredictionMarketLeaderboard") {
+      return json(apiPredictionMarketPlayerR4Dispatch(action, body));
+    }
+
     if (action === "saveEditableProfile") {
       return json(apiSaveEditableProfile(body));
     }
@@ -1542,6 +1548,14 @@ function doGet(e) {
 
     if (action === "adminBuildNflSeasonPack") {
       return json(apiAdminBuildNflSeasonPack(params));
+    }
+
+    if (action === "adminGetPredictionMarkets" || action === "adminCreatePredictionMarket" ||
+        action === "adminEditPredictionMarket" || action === "adminSetPredictionMarketPrice" ||
+        action === "adminRefreshPredictionMarketReference" ||
+        action === "adminOpenPredictionMarket" || action === "adminLockPredictionMarket" ||
+        action === "adminResolvePredictionMarket" || action === "adminVoidPredictionMarket") {
+      return json(apiAdminPredictionMarketR3Dispatch(action, params));
     }
 
     if (action === "adminGetGames") {

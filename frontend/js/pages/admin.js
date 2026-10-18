@@ -83,6 +83,11 @@ async function renderAdminPage() {
                 <div class="admin-list-row"><div><strong>Awards</strong><div class="admin-sub">Ceremonies such as Oscars and Emmys remain in the existing Awards Manager. Emmys belongs under Awards, not General.</div></div></div>
               </div>
             </div>
+            <div class="admin-category-card" data-admin-prediction-markets-destination-r3="1">
+              <div class="admin-sub"><strong>Admin → Games &amp; Design → Prediction Markets</strong></div>
+              <div class="admin-sub">Dedicated binary market administration using the accepted Prediction Market engine. Separate from General / Custom and Sports.</div>
+              <div class="admin-actions" style="margin-top:10px"><button class="button admin-button" onclick="navigate('admin-prediction-markets')">Prediction Markets</button></div>
+            </div>
             <div class="admin-category-card">
               <strong>Appearance</strong><div class="admin-sub">Manage colors, icons, labels, navigation appearance, and branding. Gameplay rules do not belong here.</div>
               <strong style="display:block;margin-top:8px;">Visual Studio</strong><div class="admin-sub">Manage page layout, spacing, sizing, and positioning. Appearance-owned styling remains under Appearance Manager.</div>
