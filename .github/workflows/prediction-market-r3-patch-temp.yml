@@ -1,78 +1,25 @@
-name: Prediction Market R3 Patch Temp
+name: Prediction Market R3 Validation Temp
 
 on:
   push:
     branches:
       - feature/prediction-market-r9-admin-r3
 
-permissions:
-  contents: write
-
 jobs:
-  patch:
-    if: github.actor != 'github-actions[bot]'
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply narrow R3 integration patches
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_once(path, old, new):
-              p = Path(path)
-              text = p.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected one marker, found {count}: {old[:80]!r}')
-              p.write_text(text.replace(old, new, 1))
-
-          # Backend route table: all admin* requests have already passed ApiSecurity.
-          replace_once('backend/Api.js',
-              '    if (action === "adminGetGames") {\n',
-              '    if (action === "adminGetPredictionMarkets" || action === "adminCreatePredictionMarket" ||\n'
-              '        action === "adminEditPredictionMarket" || action === "adminSetPredictionMarketPrice" ||\n'
-              '        action === "adminOpenPredictionMarket" || action === "adminLockPredictionMarket" ||\n'
-              '        action === "adminResolvePredictionMarket" || action === "adminVoidPredictionMarket") {\n'
-              '      return json(apiAdminPredictionMarketR3Dispatch(action, params));\n'
-              '    }\n\n'
-              '    if (action === "adminGetGames") {\n')
-
-          # Games & Design peer destination, intentionally outside Sports organization.
-          replace_once('frontend/js/pages/admin.js',
-              '            <div class="admin-category-card">\n              <strong>Appearance</strong>',
-              '            <div class="admin-category-card" data-admin-prediction-markets-destination-r3="1">\n'
-              '              <div class="admin-sub"><strong>Admin → Games &amp; Design → Prediction Markets</strong></div>\n'
-              '              <div class="admin-sub">Dedicated binary market administration using the accepted Prediction Market engine. Separate from General / Custom and Sports.</div>\n'
-              '              <div class="admin-actions" style="margin-top:10px"><button class="button admin-button" onclick="navigate(\'admin-prediction-markets\')">Prediction Markets</button></div>\n'
-              '            </div>\n'
-              '            <div class="admin-category-card">\n              <strong>Appearance</strong>')
-
-          for app_path in ['frontend/app.js', 'frontend/js/app.js']:
-              replace_once(app_path,
-                  '    page === "admin-reality-tv" ||\n    page.indexOf("admin-game-setup:") === 0;',
-                  '    page === "admin-reality-tv" ||\n    page === "admin-prediction-markets" ||\n    page.indexOf("admin-game-setup:") === 0;')
-              replace_once(app_path,
-                  '  "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],\n',
-                  '  "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],\n  "admin-prediction-markets": ["admin", "adminUi", "adminPredictionMarketsR3"],\n')
-              replace_once(app_path,
-                  '      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-nfl-cup" ||\n',
-                  '      page === "admin-reality-tv" || page === "admin-appearance" || page === "admin-prediction-markets" || page === "admin-nfl-cup" ||\n')
-              replace_once(app_path,
-                  '    case "admin-nfl-cup":\n',
-                  '    case "admin-prediction-markets":\n      if (typeof renderAdminPredictionMarketsPage !== "function") throw new Error("Prediction Market admin script is not loaded.");\n      app.innerHTML = await renderAdminPredictionMarketsPage();\n      break;\n\n    case "admin-nfl-cup":\n')
-
-          replace_once('frontend/js/navigationSlotsR1.js',
-              "        page === 'admin-awards' || page === 'admin-reality-tv' || page === 'admin-appearance' ||\n",
-              "        page === 'admin-awards' || page === 'admin-reality-tv' || page === 'admin-appearance' || page === 'admin-prediction-markets' ||\n")
-          PY
-
-          git diff --check
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add backend/Api.js frontend/app.js frontend/js/app.js frontend/js/pages/admin.js frontend/js/navigationSlotsR1.js
-          git commit -m "Wire Prediction Market R3 Admin manager"
-          git push origin HEAD:feature/prediction-market-r9-admin-r3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Accepted R2 tests
+        run: node tests/prediction_market_engine_r2_tests.js
+      - name: Prediction Market R3 tests
+        run: node tests/prediction_market_admin_r3_tests.js
+      - name: Explicit diff check
+        run: git diff --check 034c07729b283b94682ca8579a333c0c8fa41b28...HEAD
+      - name: Full production checks
+        run: bash tools/run_production_checks.sh
