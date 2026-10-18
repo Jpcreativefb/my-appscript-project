@@ -555,6 +555,10 @@ async function apiPost(action, payload = {}) {
   }
 }
 
+function apiPredictionMarketPlayerR4(action, payload = {}) {
+  return api(action, payload || {});
+}
+
 /* ======================
    TEAM FANTASY POST BRIDGE — v1.2.18j2
    Repo-owned Cloudflare Pages proxy. Falls back to the legacy

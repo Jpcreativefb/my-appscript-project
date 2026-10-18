@@ -715,6 +715,7 @@ const APP_PAGE_MODULES = {
   "ranking": ["ranking", "rankingSportsR1"],
   "game-hub": ["gameModeHub"],
   "betting": ["betting"],
+  "prediction-markets": ["predictionMarketsR4"],
   "team-fantasy": ["teamFantasy"],
   "leaderboard": ["leaderboard"],
   "season-hub": ["seasonHub", "nflCupR1"],
@@ -1095,6 +1096,7 @@ function appPageSnapshotEligible_(page) {
     page === "ranking" ||
     page === "team-fantasy" ||
     page === "betting" ||
+    page === "prediction-markets" ||
     page === "leaderboard" ||
     page === "season-hub" ||
     page === "trophy-room" ||
@@ -1350,6 +1352,7 @@ function appProgressiveRouteLabel_(page) {
     "ranking": "Ranking",
     "team-fantasy": "Team Fantasy",
     "betting": "Wagers",
+    "prediction-markets": "Prediction Markets",
     "leaderboard": "Leaderboard",
     "season-hub": "Season Hub",
     "trophy-room": "Trophy Room",
@@ -2301,6 +2304,11 @@ async function renderPage(page) {
     case "team-fantasy":
       if (typeof renderTeamFantasyPage !== "function") throw new Error("Team Fantasy page script is not loaded.");
       app.innerHTML = await renderTeamFantasyPage();
+      break;
+
+    case "prediction-markets":
+      if (typeof renderPredictionMarketsPage !== "function") throw new Error("Prediction Markets player script is not loaded.");
+      app.innerHTML = await renderPredictionMarketsPage();
       break;
 
     case "betting":

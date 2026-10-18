@@ -119,6 +119,12 @@ function doPost(e) {
     // PLAYER WRITES
     // =========================
 
+    if (action === "getPredictionMarketPlayerState" || action === "getPredictionMarketPlayerDetail" ||
+        action === "bootstrapPredictionMarketWallet" || action === "executePredictionMarketTrade" ||
+        action === "getPredictionMarketLeaderboard") {
+      return json(apiPredictionMarketPlayerR4Dispatch(action, body));
+    }
+
     if (action === "saveEditableProfile") {
       return json(apiSaveEditableProfile(body));
     }
