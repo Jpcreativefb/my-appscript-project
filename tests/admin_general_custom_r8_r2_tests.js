@@ -27,8 +27,13 @@ function makeContext(apiImpl) {
     getAttribute(key) { return this.attrs[key] || ''; },
     setAttribute(key, value) { this.attrs[key] = String(value); }
   };
+  const workspaceHost = {
+    innerHTML: '',
+    scrollIntoView() {}
+  };
   const shell = {
     querySelector(selector) {
+      if (selector === '[data-admin-go-live-workspace-host]') return workspaceHost;
       if (selector === '[data-admin-r3b-builder-host]') return host;
       if (selector === '[data-admin-r2-selection-message]') return { textContent: '' };
       return null;
@@ -59,7 +64,7 @@ function makeContext(apiImpl) {
   context.window = context;
   vm.createContext(context);
   vm.runInContext(shellSource, context);
-  return { context, calls, host };
+  return { context, calls, host, workspaceHost };
 }
 
 function makeForm(overrides = {}) {
@@ -94,8 +99,13 @@ async function submit(context, form) {
   assert.deepStrictEqual(Array.from(state.context.PATTC_ADMIN_OTHER_GAME_TYPES_R3B), EXACT_TYPES, 'R3 allowlist must remain unchanged');
 
   assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shared shell should mount');
-  const html = state.host.innerHTML;
-  assert(html.includes('Admin → Games &amp; Design → General / Custom'), 'General / Custom destination must be present');
+  const landingHtml = state.host.innerHTML;
+  assert(landingHtml.includes('data-admin-go-live-destination="general-custom"'), 'Games & Design landing hub must contain the General / Custom destination');
+  assert(landingHtml.includes('General / Custom'), 'Games & Design landing hub must label the General / Custom destination');
+
+  assert.strictEqual(state.context.pattcAdminGamesDesignOpenR2_('general-custom'), true, 'General / Custom destination should open its workspace');
+  const html = state.workspaceHost.innerHTML;
+  assert(html.includes('Admin → Games &amp; Design → General / Custom'), 'General / Custom workspace must identify its destination');
   assert(html.includes('Manage Existing Games'), 'General / Custom must retain Manage Existing');
   assert(html.includes("navigate('admin-games')"), 'Manage Existing must route to admin-games');
   assert(html.includes('admin-game-setup:&lt;gameId&gt;'), 'generic post-create setup authority must be documented');
