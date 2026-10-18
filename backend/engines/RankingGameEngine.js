@@ -40,10 +40,6 @@ function rankingBool_(value) {
 function rankingEnsureSheet_() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(RANKING_ENTRIES_SHEET);
-
-  // Opening the Ranking page can start multiple API reads at nearly the same
-  // time. Make first-use sheet creation atomic so two requests cannot both see
-  // a missing sheet and race to insert the same tab.
   if (!sh) {
     const lock = LockService.getScriptLock();
     let locked = false;
@@ -55,8 +51,6 @@ function rankingEnsureSheet_() {
         try {
           sh = ss.insertSheet(RANKING_ENTRIES_SHEET);
         } catch (error) {
-          // Defensive fallback: another execution may have completed creation
-          // between the re-check and insertSheet call.
           sh = ss.getSheetByName(RANKING_ENTRIES_SHEET);
           if (!sh) throw error;
         }
@@ -307,6 +301,10 @@ function apiGetRankingState_(payload) {
   if (!gameId) throw new Error("GameId is required.");
   if (!username) throw new Error("Username is required.");
 
+  if (typeof movieCommunityAwardsIsGame_ === "function" && movieCommunityAwardsIsGame_(gameId)) {
+    return movieCommunityAwardsGetState_({ username: username, gameId: gameId });
+  }
+
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || (rankingKey_(game.type) !== "ranking" && game.rankingEnabled !== true)) {
     throw new Error("This game is not configured for Ranking play.");
@@ -372,6 +370,11 @@ function saveRankingBallot_(payload) {
   const categoryId = rankingKey_(payload.categoryId);
   const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
   if (!gameId || !username || !categoryId) throw new Error("Username, GameId, and CategoryId are required.");
+
+  if (typeof movieCommunityAwardsIsGame_ === "function" && movieCommunityAwardsIsGame_(gameId)) {
+    return movieCommunityAwardsSave_({ username: username, gameId: gameId, categoryId: categoryId, rankings: rankings });
+  }
+
   // Only the authenticated Finalize workflow may commit Playoff Race ballots.
   if (typeof nflPlayoffRaceIsGame_ === "function" && nflPlayoffRaceIsGame_(gameId) &&
       payload.playoffRaceTimingAuthorized !== true) throw new Error("Use Finalize Picks for Playoff Race.");
@@ -497,8 +500,6 @@ function adminSaveRankingResults_(payload) {
       locked: true,
       notes: "Ranking result finalized."
     });
-    // adminUpdateCategory may mirror the winner into CategoryResults; write the
-    // complete rank set one more time so every final position remains canonical.
     upsertCategoryResultsBulk_(payloads);
   }
 
