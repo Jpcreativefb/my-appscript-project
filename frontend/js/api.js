@@ -1,4 +1,11 @@
-const API_BASE =
+// Branch and immutable Pages previews share the Preview Apps Script backend.
+// Canonical production and existing custom/local hosts retain their backend.
+const API_IS_CLOUDFLARE_PREVIEW = typeof location !== "undefined" &&
+  String(location.hostname || "").toLowerCase().endsWith(".my-appscript-project.pages.dev");
+
+const API_BASE = API_IS_CLOUDFLARE_PREVIEW
+  ? "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec"
+  :
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
 const API_APP_PROXY = "./api/app";
@@ -450,7 +457,7 @@ async function apiPostRaw_(action, payload = {}) {
     const dashboardReadFallback =
       String(action || "") === "getDashboardGamesHub" &&
       [502, 503, 504, 524].indexOf(Number(response.status)) !== -1;
-    if (response.status === 404 || response.status === 405 || dashboardReadFallback) {
+    if (!API_IS_CLOUDFLARE_PREVIEW && (response.status === 404 || response.status === 405 || dashboardReadFallback)) {
       response = await fetch(
         API_UPLOAD_PROXY,
         {
@@ -496,7 +503,7 @@ async function apiPostRaw_(action, payload = {}) {
 
   } catch (err) {
 
-    if (String(action || "") === "getDashboardGamesHub") {
+    if (!API_IS_CLOUDFLARE_PREVIEW && String(action || "") === "getDashboardGamesHub") {
       try {
         const fallbackResponse = await fetch(
           API_UPLOAD_PROXY,

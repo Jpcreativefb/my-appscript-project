@@ -15,7 +15,7 @@ assert(engine.includes("perfectFieldBonus"));
 assert(rankEngine.includes("nflPlayoffRaceBonusForBallot_"));
 assert(api.includes('action === "adminGetNflPlayoffRaceSettings"'));
 assert(api.includes('action === "adminSaveNflPlayoffRaceSettings"'));
-assert(route.includes('"adminGetNflPlayoffRaceSettings"'));
+assert(route.includes('const upstreamUrl = productionRequest'), 'Playoff reads follow environment routing');
 assert(route.includes('"adminSaveNflPlayoffRaceSettings"'));
 assert(admin.includes("NFL Playoff Race Timing"));
 assert(admin.includes("Open Now"));
