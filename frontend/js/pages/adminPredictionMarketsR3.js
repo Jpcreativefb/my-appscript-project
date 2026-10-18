@@ -32,6 +32,7 @@
     var out = [];
     if (has("EDIT")) out.push('<button class="button admin-button secondary" onclick="predictionMarketAdminR3EditDraft_(\''+esc(row.marketId)+'\')">Edit Draft</button>');
     if (has("SET_PRICE")) out.push('<button class="button admin-button secondary" onclick="predictionMarketAdminR3SetPrice_(\''+esc(row.marketId)+'\')">Update Price</button>');
+    if (has("REFRESH_PROVIDER")) out.push('<button class="button admin-button secondary" onclick="predictionMarketAdminR5RefreshProvider_(\''+esc(row.marketId)+'\')">Refresh Reference Price</button>');
     if (has("OPEN")) out.push('<button class="button admin-button" onclick="predictionMarketAdminR3Lifecycle_(\'open\',\''+esc(row.marketId)+'\')">Open</button>');
     if (has("LOCK")) out.push('<button class="button admin-button" onclick="predictionMarketAdminR3Lifecycle_(\'lock\',\''+esc(row.marketId)+'\')">Lock</button>');
     if (has("RESOLVE_YES")) out.push('<button class="button admin-button" onclick="predictionMarketAdminR3Lifecycle_(\'resolve-yes\',\''+esc(row.marketId)+'\')">Resolve YES</button>');
@@ -124,6 +125,20 @@
     catch(err){message(err&&err.message?err.message:"Price update failed.","error");return false;}
   };
 
+  root.predictionMarketAdminR5RefreshProvider_ = async function(id) {
+    var row=market(id); if(!row) return false;
+    message("Refreshing "+s(row.providerKind)+" reference price…","working");
+    try {
+      var res=await call("adminRefreshPredictionMarketReference",{marketId:id});
+      var proposed=res.proposed||{};
+      message("Reference price refreshed: YES "+s(proposed.referenceYesPrice)+" / NO "+s(proposed.referenceNoPrice)+" · "+s(proposed.referencePriceAsOf),"success");
+      await load(); return true;
+    } catch(err) {
+      message(err&&err.message?err.message:"Provider refresh failed. Last accepted price was retained.","error");
+      await load(); return false;
+    }
+  };
+
   root.predictionMarketAdminR3Lifecycle_ = async function(action,id) {
     var apiAction="", payload={marketId:id}, finalText="";
     if(action==="open") apiAction="adminOpenPredictionMarket";
@@ -141,7 +156,7 @@
     window.setTimeout(load,0);
     return '<div class="page admin-page" data-admin-prediction-markets-r3="1">'+
       '<div class="admin-sub"><button type="button" class="admin-small-button secondary" onclick="navigate(\'admin\')">Admin</button> → Games &amp; Design → Prediction Markets</div>'+
-      '<div class="admin-page-header"><div><h1>Prediction Markets</h1><div class="admin-sub">Create and operate binary Prediction Markets through the accepted R2 engine. Player trading, external ingestion, and direct storage editing are not part of this manager.</div></div></div>'+
+      '<div class="admin-page-header"><div><h1>Prediction Markets</h1><div class="admin-sub">Create and operate binary Prediction Markets through the accepted R2 engine. External providers are reference-only; Admin-triggered refresh never bypasses R2 price authority or edits storage directly.</div></div></div>'+
       '<div id="adminPredictionMarketMessage" class="admin-message" aria-live="polite"></div>'+
       '<div class="card admin-card"><h2>Create / Edit Draft Market</h2><form id="adminPredictionMarketForm" onsubmit="predictionMarketAdminR3Submit_(event);return false;"><div class="admin-control-grid">'+
         '<label class="admin-field"><span>Market ID</span><input name="marketId" required></label><label class="admin-field"><span>Title</span><input name="title" required></label><label class="admin-field"><span>Category</span><input name="category"></label><label class="admin-field"><span>Description</span><input name="description"></label>'+

@@ -1552,6 +1552,7 @@ function doGet(e) {
 
     if (action === "adminGetPredictionMarkets" || action === "adminCreatePredictionMarket" ||
         action === "adminEditPredictionMarket" || action === "adminSetPredictionMarketPrice" ||
+        action === "adminRefreshPredictionMarketReference" ||
         action === "adminOpenPredictionMarket" || action === "adminLockPredictionMarket" ||
         action === "adminResolvePredictionMarket" || action === "adminVoidPredictionMarket") {
       return json(apiAdminPredictionMarketR3Dispatch(action, params));

@@ -409,6 +409,35 @@ function predictionMarketR2CreateEngine(options) {
       return repository.saveMarket(predictionMarketR2NormalizeMarket_(merged));
     });
   }
+  function setReferencePrice(context, marketId, snapshot) {
+    assertAdmin(context);
+    snapshot = snapshot || {};
+    return repository.criticalSection(function() {
+      var market = repository.getMarket(marketId);
+      if (!market) throw new Error("Prediction Market not found");
+      var status = predictionMarketR2Status_(market.status);
+      if (status === "RESOLVED" || status === "VOID") throw new Error("Cannot price a terminal Prediction Market");
+      var yes = predictionMarketR2Price_(snapshot.referenceYesPrice, "referenceYesPrice");
+      var no = predictionMarketR2Price_(snapshot.referenceNoPrice, "referenceNoPrice");
+      if (Math.abs((yes + no) - 1) > 0.000001) throw new Error("Binary reference YES and NO prices must sum to 1");
+      var providerKind = predictionMarketR2RequireId_(snapshot.providerKind, "providerKind").toUpperCase();
+      var providerId = predictionMarketR2RequireId_(snapshot.providerId, "providerId");
+      var externalMarketId = predictionMarketR2RequireId_(snapshot.externalMarketId, "externalMarketId");
+      if (typeof snapshot.trusted !== "boolean") throw new Error("trusted must be explicit");
+      market.referenceYesPrice = yes;
+      market.referenceNoPrice = no;
+      market.referencePriceAsOf = predictionMarketR2Iso_(snapshot.referencePriceAsOf);
+      market.referencePriceTrusted = snapshot.trusted;
+      market.providerKind = providerKind;
+      market.providerId = providerId;
+      market.externalMarketId = externalMarketId;
+      market.sourceUrl = predictionMarketR2String_(snapshot.sourceUrl);
+      market.providerMetadata = snapshot.providerMetadata && typeof snapshot.providerMetadata === "object" ? snapshot.providerMetadata : {};
+      market.updatedAt = nowIso();
+      market.updatedBy = predictionMarketR2String_((context || {}).playerId || (context || {}).username || "SYSTEM");
+      return repository.saveMarket(predictionMarketR2NormalizeMarket_(market));
+    });
+  }
   function setManualPrice(context, marketId, yesPrice, noPrice, asOf) {
     assertAdmin(context);
     return repository.criticalSection(function() {
@@ -650,7 +679,7 @@ function predictionMarketR2CreateEngine(options) {
     return rows;
   }
   return {
-    setup: setup, createMarket: createMarket, editDraftMarket: editDraftMarket, setManualPrice: setManualPrice,
+    setup: setup, createMarket: createMarket, editDraftMarket: editDraftMarket, setManualPrice: setManualPrice, setReferencePrice: setReferencePrice,
     openMarket: openMarket, lockMarket: lockMarket, resolveMarket: resolveMarket, setManualResolution: resolveMarket, voidMarket: voidMarket,
     bootstrapWallet: bootstrapWallet, getWallet: getWallet, getMarkets: getMarkets, executeTrade: executeTrade,
     settlePlayerMarket: settlePlayerMarket, getPortfolio: getPortfolio, getLeaderboard: getLeaderboard,

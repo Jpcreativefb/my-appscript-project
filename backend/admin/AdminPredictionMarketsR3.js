@@ -31,15 +31,21 @@ function predictionMarketAdminR3AllowedActions_(status) {
 
 function predictionMarketAdminR3MarketView_(market) {
   market = market || {};
+  var allowed = predictionMarketAdminR3AllowedActions_(market.status).slice();
+  var status = predictionMarketAdminR3String_(market.status).toUpperCase();
+  var providerKind = predictionMarketAdminR3String_(market.providerKind || "MANUAL").toUpperCase();
+  if (providerKind !== "MANUAL" && status !== "RESOLVED" && status !== "VOID") allowed.push("REFRESH_PROVIDER");
   return Object.assign({}, market, {
-    allowedAdminActions: predictionMarketAdminR3AllowedActions_(market.status),
-    tradingAvailable: predictionMarketAdminR3String_(market.status).toUpperCase() === "OPEN"
+    allowedAdminActions: allowed,
+    tradingAvailable: status === "OPEN",
+    providerRefreshAvailable: allowed.indexOf("REFRESH_PROVIDER") !== -1
   });
 }
 
 function predictionMarketAdminR3CreateService(options) {
   options = options || {};
   var engine = options.engine;
+  var providerRegistry = options.providerRegistry || null;
   if (!engine) throw new Error("Prediction Market R2 engine is required");
 
   function actor(username) { return predictionMarketAdminR3Context_(username); }
@@ -100,6 +106,37 @@ function predictionMarketAdminR3CreateService(options) {
     var result = engine.setManualPrice(actor(username), payload.marketId, payload.referenceYesPrice, payload.referenceNoPrice, payload.referencePriceAsOf);
     return { success: true, market: predictionMarketAdminR3MarketView_(result) };
   }
+  function refreshReference(username, payload) {
+    payload = payload || {};
+    var ctx = actor(username);
+    if (!providerRegistry || typeof providerRegistry.fetchReference !== "function") throw new Error("Prediction Market provider registry is unavailable");
+    var marketId = predictionMarketAdminR3String_(payload.marketId);
+    var current = (engine.getMarkets() || []).filter(function(row) { return predictionMarketAdminR3String_(row.marketId) === marketId; })[0];
+    if (!current) throw new Error("Prediction Market not found");
+    if (predictionMarketAdminR3String_(current.providerKind || "MANUAL").toUpperCase() === "MANUAL") {
+      return { success:false, providerStatus:"UNAVAILABLE", message:"MANUAL markets use Update Price rather than external refresh.", market:predictionMarketAdminR3MarketView_(current) };
+    }
+    var fetched = providerRegistry.fetchReference(current);
+    if (!fetched || fetched.success !== true || !fetched.snapshot) {
+      return { success:false, providerStatus:(fetched && fetched.providerStatus) || "PROVIDER_ERROR", message:(fetched && fetched.message) || "Provider refresh failed", market:predictionMarketAdminR3MarketView_(current) };
+    }
+    var snapshot = fetched.snapshot;
+    var prospective = Object.assign({}, current, {
+      referenceYesPrice:snapshot.referenceYesPrice, referenceNoPrice:snapshot.referenceNoPrice,
+      referencePriceAsOf:snapshot.referencePriceAsOf, referencePriceTrusted:snapshot.trusted,
+      providerKind:snapshot.providerKind, providerId:snapshot.providerId, externalMarketId:snapshot.externalMarketId,
+      sourceUrl:snapshot.sourceUrl, providerMetadata:snapshot.providerMetadata || {}
+    });
+    try {
+      engine.validatePriceState(prospective, new Date().toISOString());
+    } catch (err) {
+      var msg = err && err.message ? err.message : "Provider reference failed R2 validation";
+      var providerStatus = /stale/i.test(msg) ? "STALE" : "INVALID";
+      return { success:false, providerStatus:providerStatus, message:msg, proposed:snapshot, market:predictionMarketAdminR3MarketView_(current) };
+    }
+    var applied = engine.setReferencePrice(ctx, marketId, snapshot);
+    return { success:true, providerStatus:"FRESH", proposed:snapshot, market:predictionMarketAdminR3MarketView_(applied) };
+  }
   function open(username, payload) {
     var result = engine.openMarket(actor(username), (payload || {}).marketId);
     return { success: true, market: predictionMarketAdminR3MarketView_(result) };
@@ -118,13 +155,14 @@ function predictionMarketAdminR3CreateService(options) {
     return { success: true, market: predictionMarketAdminR3MarketView_(result) };
   }
 
-  return { list:list, create:create, edit:edit, price:price, open:open, lock:lock, resolve:resolve, voidMarket:voidMarket };
+  return { list:list, create:create, edit:edit, price:price, refreshReference:refreshReference, open:open, lock:lock, resolve:resolve, voidMarket:voidMarket };
 }
 
 function predictionMarketAdminR3ProductionService_() {
   var repository = predictionMarketR2CreateAppsScriptRepository();
-  var engine = predictionMarketR2CreateEngine({ repository: repository });
-  return predictionMarketAdminR3CreateService({ engine: engine });
+  var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });
+  var providerRegistry = predictionMarketReferenceProvidersR5CreateRegistry({ maxAgeMs: PREDICTION_MARKET_R2_CONFIG.maxReferencePriceAgeMs });
+  return predictionMarketAdminR3CreateService({ engine: engine, providerRegistry: providerRegistry });
 }
 
 function apiAdminPredictionMarketR3Dispatch(action, payload) {
@@ -136,6 +174,7 @@ function apiAdminPredictionMarketR3Dispatch(action, payload) {
     case "adminCreatePredictionMarket": return service.create(username, payload);
     case "adminEditPredictionMarket": return service.edit(username, payload);
     case "adminSetPredictionMarketPrice": return service.price(username, payload);
+    case "adminRefreshPredictionMarketReference": return service.refreshReference(username, payload);
     case "adminOpenPredictionMarket": return service.open(username, payload);
     case "adminLockPredictionMarket": return service.lock(username, payload);
     case "adminResolvePredictionMarket": return service.resolve(username, payload);

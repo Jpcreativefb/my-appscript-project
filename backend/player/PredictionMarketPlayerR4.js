@@ -135,7 +135,7 @@ function predictionMarketPlayerR4CreateService(options) {
 
 function predictionMarketPlayerR4ProductionService_() {
   var repository = predictionMarketR2CreateAppsScriptRepository();
-  var engine = predictionMarketR2CreateEngine({ repository: repository });
+  var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });
   return predictionMarketPlayerR4CreateService({ engine: engine });
 }
 
