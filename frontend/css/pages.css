@@ -4576,3 +4576,23 @@ body.game-profile-choice-open { overflow:hidden; }
 .pattc-sports-hero-content{min-height:210px;display:flex;align-items:flex-end;gap:14px;padding:24px 26px;position:relative}.pattc-sports-hero-copy{min-width:0;flex:1}.pattc-sports-hero-kicker{font-size:11px;font-weight:900;letter-spacing:.16em;color:var(--pattc-sports-hero-accent,#19a7ce);text-transform:uppercase}.pattc-sports-hero h1{margin:5px 0 4px;font-size:clamp(28px,4vw,46px);line-height:.98;letter-spacing:-.035em;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.38)}.pattc-sports-hero p{margin:0;max-width:680px;color:#d9edf7;font-size:14px;line-height:1.35}.pattc-sports-hero-mark{width:62px;height:62px;object-fit:contain;align-self:center;filter:drop-shadow(0 5px 12px rgba(0,0,0,.35))}.pattc-sports-hero-context{margin-left:auto;align-self:flex-end;max-width:280px}.pattc-sports-hero-context .sports-league-selector,.pattc-sports-hero-context .tf-field{margin:0;background:rgba(2,12,24,.76);backdrop-filter:blur(8px)}
 .appearance-sports-hero-controls{grid-column:1/-1;border-top:1px solid rgba(148,163,184,.2);margin-top:8px;padding-top:12px}.appearance-sports-hero-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.appearance-sports-hero-grid label{display:flex;flex-direction:column;gap:5px}.appearance-sports-hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.appearance-sports-hero-previews{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,.55fr);gap:12px;margin-top:12px}.appearance-sports-hero-preview{padding:8px;border:1px solid rgba(148,163,184,.2);border-radius:12px;background:#050b14;overflow:hidden}.appearance-sports-hero-preview>strong{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px;color:#9fb6ca}.appearance-sports-hero-preview.is-mobile .pattc-sports-hero{max-width:390px;margin-left:auto;margin-right:auto}
 @media(max-width:700px){.pattc-sports-hero{min-height:164px;border-radius:14px}.pattc-sports-hero-content{min-height:164px;padding:18px 16px;align-items:flex-end;flex-wrap:wrap}.pattc-sports-hero h1{font-size:29px}.pattc-sports-hero p{font-size:12px}.pattc-sports-hero-mark{width:46px;height:46px}.pattc-sports-hero-context{width:100%;max-width:none;margin:0}.appearance-sports-hero-grid,.appearance-sports-hero-previews{grid-template-columns:1fr}}
+
+
+/* COOKOFF V1 ADVANCED CONTROLS */
+.voting-evaluation-workspace { margin: 18px 0 22px; }
+.voting-evaluation-heading { margin-bottom: 12px; }
+.voting-evaluation-heading h3 { margin-bottom: 4px; }
+.voting-evaluated-toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-weight: 700; }
+.voting-evaluated-toggle input { width: 20px; height: 20px; flex: 0 0 auto; }
+.voting-criteria-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+.voting-criteria-grid input { width: 100%; }
+.voting-final-submit { position: relative; z-index: 1; margin-bottom: 20px; }
+.admin-cookoff-criteria-field { margin-top: 12px; }
+.admin-cookoff-criteria-field textarea { width: 100%; min-height: 120px; }
+@media (max-width: 480px) {
+  .voting-page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .voting-evaluation-workspace .voting-entry-grid, .voting-criteria-grid { grid-template-columns: minmax(0, 1fr); }
+  .voting-evaluated-toggle { min-height: 44px; }
+  .voting-final-submit .button { width: 100%; min-height: 48px; }
+  .admin-cookoff-controls { grid-template-columns: minmax(0, 1fr); }
+}
