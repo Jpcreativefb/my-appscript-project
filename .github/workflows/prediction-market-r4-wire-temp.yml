@@ -22,26 +22,26 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace_once(path, old, new):
-              p=Path(path); s=p.read_text(); c=s.count(old)
-              if c!=1: raise SystemExit(f'{path}: expected one marker, found {c}: {old!r}')
+          def replace_first(path, old, new):
+              p=Path(path); s=p.read_text()
+              if old not in s: raise SystemExit(f'{path}: marker not found: {old!r}')
               p.write_text(s.replace(old,new,1))
 
-          replace_once('backend/core/ApiSecurity.js',
-              '  saveSurvivorPick: true, saveSportsSurvivorAutoPickPreference: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true,\n',
-              '  saveSurvivorPick: true, saveSportsSurvivorAutoPickPreference: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true, executePredictionMarketTrade: true,\n')
+          replace_first('backend/core/ApiSecurity.js',
+              'saveBet: true, removeBet: true,',
+              'saveBet: true, removeBet: true, executePredictionMarketTrade: true,')
 
-          replace_once('backend/Api.js',
-              '    if (action === "saveEditableProfile") {\n',
+          replace_first('backend/Api.js',
+              '    // PLAYER WRITES\n    // =========================\n\n',
+              '    // PLAYER WRITES\n    // =========================\n\n'
               '    if (action === "getPredictionMarketPlayerState" || action === "getPredictionMarketPlayerDetail" ||\n'
               '        action === "bootstrapPredictionMarketWallet" || action === "executePredictionMarketTrade" ||\n'
               '        action === "getPredictionMarketLeaderboard") {\n'
               '      return json(apiPredictionMarketPlayerR4Dispatch(action, body));\n'
-              '    }\n\n'
-              '    if (action === "saveEditableProfile") {\n')
+              '    }\n\n')
 
           for path in ['frontend/js/api.js','frontend/api.js']:
-              replace_once(path,
+              replace_first(path,
                   '/* ======================\n   TEAM FANTASY POST BRIDGE — v1.2.18j2\n',
                   'function apiPredictionMarketPlayerR4(action, payload = {}) {\n'
                   '  return api(action, payload || {});\n'
@@ -49,27 +49,24 @@ jobs:
                   '/* ======================\n   TEAM FANTASY POST BRIDGE — v1.2.18j2\n')
 
           for path in ['frontend/js/app.js','frontend/app.js']:
-              replace_once(path,
+              replace_first(path,
                   '  "betting": ["betting"],\n',
                   '  "betting": ["betting"],\n  "prediction-markets": ["predictionMarketsR4"],\n')
-              replace_once(path,
+              replace_first(path,
                   '    page === "betting" ||\n',
                   '    page === "betting" ||\n    page === "prediction-markets" ||\n')
-              replace_once(path,
+              replace_first(path,
                   '    "betting": "Wagers",\n',
                   '    "betting": "Wagers",\n    "prediction-markets": "Prediction Markets",\n')
-              marker='    case "betting":\n'
-              p=Path(path); s=p.read_text(); c=s.count(marker)
-              if c!=1: raise SystemExit(f'{path}: betting case count {c}')
-              s=s.replace(marker,
+              replace_first(path,
+                  '    case "betting":\n',
                   '    case "prediction-markets":\n'
                   '      if (typeof renderPredictionMarketsPage !== "function") throw new Error("Prediction Markets player script is not loaded.");\n'
                   '      app.innerHTML = await renderPredictionMarketsPage();\n'
                   '      break;\n\n'
-                  + marker,1)
-              p.write_text(s)
+                  '    case "betting":\n')
 
-          replace_once('frontend/app.html',
+          replace_first('frontend/app.html',
               '  <button data-page="more" onclick="navigate(\'more\')">\n',
               '  <button data-page="prediction-markets" onclick="navigate(\'prediction-markets\')">\n'
               '    <span class="bottom-nav-icon">◐</span>\n'
