@@ -261,4 +261,6 @@ function sell(engine, tx, user, market, outcome, quantity, version, referencePri
   assert(fs.readFileSync(sportsWager,'utf8').includes('SPORTS WAGER ENGINE'));
 })();
 
+require('./prediction_market_store_r2_failure_tests.js');
+
 console.log('PASS prediction_market_engine_r2_tests');
