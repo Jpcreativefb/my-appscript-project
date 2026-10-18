@@ -14,7 +14,7 @@ const window={renderAdminGamesPage:async()=>'<div class="page admin-games-page">
 const context={window,document:{getElementById:id=>elements[id]||null},apiAdminGetGames:async()=>({success:true,games:sourceGames}),apiAdminUpdateGame:async payload=>{writes.push(payload);Object.assign(sourceGames.find(g=>g.gameId===payload.gameId),payload);return{success:true,result:{success:true}};},apiAdminRunGamePreflight:async()=>({success:true,errorCount:0,warningCount:0,issues:[]}),apiAdminFinalizeGamePublication:async payload=>{publishes.push(payload);Object.assign(sourceGames.find(g=>g.gameId===payload.gameId),{status:'Active',active:true,lockAllPicks:payload.lockAllPicks});return{success:true,activated:true};},navigate:()=>{},console};
 vm.runInNewContext(section,context,{filename:'cup-controller.js'});
 (async()=>{
- const html=await window.renderAdminGamesPage();
+ const html=await window.pattcCupControlAdminCardR3_();
  assert(html.includes('NFL Cup · Control Center'));assert(html.includes('NFL Confidence'));assert(html.includes('NFL Futures'));assert(html.includes('Minimum field participation %'));assert(html.includes('Best mini-games'));
  await window.pattcCupSaveRulesR1_();
  assert.strictEqual(sourceGames[0].parentBestCount,0);

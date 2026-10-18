@@ -80,7 +80,7 @@ ok(app.includes('const usePageLoader = options.suppressLoader !== true;'), 'Navi
 ok(app.includes('if (snapshot) {'), 'Cached navigation must short-circuit before opening the route loader');
 
 const adminPage = read('frontend/js/pages/admin.js');
-ok(adminPage.includes('Sports Scores & Game Builder'), 'Admin page must restore Sports Scores & Game Builder launcher');
+ok(adminPage.includes('Sports Scores &amp; Game Builder'), 'Admin page must restore Sports Scores & Game Builder launcher');
 ok(adminPage.includes("window.location.href='./sports.html'"), 'Admin Sports launcher must open sports.html');
 
 const sportsPage = read('frontend/js/sports.js');

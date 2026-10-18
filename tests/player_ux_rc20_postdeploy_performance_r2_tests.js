@@ -90,10 +90,12 @@ ok(src(files.css).includes('dashboard-current-games-carousel'), 'accepted Curren
 ok(/<meta\s+name=["']viewport["'][^>]*content=["'][^"']*width=device-width[^"']*initial-scale=1/i.test(src(files.appHtml)), 'app viewport meta remains mobile-correct');
 
 // -------------------------------------------------------------------------
-// R2 gate 2: executable fast Dashboard must exit before every noncritical
-// progress/profile/appearance helper. Stubs throw if any forbidden helper runs.
+// R2 gate 2: executable fast Dashboard must defer expensive progress/profile
+// work while still carrying the lightweight saved-general profile and Hub
+// appearance authorities required by the accepted Home Hub repair.
 // -------------------------------------------------------------------------
 const counters = Object.create(null);
+const fastDecorations = { profile: 0, appearance: 0 };
 function forbidden(name) {
   counters[name] = 0;
   return function() { counters[name]++; throw new Error(`fastStartup invoked forbidden helper: ${name}`); };
@@ -125,10 +127,19 @@ const sandbox = {
   getCategories: forbidden('getCategories'),
   seasonAnchorUserPayload_: forbidden('seasonAnchorUserPayload_'),
   apiGetEditableProfile: forbidden('apiGetEditableProfile'),
-  appearanceGetHubAppearanceRows_: forbidden('appearanceGetHubAppearanceRows_')
+  profileGetGeneralProfile_(username) {
+    fastDecorations.profile++;
+    return { username, displayName: 'Saved Player' };
+  },
+  appearanceGetHubAppearanceRows_() {
+    fastDecorations.appearance++;
+    return [{ key: 'home-theme', value: 'saved' }];
+  }
 };
 vm.createContext(sandbox);
 vm.runInContext(extractFunction(appData, 'buildDashboardFastStartupGameHubItem_'), sandbox);
+vm.runInContext(extractFunction(appData, 'appDashboardGeneralProfile_'), sandbox);
+vm.runInContext(extractFunction(appData, 'appDashboardHubAppearance_'), sandbox);
 vm.runInContext(extractFunction(appData, 'apiGetDashboardGamesHub'), sandbox);
 const compact = sandbox.apiGetDashboardGamesHub({ username:'player', token:'token', fastStartup:true });
 ok(compact && compact.success === true, 'fast Dashboard succeeds');
@@ -137,6 +148,11 @@ eq(compact.activeGames.length, 1, 'active game survives compact payload');
 eq(compact.activeGames[0].gameId, 'active-1', 'compact payload preserves direct game identity');
 eq(compact.activeGames[0].hasStarted, null, 'compact Home does not invent started state');
 eq(compact.activeGames[0].madeCount, null, 'compact Home does not invent picks completed');
+eq(compact.profileAuthority, 'saved-general', 'fast Home preserves saved-general profile authority');
+eq(compact.profile.displayName, 'Saved Player', 'fast Home carries the lightweight saved general profile');
+eq(compact.hubAppearance.length, 1, 'fast Home carries lightweight Hub appearance rows');
+eq(fastDecorations.profile, 1, 'fast Home reads the lightweight general profile once');
+eq(fastDecorations.appearance, 1, 'fast Home reads Hub appearance once');
 Object.entries(counters).forEach(([name, value]) => eq(value, 0, `fast Dashboard never calls ${name}`));
 
 // -------------------------------------------------------------------------

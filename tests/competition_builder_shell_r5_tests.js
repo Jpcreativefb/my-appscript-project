@@ -25,7 +25,6 @@ for (const heading of [
 // 2-5. Compact competition selector, full-width workspace, authoritative Cup route, no duplicated Cup controls.
 assert(/Competition Type[\s\S]*value="cup"[\s\S]*>Cup<\/option>[\s\S]*value="series"[\s\S]*>Series<\/option>[\s\S]*value="tournament"[\s\S]*>Tournament<\/option>/.test(shellSource), 'Competition selector must include Cup, Series, Tournament');
 assert(shellSource.includes('data-admin-r5-competition-host'), 'full-width Competition workspace host missing');
-assert(shellSource.indexOf('data-admin-r5-competition-host') > shellSource.indexOf('5. Operations'), 'Competition workspace must render below lifecycle cards');
 assert(shellSource.includes("navigate('admin-nfl-cup')"), 'Cup must retain admin-nfl-cup route');
 assert(shellSource.includes('Open NFL Cup Control Center'), 'Cup workspace must expose one authoritative manager action');
 assert(!shellSource.includes('pattcCupControlAdminCardR3_'), 'shared shell must not duplicate Cup Control Center renderer');
@@ -85,6 +84,7 @@ function runtime() {
   const state = runtime();
   assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount');
   const html = state.mountHost.innerHTML;
+  assert(html.indexOf('data-admin-r5-competition-host') > html.indexOf('5. Operations'), 'Competition workspace must render below lifecycle cards');
 
   // 11-16. R3/R4 routing and builder boundaries remain intact.
   for (const label of ['Confidence', 'Survivor', 'Team Fantasy', 'Playoff / Forecast', 'Other Game']) {

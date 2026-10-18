@@ -38,7 +38,9 @@ assert(dashboard.includes('reality: "Reality Shows"'), 'Reality hub is missing.'
 assert(dashboard.includes('awards: "Awards Shows"'), 'Awards hub is missing.');
 assert(dashboard.includes('general: "General Games"'), 'General hub is missing.');
 
-assert(appData.includes('apiGetEditableProfile(username, "")'), 'Dashboard payload should carry the lightweight general profile without another browser request.');
+assert(appData.includes('function appDashboardGeneralProfile_'), 'Dashboard lightweight general-profile helper is missing.');
+assert(appData.includes('profileGetGeneralProfile_(username)'), 'Dashboard must read the saved general profile through the current lightweight authority.');
+assert(appData.includes('profileAuthority: "saved-general"'), 'Dashboard payload must mark the saved general profile as authoritative.');
 assert(appData.includes('hubCategory:'), 'Dashboard game payload should include hub category.');
 assert(appData.includes('hubGroup:'), 'Dashboard game payload should include hub subgroup.');
 assert(appData.includes('function getDashboardHubPlacement_'), 'Backend hub placement helper is missing.');

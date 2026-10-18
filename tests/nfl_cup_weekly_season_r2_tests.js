@@ -37,11 +37,11 @@ for(const name of ['confidence','fantasy']){
  put('cupR2_'+name+'_weekly','',true);put('cupR2_'+name+'_season','',true);put('cupR2_'+name+'_weeklyWeight','1');put('cupR2_'+name+'_seasonWeight','2');put('cupR2_'+name+'_weeklyPoints','5,3,1');put('cupR2_'+name+'_bestWeekly','0');put('cupR2_'+name+'_finalWeeks','3');put('cupR2_'+name+'_seasonFinal','',false);
 }
 const games=[parent,Object.assign({parentGameId:'nfl-cup-2026'},child),Object.assign({parentGameId:'nfl-cup-2026'},fantasy)];
-const front={window:{renderAdminGamesPage:async()=>'<div class="page"><details><summary>2 · Cup points &amp; field protection</summary></details></div>',confirm:()=>true},document:{getElementById:id=>elements[id]||null},apiAdminGetGames:async()=>({success:true,games}),apiAdminUpdateGame:async payload=>{writes.push(payload);Object.assign(parent,payload);return{success:true,result:{success:true}};},console};
+const front={window:{pattcCupControlAdminCardR3_:async()=>'<div class="page"><details><summary>2 · Cup points &amp; field protection</summary></details><details><summary>3 · Cup publication</summary></details></div>',confirm:()=>true},document:{getElementById:id=>elements[id]||null},apiAdminGetGames:async()=>({success:true,games}),apiAdminUpdateGame:async payload=>{writes.push(payload);Object.assign(parent,payload);return{success:true,result:{success:true}};},console};
 const section=admin.slice(admin.indexOf('/* PATTC NFL CUP R2 admin extension.'));
 vm.runInNewContext(section,front,{filename:'cup-r2-admin.js'});
 (async()=>{
- const html=await front.window.renderAdminGamesPage();assert(html.includes('Weekly + season awards'));assert(html.includes('NFL Confidence'));assert(html.includes('Team Fantasy'));
+ const html=await front.window.pattcCupControlAdminCardR3_();assert(html.includes('Weekly + season awards'));assert(html.includes('NFL Confidence'));assert(html.includes('Team Fantasy'));
  await front.window.pattcCupSaveWeeklySeasonR2_();assert.strictEqual(writes.length,1);const saved=JSON.parse(parent.placementPointsJSON);
  assert.strictEqual(saved.points[0],25,'save preserves existing Cup point scale');
  assert.strictEqual(saved.weeklySeasonR2.games['nfl-confidence-2026'].seasonWeight,2);assert.strictEqual(saved.weeklySeasonR2.games['league-of-fantasy-champions-2026'].finalizedWeeks[0],3);

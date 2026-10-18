@@ -36,7 +36,7 @@ for (const heading of [
 for (const builder of ['Confidence', 'Survivor', 'Team Fantasy', 'Playoff / Forecast', 'Other Game']) {
   assert(shell.includes(builder), 'missing builder destination: ' + builder);
 }
-for (const competition of ['Cups', 'Series', 'Tournaments']) {
+for (const competition of ['Cup', 'Series', 'Tournament']) {
   assert(shell.includes(competition), 'missing competition destination: ' + competition);
 }
 for (const dataArea of ['Teams', 'Schedule', 'Scores', 'Standings', 'Odds', 'Season Timing']) {
