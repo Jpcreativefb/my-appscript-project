@@ -165,7 +165,8 @@ assert.equal(voidSettlement.wallet.availableCredits, 1000);
 assert.deepEqual(voidStack.engine.settlePlayerMarket(adminCtx,'r6-void','void-player'), voidSettlement);
 
 // External-source snapshot scenario: mocked Kalshi mapping -> Admin refresh -> stored price -> player only sees stored snapshot.
-const extNow = { value: BASE_NOW };
+const extNow = { value: Date.now() };
+const extIso = offset => new Date(extNow.value + offset).toISOString();
 const extRepo = predictionMarketR2CreateMemoryRepository();
 const extEngine = predictionMarketR2CreateEngine({
   repository: extRepo,
@@ -175,13 +176,13 @@ const extEngine = predictionMarketR2CreateEngine({
 const goodRegistry = providers.predictionMarketReferenceProvidersR5CreateRegistry({
   nowMs: extNow.value,
   maxAgeMs: 15*60*1000,
-  kalshiTransport: () => ({status:200, body:{market:{ticker:'KXR6',event_ticker:'KXR6E',last_price_dollars:'0.65',updated_time:'2026-10-18T11:59:00Z',status:'open'}}})
+  kalshiTransport: () => ({status:200, body:{market:{ticker:'KXR6',event_ticker:'KXR6E',last_price_dollars:'0.65',updated_time:extIso(-60*1000),status:'open'}}})
 });
 const extAdmin = predictionMarketAdminR3CreateService({engine:extEngine,providerRegistry:goodRegistry});
 extAdmin.create('director', {
   marketId:'r6-external', title:'External snapshot?', referenceYesPrice:0.5, referenceNoPrice:0.5,
-  referencePriceAsOf:'2026-10-18T11:58:00Z', referencePriceTrusted:true, providerKind:'KALSHI', providerId:'kalshi-public',
-  externalMarketId:'KXR6', sourceUrl:'https://kalshi.com/markets/KXR6', providerMetadata:'{}', lockTime:'2026-10-18T13:00:00Z'
+  referencePriceAsOf:extIso(-2*60*1000), referencePriceTrusted:true, providerKind:'KALSHI', providerId:'kalshi-public',
+  externalMarketId:'KXR6', sourceUrl:'https://kalshi.com/markets/KXR6', providerMetadata:'{}', lockTime:extIso(60*60*1000)
 });
 const refreshed = extAdmin.refreshReference('director',{marketId:'r6-external'});
 assert.equal(refreshed.success,true);
@@ -208,7 +209,7 @@ assert.equal(afterFailure.referencePriceAsOf,beforeFailure.referencePriceAsOf);
 
 failingAdmin = predictionMarketAdminR3CreateService({engine:extEngine,providerRegistry:{fetchReference:()=>({success:true,snapshot:{
   providerKind:'KALSHI',providerId:'kalshi-public',externalMarketId:'KXR6',referenceYesPrice:0.8,referenceNoPrice:0.2,
-  referencePriceAsOf:'2026-10-18T10:00:00Z',trusted:true,sourceUrl:'https://example.invalid',providerMetadata:{}
+  referencePriceAsOf:extIso(-60*60*1000),trusted:true,sourceUrl:'https://example.invalid',providerMetadata:{}
 }})}});
 const staleResult = failingAdmin.refreshReference('director',{marketId:'r6-external'});
 assert.equal(staleResult.success,false);
