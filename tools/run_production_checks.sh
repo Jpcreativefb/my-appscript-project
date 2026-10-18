@@ -8,6 +8,7 @@ echo "== Awards App production checks =="
 
 echo "[1/14] Git diff integrity"
 git diff --check
+git diff --check 76fb1ad95e19586014439b3e59ec28e7b981532d...HEAD
 echo "  PASS: git diff --check"
 
 echo "[2/14] JavaScript syntax"
