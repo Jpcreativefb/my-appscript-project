@@ -1,7 +1,7 @@
 # PATTC Prediction Market R9 — Foundation Architecture R1
 
-**Status:** Foundation / contract only  
-**Starting Director checkpoint:** `76fb1ad95e19586014439b3e59ec28e7b981532d`  
+**Status:** Foundation / contract only
+**Starting Director checkpoint:** `76fb1ad95e19586014439b3e59ec28e7b981532d`
 **Branch:** `feature/prediction-market-r9-foundation-r1`
 
 ## 1. Product boundary
