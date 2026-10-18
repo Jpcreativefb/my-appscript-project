@@ -34,8 +34,8 @@ includes(movie, 'if(gameId && !eligibleMap[movieId]) throw new Error("Movie is n
 includes(movie, 'lock.waitLock(4000)');
 
 // The current Ranking API authority delegates Movie Community Awards without replacing generic Ranking behavior.
-includes(ranking, 'movieCommunityAwardsGetState_({username:username,gameId:gameId})');
-includes(ranking, 'movieCommunityAwardsSave_({username:username,gameId:gameId,categoryId:categoryId,rankings:rankings})');
+includes(ranking, 'return movieCommunityAwardsGetState_({ username: username, gameId: gameId });');
+includes(ranking, 'return movieCommunityAwardsSave_({ username: username, gameId: gameId, categoryId: categoryId, rankings: rankings });');
 includes(ranking, 'Rank every answer before saving this question.');
 
 // Server validation enforces Seen-only partial ballots and event lifecycle authority.
