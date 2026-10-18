@@ -1,0 +1,23 @@
+name: Prediction Market R2 Recovery Validation Temp
+
+on:
+  push:
+    branches:
+      - feature/prediction-market-r9-engine-r2
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Focused Prediction Market R2 tests
+        run: node tests/prediction_market_engine_r2_tests.js
+      - name: Diff check
+        run: git diff --check fcf456c8b6aa95d28efed1e149468a5b59e8336b...HEAD
+      - name: Full production checks
+        run: bash tools/run_production_checks.sh
