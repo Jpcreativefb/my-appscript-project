@@ -44,6 +44,7 @@ function runtime() {
   const calls = { api: [], nav: [] };
   const builderHost = { innerHTML: '' };
   const competitionHost = { innerHTML: '' };
+  const workspaceHost = { innerHTML: '', scrollIntoView() {} };
   const message = { textContent: '' };
   const mountHost = {
     innerHTML: '',
@@ -53,6 +54,7 @@ function runtime() {
   };
   const shell = {
     querySelector(selector) {
+      if (selector === '[data-admin-go-live-workspace-host]') return workspaceHost;
       if (selector === '[data-admin-r3b-builder-host]') return builderHost;
       if (selector === '[data-admin-r5-competition-host]') return competitionHost;
       if (selector === '[data-admin-r2-selection-message]') return message;
@@ -77,13 +79,16 @@ function runtime() {
   context.window = context;
   vm.createContext(context);
   vm.runInContext(shellSource, context);
-  return { context, calls, competitionHost, mountHost };
+  return { context, calls, competitionHost, workspaceHost, mountHost };
 }
 
 {
   const state = runtime();
   assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount');
-  const html = state.mountHost.innerHTML;
+  const landingHtml = state.mountHost.innerHTML;
+  assert(landingHtml.includes('data-admin-go-live-destination="sports"'), 'Games & Design landing hub must contain the Sports destination');
+  assert.strictEqual(state.context.pattcAdminGamesDesignOpenR2_('sports'), true, 'Sports destination should open its workspace');
+  const html = state.workspaceHost.innerHTML;
   assert(html.indexOf('data-admin-r5-competition-host') > html.indexOf('5. Operations'), 'Competition workspace must render below lifecycle cards');
 
   // 11-16. R3/R4 routing and builder boundaries remain intact.
