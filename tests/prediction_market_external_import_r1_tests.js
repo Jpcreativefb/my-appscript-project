@@ -3,8 +3,10 @@ const fs = require('fs');
 const vm = require('vm');
 
 const source = fs.readFileSync('backend/admin/AdminPredictionMarketsR3.js', 'utf8');
-assert(source.includes('apiAdminAwardsSearchExternalMarkets'), 'Awards search authority must be reused');
-assert(source.includes('apiAdminAwardsGetExternalEvent'), 'Awards detail authority must be reused');
+const discoverySource = fs.readFileSync('backend/engines/PredictionMarketExternalDiscoveryR2.js', 'utf8');
+const authoritySource = source + '\n' + discoverySource;
+assert(authoritySource.includes('apiAdminAwardsSearchExternalMarkets'), 'Awards search authority must be reused');
+assert(authoritySource.includes('apiAdminAwardsGetExternalEvent'), 'Awards detail authority must be reused');
 assert(!source.includes('PredictionMarketMarkets'), 'Admin adapter must not name/write raw PM sheets');
 assert(!/\.setup\s*\(/.test(source), 'Admin import must not invoke setup');
 assert(!/executeTrade\s*\(/.test(source), 'Admin import must not invoke trading');
@@ -135,6 +137,7 @@ context.predictionMarketAdminR3ProductionService_ = function() {
     list() { dispatched.push('list'); return { success: true, markets: [] }; },
     searchExternal(user, payload) { dispatched.push('search:' + payload.provider); return { success: true, events: [] }; },
     getExternalDetail() { dispatched.push('detail'); return { success: true, markets: [] }; },
+    resolveExternal() { dispatched.push('resolve'); return { success: true, event: { markets: [] } }; },
     create() { dispatched.push('create'); return { success: true, market: { status: 'DRAFT' } }; },
     importExternalDrafts() { dispatched.push('import'); return { success: true, requested: 2, created: 2, failed: 0, results: [] }; },
     edit(){}, price(){}, refreshReference(){}, open(){}, lock(){}, resolve(){}, voidMarket(){}
