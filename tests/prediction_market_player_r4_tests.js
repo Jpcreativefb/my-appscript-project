@@ -138,6 +138,6 @@ assert(backendApiSource.includes('apiPredictionMarketPlayerR4Dispatch'));
 ['SpreadsheetApp','saveWallet','savePosition','commitTrade','commitSettlement','repository.setup','settlePlayerMarket'].forEach(token=>assert(!playerAdapterSource.includes(token),token));
 assert(apiSource.includes('function apiPredictionMarketPlayerR4'));
 assert(pageSource.includes('window.confirm'));
-assert(pageSource.includes('Final server reference price is authoritative'));
+assert(playerAdapterSource.includes('var result = engine.executeTrade(ctx, request);'));
 
 console.log('PASS prediction_market_player_r4_tests');
