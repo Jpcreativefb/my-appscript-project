@@ -134,24 +134,35 @@ assert(
 );
 assert(
   shellSource.includes('data-admin-other-game="cookoff"') &&
-  shellSource.includes('Manage Cookoff') &&
-  shellSource.includes('existing Voting / Competition game authority'),
-  'Cookoff product destination must preserve Voting / Competition authority'
+  shellSource.includes('Build Cookoff') &&
+  shellSource.includes("pattcAdminOtherGameBuilderR3Select_('cookoff')") &&
+  shellSource.includes('cookoff: Object.freeze({ label: "Cookoff", type: "voting" })'),
+  'Cookoff destination must open the shared builder backed by canonical voting'
 );
 assert(
   shellSource.includes('data-admin-other-game="movie-ranking"') &&
-  shellSource.includes('Movie Ranking / Community Awards') &&
-  shellSource.includes('existing Ranking / Movie Community Awards authority'),
-  'Movie Ranking / Community Awards product destination must preserve Ranking authority'
+  shellSource.includes('Build Movie Ranking / Community Awards') &&
+  shellSource.includes("pattcAdminOtherGameBuilderR3Select_('movie-ranking')") &&
+  shellSource.includes('"movie-ranking": Object.freeze({ label: "Movie Ranking / Community Awards", type: "ranking" })'),
+  'Movie Ranking / Community Awards must open the shared builder backed by canonical ranking'
 );
 assert(
   shellSource.includes('data-admin-other-game="voting"') &&
-  shellSource.includes('data-admin-other-game="ranking"'),
-  'generic Voting / Competition and Ranking destinations missing'
+  shellSource.includes("pattcAdminOtherGameBuilderR3Select_('voting')") &&
+  shellSource.includes('data-admin-other-game="ranking"') &&
+  shellSource.includes("pattcAdminOtherGameBuilderR3Select_('ranking')"),
+  'generic Voting / Competition and Ranking destinations must open builders'
 );
 assert(
-  shellSource.includes('data-admin-other-game="general-custom"'),
-  'General / Custom destination missing'
+  shellSource.includes('data-admin-other-game="general-custom"') &&
+  shellSource.includes("pattcAdminOtherGameBuilderR3Select_('general-custom')") &&
+  shellSource.includes('data-admin-other-game-builder-host'),
+  'General / Custom must open the shared Other Games builder workspace'
+);
+assert(
+  shellSource.includes('data-admin-other-game="manage-existing"') &&
+  shellSource.includes("onclick=\"navigate('admin-games')\">Manage Existing Games</button>"),
+  'Manage Existing Games must remain the explicit admin-games editing route'
 );
 
 assert(
