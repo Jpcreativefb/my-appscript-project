@@ -501,27 +501,27 @@
         <section class="admin-r2-destination" data-admin-other-game="cookoff">
           <h3>Cookoff</h3>
           <div class="admin-sub">Create a Cookoff Draft game using the existing game creator. Voting / Competition remains the underlying authoritative game type.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('cookoff')">Build Cookoff</button></div>
+          <div class="admin-actions"><button type="button" class="button admin-button" data-admin-no-progress="true" onclick="pattcAdminOtherGameBuilderR3Select_('cookoff')">Build Cookoff</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="movie-ranking">
           <h3>Movie Ranking / Community Awards</h3>
           <div class="admin-sub">Create a Movie Ranking / Community Awards Draft game using the existing Ranking authority.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('movie-ranking')">Build Movie Ranking / Community Awards</button></div>
+          <div class="admin-actions"><button type="button" class="button admin-button" data-admin-no-progress="true" onclick="pattcAdminOtherGameBuilderR3Select_('movie-ranking')">Build Movie Ranking / Community Awards</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="voting">
           <h3>Voting / Competition</h3>
           <div class="admin-sub">Create a Draft game with the existing canonical Voting / Competition game type.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('voting')">Build Voting / Competition</button></div>
+          <div class="admin-actions"><button type="button" class="button admin-button" data-admin-no-progress="true" onclick="pattcAdminOtherGameBuilderR3Select_('voting')">Build Voting / Competition</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="ranking">
           <h3>Ranking</h3>
           <div class="admin-sub">Create a Draft game with the existing canonical Ranking game type.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('ranking')">Build Ranking</button></div>
+          <div class="admin-actions"><button type="button" class="button admin-button" data-admin-no-progress="true" onclick="pattcAdminOtherGameBuilderR3Select_('ranking')">Build Ranking</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="general-custom">
           <h3>General / Custom</h3>
           <div class="admin-sub">Choose from the existing eight canonical General / Custom game types.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('general-custom')">Open General / Custom Game Builder</button></div>
+          <div class="admin-actions"><button type="button" class="button admin-button" data-admin-no-progress="true" onclick="pattcAdminOtherGameBuilderR3Select_('general-custom')">Open General / Custom Game Builder</button></div>
         </section>
       </div>
 
