@@ -19,6 +19,13 @@ function predictionMarketPlayerR4Finite_(value, fallback) {
   return isFinite(n) ? n : (fallback == null ? 0 : fallback);
 }
 
+function predictionMarketPlayerR4FeeConfig_(market) {
+  if (typeof predictionMarketTradingFeesR1MarketConfig_ === "function") {
+    return predictionMarketTradingFeesR1MarketConfig_(market || {});
+  }
+  return { mode:"INHERIT", customFeeBps:null, effectiveFeeBps:0, effectiveFeePercent:0, source:"DEFAULT" };
+}
+
 function predictionMarketPlayerR4MarketView_(market, nowMs) {
   market = market || {};
   var status = predictionMarketPlayerR4String_(market.status).toUpperCase();
@@ -30,11 +37,16 @@ function predictionMarketPlayerR4MarketView_(market, nowMs) {
   var trusted = market.referencePriceTrusted === true;
   var priceFresh = trusted && isFinite(asOfMs) && asOfMs <= nowMs && nowMs - asOfMs <= maxAge;
   var beforeLock = isFinite(lockMs) && nowMs < lockMs;
+  var fee = predictionMarketPlayerR4FeeConfig_(market);
   return Object.assign({}, market, {
     priceFresh: priceFresh,
     priceStale: !priceFresh,
     tradingAvailable: status === "OPEN" && priceFresh && beforeLock,
-    providerLabel: predictionMarketPlayerR4String_(market.providerId || market.providerKind || "MANUAL")
+    providerLabel: predictionMarketPlayerR4String_(market.providerId || market.providerKind || "MANUAL"),
+    tradingFeeMode: fee.mode,
+    tradingFeeBps: fee.effectiveFeeBps,
+    tradingFeePercent: fee.effectiveFeePercent,
+    tradingFeeSource: fee.source
   });
 }
 
@@ -54,6 +66,7 @@ function predictionMarketPlayerR4PositionView_(position, market) {
 function predictionMarketPlayerR4CreateService(options) {
   options = options || {};
   var engine = options.engine;
+  var repository = options.repository || null;
   var now = typeof options.now === "function" ? options.now : function() { return new Date(); };
   if (!engine) throw new Error("Prediction Market R2 engine is required");
 
@@ -119,6 +132,10 @@ function predictionMarketPlayerR4CreateService(options) {
       requestedAt: payload.requestedAt
     };
     var result = engine.executeTrade(ctx, request);
+    if (repository && typeof repository.getTransaction === "function") {
+      var committed = repository.getTransaction(request.transactionId);
+      if (committed && committed.committedResult) result = committed.committedResult;
+    }
     return {
       success:true,
       trade:result,
@@ -134,9 +151,12 @@ function predictionMarketPlayerR4CreateService(options) {
 }
 
 function predictionMarketPlayerR4ProductionService_() {
-  var repository = predictionMarketR2CreateAppsScriptRepository();
+  var baseRepository = predictionMarketR2CreateAppsScriptRepository();
+  var repository = typeof predictionMarketTradingFeesR1DecorateRepository === "function"
+    ? predictionMarketTradingFeesR1DecorateRepository(baseRepository)
+    : baseRepository;
   var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });
-  return predictionMarketPlayerR4CreateService({ engine: engine });
+  return predictionMarketPlayerR4CreateService({ engine: engine, repository: repository });
 }
 
 function apiPredictionMarketPlayerR4Dispatch(action, payload) {
