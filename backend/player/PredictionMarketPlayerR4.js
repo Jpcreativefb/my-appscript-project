@@ -23,7 +23,15 @@ function predictionMarketPlayerR4CreateService(options){
   function state(username){var ctx=context(username),wallet=ensureWallet_(ctx,username),portfolio=engine.getPortfolio(ctx,username),nowMs=now().getTime(),marketRows=engine.getMarkets()||[],communityByMarket=communityService?communityService.forMarkets(marketRows.map(function(m){return m.marketId;})):{},markets=marketRows.map(function(market){return Object.assign(predictionMarketPlayerR4MarketView_(market,nowMs),{community:communityByMarket[market.marketId]||null});});return{success:true,playerId:username,wallet:wallet,portfolio:portfolio,markets:markets,marketGroups:groupViews_(markets),groupedPortfolio:productCoordinator?productCoordinator.groupedPortfolio(portfolio):[]};}
   function detail(username,payload){payload=payload||{};var ctx=context(username);ensureWallet_(ctx,username);var portfolio=engine.getPortfolio(ctx,username),map=marketMap_(),market=map[predictionMarketPlayerR4String_(payload.marketId)];if(!market)throw new Error("Prediction Market not found");var nowMs=now().getTime(),positions=(portfolio.positions||[]).filter(function(position){return position.marketId===market.marketId;}).map(function(position){return predictionMarketPlayerR4PositionView_(position,market);});return{success:true,market:Object.assign(predictionMarketPlayerR4MarketView_(market,nowMs),{community:communityService?communityService.market(market.marketId):null}),positions:positions,portfolio:portfolio};}
   function bootstrap(username){var ctx=context(username);return{success:true,wallet:engine.bootstrapWallet(ctx,username),portfolio:engine.getPortfolio(ctx,username)};}
-  function trade(username,payload){payload=payload||{};var ctx=context(username);ensureWallet_(ctx,username);var request={transactionId:payload.transactionId,playerId:username,marketId:payload.marketId,side:payload.side,outcome:payload.outcome,quantity:payload.quantity,referencePrice:payload.referencePrice,expectedWalletVersion:payload.expectedWalletVersion,requestedAt:payload.requestedAt};var result=engine.executeTrade(ctx,request);if(repository&&typeof repository.getTransaction==="function"){var committed=repository.getTransaction(request.transactionId);if(committed&&committed.committedResult)result=committed.committedResult;}return{success:true,trade:result,portfolio:engine.getPortfolio(ctx,username)};}
+  function trade(username,payload){
+    payload=payload||{};
+    var ctx=context(username);
+    ensureWallet_(ctx,username);
+    var request={transactionId:payload.transactionId,playerId:username,marketId:payload.marketId,side:payload.side,outcome:payload.outcome,quantity:payload.quantity,referencePrice:payload.referencePrice,expectedWalletVersion:payload.expectedWalletVersion,requestedAt:payload.requestedAt};
+    var result = engine.executeTrade(ctx, request);
+    if(repository&&typeof repository.getTransaction==="function"){var committed=repository.getTransaction(request.transactionId);if(committed&&committed.committedResult)result=committed.committedResult;}
+    return{success:true,trade:result,portfolio:engine.getPortfolio(ctx,username)};
+  }
   function leaderboard(username){context(username);return{success:true,leaderboard:engine.getLeaderboard({role:"SYSTEM",playerId:username,username:username})};}
   return{state:state,detail:detail,bootstrap:bootstrap,trade:trade,leaderboard:leaderboard};
 }
