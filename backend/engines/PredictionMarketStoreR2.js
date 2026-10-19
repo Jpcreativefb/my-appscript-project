@@ -109,6 +109,16 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
     try { return fn(); } finally { lock.releaseLock(); }
   }
 
+  function setupStore(storeName) {
+    if (!Object.prototype.hasOwnProperty.call(PREDICTION_MARKET_R2_SHEETS, storeName)) {
+      throw new Error("Unknown Prediction Market store: " + storeName);
+    }
+
+    return criticalSection(function() {
+      return setupSheet(storeName);
+    });
+  }
+
   function setup() {
     return criticalSection(function() {
       return Object.keys(PREDICTION_MARKET_R2_SHEETS).map(setupSheet);
@@ -189,7 +199,7 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
     }
   }
 
-  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,saveTransaction:saveTransaction,getPosition:getPosition,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
+  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,setupStore:setupStore,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,saveTransaction:saveTransaction,getPosition:getPosition,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
 }
 
 if (typeof module !== "undefined" && module.exports) {
