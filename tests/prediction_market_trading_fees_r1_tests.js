@@ -36,11 +36,11 @@ function engineFor(seed) {
 }
 function player(id){ return {role:'PLAYER',playerId:id,username:id}; }
 function admin(){ return {role:'ADMIN',playerId:'admin',username:'admin'}; }
-function trade(engine, playerId, transactionId, side, quantity, version, marketId='m1') {
-  return engine.executeTrade(player(playerId), {
+function trade(engine, playerId, transactionId, side, quantity, version, marketId='m1', extra) {
+  return engine.executeTrade(player(playerId), Object.assign({
     transactionId,playerId,marketId,side,outcome:'YES',quantity,referencePrice:0.6,
     expectedWalletVersion:version,requestedAt:NOW
-  });
+  }, extra || {}));
 }
 
 predictionMarketTradingFeesR1SetDefaultFeeBps_(0);
@@ -117,6 +117,54 @@ predictionMarketTradingFeesR1SetDefaultFeeBps_(100);
   assert.throws(()=>trade(engine,'tight','insufficient-with-fee','BUY',10,0),/including trading fee/,'BUY affordability must include fee');
   assert.strictEqual(base.getWallet('tight').availableCredits,6,'failed fee-inclusive affordability check must not mutate wallet');
   assert.strictEqual(base.getTransaction('insufficient-with-fee'),null,'failed trade must not persist transaction');
+}
+
+predictionMarketTradingFeesR1SetDefaultFeeBps_(100);
+{
+  const {base,engine}=engineFor({markets:[market('m1')],wallets:[wallet('spoof',100)]});
+  trade(engine,'spoof','spoof-fee','BUY',10,0,'m1',{feeBps:0,tradingFeeBps:0,feeCredits:0});
+  const tx=base.getTransaction('spoof-fee');
+  assert.strictEqual(tx.committedResult.feeBps,100,'client fee fields must not override server-authoritative fee config');
+  assert.strictEqual(tx.committedResult.feeCredits,0.06);
+  assert.strictEqual(base.getWallet('spoof').availableCredits,93.94);
+}
+
+predictionMarketTradingFeesR1SetDefaultFeeBps_(100);
+{
+  const request={transactionId:'pending-trade',playerId:'recover',marketId:'m1',side:'BUY',outcome:'YES',quantity:10,referencePrice:0.6,expectedWalletVersion:0,requestedAt:NOW};
+  const recoveredWallet={playerId:'recover',availableCredits:93.94,reservedCredits:0,version:1,createdAt:NOW,createdBy:'SYSTEM',updatedAt:NOW,updatedBy:'recover'};
+  const recoveredPosition={playerId:'recover',marketId:'m1',outcome:'YES',quantity:10,costBasisCredits:6,averageCostCredits:0.6,realizedCredits:-0.06,settledCredits:0,settledCostBasisCredits:0,settled:false,createdAt:NOW,updatedAt:NOW};
+  const committedResult={transactionId:'pending-trade',playerId:'recover',marketId:'m1',side:'BUY',outcome:'YES',quantity:10,executionReferencePrice:0.6,grossCredits:6,feeBps:100,feePercent:1,feeSource:'DEFAULT',feeCredits:0.06,netCredits:6.06,creditDelta:-6.06,wallet:recoveredWallet,position:recoveredPosition,committedAt:NOW};
+  const pending={transactionId:'pending-trade',fingerprint:predictionMarketR2Fingerprint_(request),playerId:'recover',marketId:'m1',side:'BUY',outcome:'YES',quantity:10,executionReferencePrice:0.6,grossCredits:6,status:'PENDING',walletVersionBefore:0,walletVersionAfter:1,requestedAt:NOW,committedAt:NOW,committedResult};
+  const {base,engine}=engineFor({markets:[market('m1')],wallets:[wallet('recover',100)],transactions:[pending]});
+  const result=engine.executeTrade(player('recover'),request);
+  assert.strictEqual(result.feeCredits,0.06,'pending recovery must preserve the already-calculated fee');
+  assert.strictEqual(base.getWallet('recover').availableCredits,93.94,'pending recovery must not charge fee a second time');
+  assert.strictEqual(base.getTransaction('pending-trade').status,'COMMITTED');
+}
+
+predictionMarketTradingFeesR1SetDefaultFeeBps_(100);
+{
+  const pendingSettlement={settlementKey:'m1:pending',marketId:'m1',playerId:'pending',marketStatus:'VOID',winningOutcome:'',payoutCredits:6.06,returnedCostBasisCredits:6,walletVersionBefore:1,walletVersionAfter:2,positionResults:[],status:'PENDING',committedAt:NOW,committedResult:{returnedTradingFeeCredits:0.06}};
+  const {repository}=engineFor({markets:[market('m1')],wallets:[wallet('pending',100)],settlements:[pendingSettlement]});
+  const stats=repository.tradingFeeStats();
+  assert.strictEqual(stats.refundedFeeCredits,0,'pending settlement refunds must not be reported as completed refunds');
+  assert.strictEqual(stats.netFeeCredits,0);
+}
+
+predictionMarketTradingFeesR1SetDefaultFeeBps_(100);
+{
+  const {base,repository,engine}=engineFor({markets:[market('m1')],wallets:[wallet('resolved',100)]});
+  trade(engine,'resolved','resolved-buy','BUY',10,0);
+  const resolved=base.getMarket('m1'); resolved.status='RESOLVED'; resolved.winningOutcome='YES'; resolved.resolutionStatus='RESOLVED'; base.saveMarket(resolved);
+  const settlement=engine.settlePlayerMarket(admin(),'m1','resolved');
+  assert.strictEqual(settlement.payoutCredits,10,'resolved settlement pays shares only and does not add a settlement fee');
+  assert.strictEqual(base.getWallet('resolved').availableCredits,103.94,'resolved wallet should reflect trading fee once and no settlement fee');
+  assert.strictEqual(base.getPosition('resolved','m1','YES').realizedCredits,3.94,'resolved realized P/L should include the trading fee exactly once');
+  const stats=repository.tradingFeeStats();
+  assert.strictEqual(stats.chargedFeeCredits,0.06);
+  assert.strictEqual(stats.refundedFeeCredits,0);
+  assert.strictEqual(stats.netFeeCredits,0.06);
 }
 
 assert.strictEqual(predictionMarketTradingFeesR1MarketConfig_({providerMetadata:{tradingFeeMode:'INHERIT'}}).effectiveFeeBps,100);
