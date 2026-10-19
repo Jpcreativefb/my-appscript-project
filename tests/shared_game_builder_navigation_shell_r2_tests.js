@@ -24,19 +24,27 @@ assert(!helper.includes('adminGameBuilderNavigationShellR2'), 'Survivor/Playoff 
 assert(!helper.includes('shared-game-builder-navigation-shell-r2'), 'Survivor/Playoff helper must contain no R2 shell-loader dependency');
 
 for (const heading of [
-  '1. Game Builder',
-  '2. Manage Existing Games',
-  '3. Competitions',
-  '4. League / Season Data',
-  '5. Operations'
+  'Game Builder',
+  'Manage Existing Games',
+  'Competitions',
+  'League / Season Data',
+  'Operations'
 ]) {
-  assert(shell.includes(heading), 'missing lifecycle destination: ' + heading);
+  assert(shell.includes(heading), 'missing Sports lifecycle destination: ' + heading);
 }
+for (const section of ['Sports', 'Reality TV', 'Awards', 'Other Games', 'Prediction Markets', 'Appearance / Visual Design']) {
+  assert(shell.includes(section), 'missing Games & Design section: ' + section);
+}
+for (const level of ['>League<', '>NFL<', '>2026<']) {
+  assert(shell.includes(level), 'missing Sports hierarchy level: ' + level);
+}
+assert(shell.includes('admin-card admin-collapsible-card admin-games-design-section'), 'Games & Design must reuse the Manage Games accordion card pattern');
+assert(shell.includes('class="admin-card-summary"') && shell.includes('admin-collapse-icon'), 'Games & Design must reuse the Manage Games native summary interaction');
 
 for (const builder of ['Confidence', 'Survivor', 'Team Fantasy', 'Playoff / Forecast', 'Other Game']) {
   assert(shell.includes(builder), 'missing builder destination: ' + builder);
 }
-for (const competition of ['Cup', 'Series', 'Tournament']) {
+for (const competition of ['Cups', 'Series', 'Tournaments']) {
   assert(shell.includes(competition), 'missing competition destination: ' + competition);
 }
 for (const dataArea of ['Teams', 'Schedule', 'Scores', 'Standings', 'Odds', 'Season Timing']) {
@@ -44,17 +52,16 @@ for (const dataArea of ['Teams', 'Schedule', 'Scores', 'Standings', 'Odds', 'Sea
 }
 
 for (const route of [
-  "navigate('admin-games')",
-  "navigate('admin-team-fantasy')",
-  'navigate("admin-playoff-race")',
-  "navigate('admin-nfl-cup')",
-  "navigate('admin-nfl-season-setup')",
-  "navigate('admin-sports-engine')",
+  'admin-games',
+  'admin-team-fantasy',
+  'admin-playoff-race',
+  'admin-nfl-cup',
+  'admin-nfl-season-setup',
+  'admin-sports-engine',
   "window.location.href='./sports.html'"
 ]) {
   assert(shell.includes(route), 'authoritative route must remain preserved: ' + route);
 }
-assert(shell.includes('Manage Games keeps its existing New Game capability.'), 'Manage Games New Game preservation must remain explicit during R3B');
 assert(shell.includes('apiAdminCreateGame(payload)'), 'R3B shell must orchestrate Draft creation through the authoritative create API');
 
 for (const forbidden of [
@@ -94,12 +101,13 @@ vm.createContext(context);
 vm.runInContext(shell, context);
 
 assert.strictEqual(typeof context.window.pattcAdminGameBuilderNavigationShellR2Mount, 'function', 'shell must expose one shared Admin mount hook');
-assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount when Sports/NFL/2026 Admin host is rendered');
-assert(currentHost.innerHTML.includes('1. Game Builder'), 'mounted shell must contain lifecycle presentation');
+assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount when Games & Design Admin host is rendered');
+assert(currentHost.innerHTML.includes('Game Builder'), 'mounted shell must contain Sports lifecycle presentation');
+assert(currentHost.innerHTML.includes('data-admin-games-design-section="sports"'), 'mounted shell must contain collapsible Sports section');
 assert(currentHost.innerHTML.includes('Game Builder Workspace'), 'mounted shell must expose a separate builder workspace');
 assert(
-  currentHost.innerHTML.indexOf('data-admin-r3b-builder-host') > currentHost.innerHTML.indexOf('5. Operations'),
-  'builder workspace must render after the lifecycle cards instead of inside the Game Builder card'
+  currentHost.innerHTML.indexOf('data-admin-r3b-builder-host') > currentHost.innerHTML.indexOf('<h3>Operations</h3>'),
+  'builder workspace must render after the Sports lifecycle cards instead of inside the Game Builder card'
 );
 assert(!currentHost.innerHTML.includes('Existing manager remains authoritative.'), 'navigation card must not carry the old Team Fantasy note');
 assert(!currentHost.innerHTML.includes('Opens existing Playoff Race configuration; it does not create a game.'), 'navigation card must not carry the old Playoff note');
@@ -113,8 +121,8 @@ currentHost = null;
 assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), false, 'navigation away from Admin must be a no-op');
 
 currentHost = makeHost();
-assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'returning to Admin must mount into the newly rendered Sports/NFL/2026 host');
-assert(currentHost.innerHTML.includes('5. Operations'), 'shell must remain available after normal Admin navigation away and back');
+assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'returning to Admin must mount into the newly rendered Games & Design host');
+assert(currentHost.innerHTML.includes('<h3>Operations</h3>'), 'shell must remain available after normal Admin navigation away and back');
 assert.strictEqual(context.window.pattcAdminGameBuilderNavigationShellR2Mount(), false, 'revisited Admin host must also remain duplicate-safe');
 
-console.log('PASS shared game builder navigation shell R2 lifecycle ownership, polish, and mount coverage');
+console.log('PASS shared game builder navigation shell R2 ownership, organized hierarchy, and mount coverage');
