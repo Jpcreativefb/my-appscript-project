@@ -34,6 +34,12 @@
     survivor: "survivor",
     "team-fantasy": "team-fantasy"
   });
+  const OTHER_GAME_PRODUCT_BUILDERS_R3 = Object.freeze({
+    cookoff: Object.freeze({ label: "Cookoff", type: "voting" }),
+    "movie-ranking": Object.freeze({ label: "Movie Ranking / Community Awards", type: "ranking" }),
+    voting: Object.freeze({ label: "Voting / Competition", type: "voting" }),
+    ranking: Object.freeze({ label: "Ranking", type: "ranking" })
+  });
 
   function escapeHtml_(value) {
     return String(value == null ? "" : value)
@@ -84,9 +90,10 @@
         </div>`;
     }
 
-    const type = DEDICATED_GAME_TYPES_R3B[choice] || "";
+    const productBuilder = OTHER_GAME_PRODUCT_BUILDERS_R3[choice] || null;
+    const type = productBuilder ? productBuilder.type : (DEDICATED_GAME_TYPES_R3B[choice] || "");
     if (!type && choice !== "other") return "";
-    const label = shellChoiceLabel_(choice);
+    const label = productBuilder ? productBuilder.label : shellChoiceLabel_(choice);
     const typeControl = choice === "other"
       ? `<label>Game Type<select name="gameType" required>${otherTypeOptionsR3B_()}</select></label>`
       : `<div class="admin-r3b-type-note">Game type: <code>${escapeHtml_(type)}</code></div>`;
@@ -173,6 +180,26 @@
     return true;
   }
 
+  function showOtherGameBuilderR3_(choice) {
+    const shell = document.querySelector("[" + MOUNTED_ATTR + '="1"]');
+    if (!shell) return false;
+    const host = shell.querySelector("[data-admin-other-game-builder-host]");
+    if (!host) return false;
+
+    if (choice === "general-custom") {
+      host.innerHTML = generalCustomWorkspaceHtmlR8R2_();
+    } else if (OTHER_GAME_PRODUCT_BUILDERS_R3[choice]) {
+      host.innerHTML = builderFormHtmlR3B_(choice);
+    } else {
+      return false;
+    }
+
+    if (typeof host.scrollIntoView === "function") {
+      host.scrollIntoView({ block: "nearest" });
+    }
+    return true;
+  }
+
   function showCompetitionR5_(choice) {
     const shell = document.querySelector("[" + MOUNTED_ATTR + '="1"]');
     if (!shell) return false;
@@ -217,7 +244,8 @@
       throw new Error("Year must be a four-digit year.");
     }
 
-    let type = DEDICATED_GAME_TYPES_R3B[String(choice || "")] || "";
+    const productBuilder = OTHER_GAME_PRODUCT_BUILDERS_R3[String(choice || "")] || null;
+    let type = productBuilder ? productBuilder.type : (DEDICATED_GAME_TYPES_R3B[String(choice || "")] || "");
     if (choice === "other") {
       type = readFormValueR3B_(form, "gameType");
       if (OTHER_GAME_TYPES_R3B.indexOf(type) === -1) throw new Error("Unsupported Other Game type.");
@@ -284,6 +312,10 @@
 
   window.pattcAdminGameBuilderR3BOpenPlayoffRace_ = function () {
     navigate("admin-playoff-race");
+  };
+
+  window.pattcAdminOtherGameBuilderR3Select_ = function (choice) {
+    return showOtherGameBuilderR3_(String(choice || ""));
   };
 
   window.pattcAdminGameBuilderR2Select_ = function (choice, kind) {
@@ -464,34 +496,45 @@
 
   function otherGamesHtml_() {
     return `
+      <div class="admin-sub"><strong>CREATE / BUILD</strong></div>
       <div class="admin-r3-section-grid" data-admin-other-games-r3="1">
         <section class="admin-r2-destination" data-admin-other-game="cookoff">
           <h3>Cookoff</h3>
-          <div class="admin-sub">Product entry point over the existing Voting / Competition game authority. No separate Cookoff engine is created.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="navigate('admin-games')">Manage Cookoff</button></div>
+          <div class="admin-sub">Create a Cookoff Draft game using the existing game creator. Voting / Competition remains the underlying authoritative game type.</div>
+          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('cookoff')">Build Cookoff</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="movie-ranking">
           <h3>Movie Ranking / Community Awards</h3>
-          <div class="admin-sub">Product entry point over the existing Ranking / Movie Community Awards authority. No replacement movie system is created.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button" onclick="navigate('admin-games')">Manage Movie Ranking / Community Awards</button></div>
+          <div class="admin-sub">Create a Movie Ranking / Community Awards Draft game using the existing Ranking authority.</div>
+          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('movie-ranking')">Build Movie Ranking / Community Awards</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="voting">
           <h3>Voting / Competition</h3>
-          <div class="admin-sub">Direct access to the existing generic game administration used by Voting / Competition games.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button secondary" onclick="navigate('admin-games')">Open Voting / Competition Administration</button></div>
+          <div class="admin-sub">Create a Draft game with the existing canonical Voting / Competition game type.</div>
+          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('voting')">Build Voting / Competition</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="ranking">
           <h3>Ranking</h3>
-          <div class="admin-sub">Direct access to the existing generic game administration used by Ranking games.</div>
-          <div class="admin-actions"><button type="button" class="button admin-button secondary" onclick="navigate('admin-games')">Open Ranking Administration</button></div>
+          <div class="admin-sub">Create a Draft game with the existing canonical Ranking game type.</div>
+          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('ranking')">Build Ranking</button></div>
         </section>
         <section class="admin-r2-destination" data-admin-other-game="general-custom">
           <h3>General / Custom</h3>
-          ${generalCustomWorkspaceHtmlR8R2_()}
+          <div class="admin-sub">Choose from the existing eight canonical General / Custom game types.</div>
+          <div class="admin-actions"><button type="button" class="button admin-button" onclick="pattcAdminOtherGameBuilderR3Select_('general-custom')">Open General / Custom Game Builder</button></div>
         </section>
+      </div>
+
+      <section class="admin-r3b-workspace" data-admin-other-game-builder-host>
+        <div class="admin-sub"><strong>Other Games Builder Workspace</strong></div>
+        <div class="admin-sub">Choose a Create / Build option above. Draft creation uses the existing authoritative game creator and setup flow.</div>
+      </section>
+
+      <div class="admin-sub" style="margin-top:12px"><strong>MANAGE</strong></div>
+      <div class="admin-r3-section-grid">
         <section class="admin-r2-destination" data-admin-other-game="manage-existing">
           <h3>Manage Existing Games</h3>
-          <div class="admin-sub">Open the existing general Manage Games authority.</div>
+          <div class="admin-sub">Edit games that already exist with the existing general Manage Games authority.</div>
           <div class="admin-actions"><button type="button" class="button admin-button secondary" onclick="navigate('admin-games')">Manage Existing Games</button></div>
         </section>
       </div>`;
