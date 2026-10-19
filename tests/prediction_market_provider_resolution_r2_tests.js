@@ -36,7 +36,7 @@ function harness(market, fetchResult) {
     lockMarket: () => { calls.lock += 1; current.status='LOCKED'; return clone(current); },
     resolveMarket: (_ctx,_id,winner) => { calls.resolve += 1; current.status='RESOLVED'; current.winningOutcome=winner; return clone(current); },
     voidMarket: () => { calls.void += 1; current.status='VOID'; return clone(current); },
-    settlePlayerMarket: (_ctx,playerId,marketId) => {
+    settlePlayerMarket: (_ctx,marketId,playerId) => {
       calls.settle += 1;
       const key = marketId + ':' + playerId;
       if (!settlements[key]) settlements[key] = { settlementKey:key, status:'COMMITTED' };
@@ -53,11 +53,11 @@ function harness(market, fetchResult) {
   return { service, calls, getMarket:() => clone(current) };
 }
 
-(function openProviderOpensDraft() {
+(function openProviderDoesNotOpenDraft() {
   const h = harness(baseMarket({status:'DRAFT',providerKind:'KALSHI'}), () => ({market:{status:'active', result:'', last_price_dollars:'0.99'}}));
   const out = h.service.sync('admin','m1');
-  assert.equal(out.market.status,'OPEN');
-  assert.equal(h.calls.open,1);
+  assert.equal(out.market.status,'DRAFT');
+  assert.equal(h.calls.open,0);
   assert.equal(h.calls.resolve,0);
 })();
 
