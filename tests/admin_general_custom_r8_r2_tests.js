@@ -95,12 +95,14 @@ async function submit(context, form) {
 
   assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shared shell should mount');
   const html = state.host.innerHTML;
-  assert(html.includes('Admin → Games &amp; Design → General / Custom'), 'General / Custom destination must be present');
+  assert(html.includes('data-admin-games-design-section="other-games"'), 'Other Games destination must be present');
+  assert(html.includes('data-admin-other-game="general-custom"'), 'General / Custom must remain visible under Other Games');
+  assert(html.includes('General / Custom Game Builder'), 'General / Custom builder must remain present');
   assert(html.includes('Manage Existing Games'), 'General / Custom must retain Manage Existing');
   assert(html.includes("navigate('admin-games')"), 'Manage Existing must route to admin-games');
-  assert(html.includes('admin-game-setup:&lt;gameId&gt;'), 'generic post-create setup authority must be documented');
-  assert(!/Prediction Market/i.test(html), 'R8 must not expose Prediction Market UI');
-  assert(!/market shares|trading|portfolio|AMM|LMSR/i.test(html), 'R8 must not expose parked R9 concepts');
+  assert(shellSource.includes('navigate("admin-game-setup:" + gameId)'), 'generic post-create setup authority must remain admin-game-setup:<gameId>');
+  assert(html.includes('data-admin-games-design-section="prediction-markets"'), 'Prediction Markets must remain a separate top-level product');
+  assert(!EXACT_TYPES.includes('prediction-market'), 'Prediction Market must not leak into General / Custom canonical types');
 
   for (const forbidden of ['general', 'custom', 'cookoff', 'judging', 'movie-ballot', 'community-awards', 'prediction-market']) {
     assert(!EXACT_TYPES.includes(forbidden), 'forbidden canonical type leaked into General / Custom: ' + forbidden);
@@ -164,7 +166,7 @@ async function submit(context, form) {
     assert.strictEqual(form.button.disabled, false, 'submit button must re-enable after create completes');
   }
 
-  console.log('PASS General / Custom R8 R2 corrected shell and create behavior');
+  console.log('PASS General / Custom R8 R2 preserved under Other Games with unchanged create behavior');
 })().catch(error => {
   console.error(error);
   process.exit(1);
