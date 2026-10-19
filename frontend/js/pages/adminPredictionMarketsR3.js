@@ -2,7 +2,7 @@
 (function(root) {
   "use strict";
 
-  var STATE = { markets: [], editingMarketId: "", feeSettings:{defaultFeeBps:0,defaultFeePercent:0}, feeStats:{feeBearingTrades:0,chargedFeeCredits:0,refundedFeeCredits:0,netFeeCredits:0} };
+  var STATE = { markets: [], editingMarketId: "", feeSettings:{defaultFeeBps:0,defaultFeePercent:0}, feeStats:{feeBearingTrades:0,chargedFeeCredits:0,refundedFeeCredits:0,netFeeCredits:0}, externalEvents:[], externalDetail:null, externalSelected:[] };
   function s(v) { return String(v == null ? "" : v).trim(); }
   function n(v) { var x=Number(v); return isFinite(x)?x:0; }
   function credits(v) { return n(v).toFixed(2); }
@@ -16,6 +16,7 @@
   function isoValue(form, name) { var v=value(form,name); if (!v) return ""; var d=new Date(v); return isNaN(d.getTime()) ? v : d.toISOString(); }
   function localDateTime(iso) { if (!iso) return ""; var d=new Date(iso); if (isNaN(d.getTime())) return ""; var z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,16); }
   function providerText(row) { return [row.providerKind,row.providerId,row.externalMarketId,row.sourceUrl].filter(Boolean).join(" · ") || "MANUAL"; }
+  function externalKey(row) { return [s(row.provider).toLowerCase(),s(row.externalEventId),s(row.externalMarketId)].join("|"); }
 
   async function call(action, payload) {
     if (typeof api !== "function") throw new Error("Admin API transport is unavailable.");
@@ -141,6 +142,125 @@
     var submit=document.getElementById("adminPredictionMarketSubmit");if(submit)submit.textContent="Create Draft Market"; return true;
   };
 
+  function renderExternalEvents() {
+    var host=document.getElementById("adminPredictionMarketExternalResults"); if(!host)return;
+    if(!STATE.externalEvents.length){host.innerHTML='<div class="admin-sub">No matching external events loaded.</div>';return;}
+    host.innerHTML=STATE.externalEvents.map(function(event){
+      return '<div class="admin-category-card"><div class="admin-category-header"><div><strong>'+esc(event.eventName||event.externalEventId)+'</strong><div class="admin-sub">'+esc((event.provider||'').toUpperCase())+' · '+esc(event.category||'Uncategorized')+' · closes '+esc(event.closeTime||'—')+'</div></div><button type="button" class="button admin-button secondary" onclick="predictionMarketAdminR3ExternalDetail_(\''+esc(event.provider)+'\',\''+esc(event.externalEventId)+'\')">Configure markets</button></div><div class="admin-sub">'+esc(event.contextSubtitle||'')+'</div></div>';
+    }).join('');
+  }
+
+  function selectedIndexByKey(key) {
+    for(var i=0;i<STATE.externalSelected.length;i+=1){if(externalKey(STATE.externalSelected[i].market)===key)return i;}
+    return -1;
+  }
+
+  function renderExternalDetail() {
+    var host=document.getElementById("adminPredictionMarketExternalDetail"); if(!host)return;
+    var detail=STATE.externalDetail;
+    if(!detail){host.innerHTML='';return;}
+    var rows=Array.isArray(detail.markets)?detail.markets:[];
+    host.innerHTML='<div class="admin-category-card"><div class="admin-category-header"><div><strong>'+esc(detail.eventName||detail.externalEventId)+'</strong><div class="admin-sub">Choose only the child markets/outcomes that should become PATTC binary Drafts.</div></div></div>'+
+      rows.map(function(row){
+        row.category=row.category||detail.category||'';
+        var key=externalKey(row), idx=selectedIndexByKey(key), selected=idx!==-1;
+        var outcomes=Array.isArray(row.outcomes)?row.outcomes:[];
+        var needsChoice=outcomes.map(function(v){return s(v).toLowerCase();}).indexOf('yes')===-1;
+        var choice=selected?s(STATE.externalSelected[idx].config.selectedOutcome):'';
+        var select=needsChoice?'<label class="admin-field"><span>PATTC YES outcome</span><select data-external-outcome="'+esc(key)+'"><option value="">Choose outcome</option>'+outcomes.map(function(o){return '<option value="'+esc(o)+'"'+(choice===s(o)?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select></label>':'<div class="admin-sub">Binary YES/NO mapping preserved.</div>';
+        return '<div class="admin-category-card" data-external-market-key="'+esc(key)+'"><label><input type="checkbox" '+(selected?'checked ':'')+'onchange="predictionMarketAdminR3ExternalToggle_(\''+esc(key)+'\',this.checked)"> <strong>'+esc(row.marketQuestion||row.externalMarketId)+'</strong></label><div class="admin-sub">'+esc(row.externalMarketId)+' · '+esc(outcomes.join(' / '))+' · closes '+esc(row.closeTime||detail.closeTime||'—')+'</div>'+select+'</div>';
+      }).join('')+'</div>';
+  }
+
+  function renderExternalSelected() {
+    var host=document.getElementById("adminPredictionMarketExternalSelected"); if(!host)return;
+    if(!STATE.externalSelected.length){host.innerHTML='<div class="admin-sub">Nothing selected yet.</div>';return;}
+    host.innerHTML=STATE.externalSelected.map(function(item,index){
+      var row=item.market, cfg=item.config||{};
+      return '<div class="admin-category-card"><div class="admin-category-header"><div><strong>'+esc(cfg.title||row.marketQuestion||row.eventName)+'</strong><div class="admin-sub">'+esc((row.provider||'').toUpperCase())+' · '+esc(row.externalMarketId)+'</div></div><button type="button" class="admin-small-button secondary" onclick="predictionMarketAdminR3ExternalRemove_('+index+')">Remove</button></div><div class="admin-control-grid"><label class="admin-field"><span>Draft title</span><input data-selected-field="title" data-selected-index="'+index+'" value="'+esc(cfg.title||row.marketQuestion||row.eventName)+'"></label><label class="admin-field"><span>Category</span><input data-selected-field="category" data-selected-index="'+index+'" value="'+esc(cfg.category||row.category||'')+'"></label><label class="admin-field"><span>Lock time</span><input type="datetime-local" data-selected-field="lockTime" data-selected-index="'+index+'" value="'+esc(localDateTime(cfg.lockTime||row.closeTime))+'"></label><label class="admin-field"><span>Trading fee</span><select data-selected-field="tradingFeeMode" data-selected-index="'+index+'"><option value="INHERIT"'+(s(cfg.tradingFeeMode||'INHERIT').toUpperCase()==='INHERIT'?' selected':'')+'>Use Default</option><option value="CUSTOM"'+(s(cfg.tradingFeeMode).toUpperCase()==='CUSTOM'?' selected':'')+'>Custom</option></select></label><label class="admin-field"><span>Custom Fee (%)</span><input type="number" min="0" max="100" step="0.01" data-selected-field="customTradingFeePercent" data-selected-index="'+index+'" value="'+esc(cfg.customTradingFeePercent==null?'':cfg.customTradingFeePercent)+'"></label></div><div class="admin-sub">PATTC YES: '+esc(cfg.selectedOutcome||'YES')+' · imported markets remain DRAFT until separately opened.</div></div>';
+    }).join('')+'<div class="admin-actions"><button type="button" class="button admin-button" onclick="predictionMarketAdminR3ExternalImport_()">Load Selected into Prediction Markets</button></div>';
+  }
+
+  root.predictionMarketAdminR3ExternalSearch_ = async function(event) {
+    if(event&&event.preventDefault)event.preventDefault();
+    var form=event&&(event.currentTarget||event.target); if(!form)return false;
+    message('Searching external markets…','working');
+    try{
+      var res=await call('adminGetPredictionMarkets',{externalAction:'search',query:value(form,'query'),provider:value(form,'provider')||'all'});
+      STATE.externalEvents=Array.isArray(res.events)?res.events:[];
+      STATE.externalDetail=null;
+      renderExternalEvents(); renderExternalDetail();
+      var warning=Array.isArray(res.errors)&&res.errors.length?' Provider warnings: '+res.errors.join(' · '):'';
+      message('External search loaded '+STATE.externalEvents.length+' event(s).'+warning,'success'); return true;
+    }catch(err){message(err&&err.message?err.message:'External search failed.','error');return false;}
+  };
+
+  root.predictionMarketAdminR3ExternalDetail_ = async function(provider,eventId) {
+    message('Loading external event markets…','working');
+    try{
+      STATE.externalDetail=await call('adminGetPredictionMarkets',{externalAction:'detail',provider:provider,eventId:eventId});
+      renderExternalDetail();
+      message('Choose one or more child markets to configure.','success'); return true;
+    }catch(err){message(err&&err.message?err.message:'External event load failed.','error');return false;}
+  };
+
+  root.predictionMarketAdminR3ExternalToggle_ = function(key,checked) {
+    var detail=STATE.externalDetail||{}, rows=Array.isArray(detail.markets)?detail.markets:[];
+    var row=rows.find(function(candidate){return externalKey(candidate)===key;}); if(!row)return false;
+    var idx=selectedIndexByKey(key);
+    if(!checked){if(idx!==-1)STATE.externalSelected.splice(idx,1);renderExternalSelected();return true;}
+    var outcomeNode=null, nodes=document.querySelectorAll('[data-external-outcome]');
+    Array.prototype.some.call(nodes,function(node){if(s(node.getAttribute('data-external-outcome'))===s(key)){outcomeNode=node;return true;}return false;});
+    var selectedOutcome=outcomeNode?s(outcomeNode.value):'';
+    var outcomes=Array.isArray(row.outcomes)?row.outcomes:[];
+    var needsChoice=outcomes.map(function(v){return s(v).toLowerCase();}).indexOf('yes')===-1;
+    if(needsChoice&&!selectedOutcome){message('Choose which external outcome maps to PATTC YES before selecting this market.','error');renderExternalDetail();return false;}
+    row=Object.assign({},row,{category:row.category||detail.category||''});
+    var item={market:row,config:{selectedOutcome:selectedOutcome,title:row.marketQuestion||row.eventName||'',category:row.category||'',lockTime:row.closeTime||detail.closeTime||'',tradingFeeMode:'INHERIT'}};
+    if(idx===-1)STATE.externalSelected.push(item);else STATE.externalSelected[idx]=item;
+    renderExternalSelected(); return true;
+  };
+
+  root.predictionMarketAdminR3ExternalRemove_ = function(index) {
+    if(index>=0&&index<STATE.externalSelected.length)STATE.externalSelected.splice(index,1);
+    renderExternalSelected(); renderExternalDetail(); return true;
+  };
+
+  function syncSelectedInputs() {
+    var nodes=document.querySelectorAll('[data-selected-field][data-selected-index]');
+    Array.prototype.forEach.call(nodes,function(node){
+      var index=Number(node.getAttribute('data-selected-index')), field=node.getAttribute('data-selected-field');
+      if(!STATE.externalSelected[index])return;
+      var v=s(node.value);
+      if(field==='lockTime'&&v){var d=new Date(v);if(!isNaN(d.getTime()))v=d.toISOString();}
+      if(field==='customTradingFeePercent'){
+        STATE.externalSelected[index].config.customTradingFeePercent=v;
+        return;
+      }
+      STATE.externalSelected[index].config[field]=v;
+    });
+    STATE.externalSelected.forEach(function(item){
+      var cfg=item.config||{};
+      cfg.tradingFeeMode=s(cfg.tradingFeeMode||'INHERIT').toUpperCase()==='CUSTOM'?'CUSTOM':'INHERIT';
+      cfg.tradingFeeBps=cfg.tradingFeeMode==='CUSTOM'&&s(cfg.customTradingFeePercent)!==''?Math.round(n(cfg.customTradingFeePercent)*100):'';
+      delete cfg.customTradingFeePercent;
+      item.config=cfg;
+    });
+  }
+
+  root.predictionMarketAdminR3ExternalImport_ = async function() {
+    syncSelectedInputs();
+    if(!STATE.externalSelected.length){message('Select at least one external market.','error');return false;}
+    message('Creating selected Prediction Market Drafts…','working');
+    try{
+      var res=await call('adminCreatePredictionMarket',{externalImportItems:STATE.externalSelected});
+      var summary='External import: '+res.created+' created, '+res.failed+' duplicate/invalid, '+res.requested+' requested.';
+      var failures=(res.results||[]).filter(function(row){return row.success!==true;}).map(function(row){return (row.status||'FAILED')+': '+(row.message||'Unknown error');});
+      message(summary+(failures.length?' '+failures.join(' · '):''),res.failed?'warning':'success');
+      STATE.externalSelected=[]; renderExternalSelected(); await load(); return true;
+    }catch(err){message(err&&err.message?err.message:'External import failed.','error');return false;}
+  };
+
   root.predictionMarketAdminR3SetPrice_ = async function(id) {
     var row=market(id); if(!row) return false;
     var yes=window.prompt("YES reference price (0 to 1)", String(row.referenceYesPrice)); if(yes===null)return false;
@@ -172,10 +292,11 @@
     window.setTimeout(load,0);
     return '<div class="page admin-page" data-admin-prediction-markets-r3="1">'+
       '<div class="admin-sub"><button type="button" class="admin-small-button secondary" onclick="navigate(\'admin\')">Admin</button> → Games &amp; Design → Prediction Markets</div>'+
-      '<div class="admin-page-header"><div><h1>Prediction Markets</h1><div class="admin-sub">Create and operate binary Prediction Markets through the accepted R2 engine. Trading fees use virtual PATTC credits only.</div></div></div>'+
+      '<div class="admin-page-header"><div><h1>Prediction Markets</h1><div class="admin-sub">Create Drafts manually or import external markets through the existing Awards discovery authority. External prices remain reference-only; imported markets never auto-open. Trading fees use virtual PATTC credits only.</div></div></div>'+
       '<div id="adminPredictionMarketMessage" class="admin-message" aria-live="polite"></div>'+
-      '<div class="card admin-card"><h2>Trading Fees</h2><div class="admin-sub">Global default applies to markets set to Use Default. A market can use its own custom fee. No settlement fee is charged; VOID settlement refunds related trading fees.</div><div class="admin-control-grid" style="margin-top:10px"><label class="admin-field"><span>Default Trading Fee (%)</span><input id="adminPredictionMarketDefaultFee" type="number" min="0" max="100" step="0.01" value="0"></label></div><div class="admin-actions"><button type="button" class="button admin-button" onclick="predictionMarketAdminR3SaveDefaultFee_()">Save Default Fee</button></div><div id="adminPredictionMarketFeeStats"></div></div>'+
-      '<div class="card admin-card"><h2>Create / Edit Draft Market</h2><form id="adminPredictionMarketForm" onsubmit="predictionMarketAdminR3Submit_(event);return false;"><div class="admin-control-grid">'+
+      '<div class="card admin-card"><h2>Trading Fees</h2><div class="admin-sub">Global default applies to markets set to Use Default, including imported Drafts unless you choose a custom fee during review. No settlement fee is charged; VOID settlement refunds related trading fees.</div><div class="admin-control-grid" style="margin-top:10px"><label class="admin-field"><span>Default Trading Fee (%)</span><input id="adminPredictionMarketDefaultFee" type="number" min="0" max="100" step="0.01" value="0"></label></div><div class="admin-actions"><button type="button" class="button admin-button" onclick="predictionMarketAdminR3SaveDefaultFee_()">Save Default Fee</button></div><div id="adminPredictionMarketFeeStats"></div></div>'+
+      '<div class="card admin-card"><h2>Import External Markets</h2><div class="admin-sub">Search Kalshi and Polymarket, inspect child markets, select multiple items, configure binary outcome mapping and optional fee override, review, then create PATTC Drafts only.</div><form onsubmit="predictionMarketAdminR3ExternalSearch_(event);return false;"><div class="admin-control-grid"><label class="admin-field"><span>Search</span><input name="query" required minlength="2" placeholder="Oscars, election, team, movie…"></label><label class="admin-field"><span>Provider</span><select name="provider"><option value="all">All</option><option value="kalshi">Kalshi</option><option value="polymarket">Polymarket</option></select></label></div><div class="admin-actions"><button type="submit" class="button admin-button">Search External Markets</button></div></form><div id="adminPredictionMarketExternalResults" class="admin-list"></div><div id="adminPredictionMarketExternalDetail" class="admin-list"></div><h3>Selected / Review</h3><div id="adminPredictionMarketExternalSelected" class="admin-list"><div class="admin-sub">Nothing selected yet.</div></div></div>'+
+      '<div class="card admin-card"><h2>Create / Edit Draft Market</h2><div class="admin-sub">Manual Draft creation remains separate from external import.</div><form id="adminPredictionMarketForm" onsubmit="predictionMarketAdminR3Submit_(event);return false;"><div class="admin-control-grid">'+
         '<label class="admin-field"><span>Market ID</span><input name="marketId" required></label><label class="admin-field"><span>Title</span><input name="title" required></label><label class="admin-field"><span>Category</span><input name="category"></label><label class="admin-field"><span>Description</span><input name="description"></label>'+
         '<label class="admin-field"><span>YES Price</span><input name="referenceYesPrice" type="number" min="0" max="1" step="0.01" required></label><label class="admin-field"><span>NO Price</span><input name="referenceNoPrice" type="number" min="0" max="1" step="0.01" required></label><label class="admin-field"><span>YES Label</span><input name="yesLabel" value="YES"></label><label class="admin-field"><span>NO Label</span><input name="noLabel" value="NO"></label>'+
         '<label class="admin-field"><span>Market Trading Fee</span><select name="tradingFeeMode" onchange="predictionMarketAdminR3FeeModeChanged_()"><option value="INHERIT">Use Default</option><option value="CUSTOM">Custom</option></select></label><label class="admin-field"><span>Custom Fee (%)</span><input name="customTradingFeePercent" type="number" min="0" max="100" step="0.01" disabled></label>'+
