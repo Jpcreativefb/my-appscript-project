@@ -277,7 +277,9 @@ function predictionMarketR2CreateMemoryRepository(seed) {
       stores.transactions[row.transactionId] = predictionMarketR2Clone_(row);
       return predictionMarketR2Clone_(row);
     },
+    listTransactions: function() { return Object.keys(stores.transactions).map(function(k) { return predictionMarketR2Clone_(stores.transactions[k]); }); },
     getPosition: function(playerId, marketId, outcome) { return predictionMarketR2Clone_(stores.positions[predictionMarketR2PositionKey_(playerId, marketId, outcome)] || null); },
+    listPositions: function() { return Object.keys(stores.positions).map(function(k) { return predictionMarketR2Clone_(stores.positions[k]); }); },
     listPositionsByPlayer: function(playerId) { return Object.keys(stores.positions).map(function(k) { return stores.positions[k]; }).filter(function(p) { return p.playerId === playerId; }).map(predictionMarketR2Clone_); },
     listPositionsByPlayerMarket: function(playerId, marketId) { return Object.keys(stores.positions).map(function(k) { return stores.positions[k]; }).filter(function(p) { return p.playerId === playerId && p.marketId === marketId; }).map(predictionMarketR2Clone_); },
     savePosition: function(row) { stores.positions[predictionMarketR2PositionKey_(row.playerId, row.marketId, row.outcome)] = predictionMarketR2Clone_(row); return predictionMarketR2Clone_(row); },
