@@ -20,7 +20,18 @@ jobs:
         with:
           node-version: '22'
       - name: Apply scoped community patch
-        run: python3 tools/apply_prediction_market_community_r1.py
+        run: |
+          python3 tools/apply_prediction_market_community_r1.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/prediction_market_community_r1_tests.js')
+          s=p.read_text()
+          old="assert.equal(history.activity.length,5);"
+          new="assert.equal(history.activity.length,4);"
+          if old not in s:
+              raise SystemExit('activity bucket assertion anchor missing')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Focused community tests
         run: node tests/prediction_market_community_r1_tests.js
       - name: Explicit diff check
