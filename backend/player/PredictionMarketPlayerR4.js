@@ -4,188 +4,30 @@
    No raw sheet mutation, no setup(), no settlement invocation.
 ===================================================== */
 
-function predictionMarketPlayerR4String_(value) {
-  return String(value == null ? "" : value).trim();
+function predictionMarketPlayerR4String_(value){return String(value==null?"":value).trim();}
+function predictionMarketPlayerR4Context_(username){username=predictionMarketPlayerR4String_(username);if(!username)throw new Error("Authenticated player username is required");return{role:"PLAYER",playerId:username,username:username};}
+function predictionMarketPlayerR4Finite_(value,fallback){var n=Number(value);return isFinite(n)?n:(fallback==null?0:fallback);}
+function predictionMarketPlayerR4FeeConfig_(market){if(typeof predictionMarketTradingFeesR1MarketConfig_==="function")return predictionMarketTradingFeesR1MarketConfig_(market||{});return{mode:"INHERIT",customFeeBps:null,effectiveFeeBps:0,effectiveFeePercent:0,source:"DEFAULT"};}
+function predictionMarketPlayerR4MarketView_(market,nowMs){market=market||{};var status=predictionMarketPlayerR4String_(market.status).toUpperCase(),asOfMs=Date.parse(predictionMarketPlayerR4String_(market.referencePriceAsOf)),lockMs=Date.parse(predictionMarketPlayerR4String_(market.lockTime)),maxAge=typeof PREDICTION_MARKET_R2_CONFIG!=="undefined"?Number(PREDICTION_MARKET_R2_CONFIG.maxReferencePriceAgeMs||0):15*60*1000,trusted=market.referencePriceTrusted===true,priceFresh=trusted&&isFinite(asOfMs)&&asOfMs<=nowMs&&nowMs-asOfMs<=maxAge,beforeLock=isFinite(lockMs)&&nowMs<lockMs,fee=predictionMarketPlayerR4FeeConfig_(market);return Object.assign({},market,{priceFresh:priceFresh,priceStale:!priceFresh,tradingAvailable:status==="OPEN"&&priceFresh&&beforeLock,providerLabel:predictionMarketPlayerR4String_(market.providerId||market.providerKind||"MANUAL"),tradingFeeMode:fee.mode,tradingFeeBps:fee.effectiveFeeBps,tradingFeePercent:fee.effectiveFeePercent,tradingFeeSource:fee.source});}
+function predictionMarketPlayerR4PositionView_(position,market){position=position||{};market=market||{};var outcome=predictionMarketPlayerR4String_(position.outcome).toUpperCase(),mark=outcome==="YES"?predictionMarketPlayerR4Finite_(market.referenceYesPrice):predictionMarketPlayerR4Finite_(market.referenceNoPrice);return Object.assign({},position,{currentMark:mark,marketTitle:predictionMarketPlayerR4String_(market.title||position.marketId),marketStatus:predictionMarketPlayerR4String_(market.status),winningOutcome:predictionMarketPlayerR4String_(market.winningOutcome)});}
+
+function predictionMarketPlayerR4CreateService(options){
+  options=options||{};var engine=options.engine,repository=options.repository||null,now=typeof options.now==="function"?options.now:function(){return new Date();},communityService=options.communityService||null,productCoordinator=options.productCoordinator||null;
+  if(!engine)throw new Error("Prediction Market R2 engine is required");
+  if(!communityService&&typeof predictionMarketCommunityR1CreateService==="function")communityService=predictionMarketCommunityR1CreateService({repository:repository||engine.repository,now:now});
+  if(!productCoordinator&&typeof predictionMarketProductR2CreateCoordinator==="function")productCoordinator=predictionMarketProductR2CreateCoordinator({engine:engine,repository:repository||engine.repository});
+  function context(username){return predictionMarketPlayerR4Context_(username);}
+  function marketMap_(){var map={};(engine.getMarkets()||[]).forEach(function(market){map[market.marketId]=market;});return map;}
+  function ensureWallet_(ctx,username){var wallet=engine.getWallet(ctx,username);if(!wallet)wallet=engine.bootstrapWallet(ctx,username);return wallet;}
+  function groupViews_(marketViews){if(!productCoordinator)return[];var byId={};marketViews.forEach(function(row){byId[row.marketId]=row;});return(productCoordinator.groups()||[]).map(function(group){var outcomes=(group.outcomes||[]).map(function(outcome){var child=byId[outcome.marketId]||{};return Object.assign({},outcome,{status:child.status,referenceProbability:child.referenceYesPrice,referencePriceAsOf:child.referencePriceAsOf,referencePriceTrusted:child.referencePriceTrusted,tradingAvailable:child.tradingAvailable,priceFresh:child.priceFresh,priceStale:child.priceStale,tradingFeePercent:child.tradingFeePercent,tradingFeeBps:child.tradingFeeBps,providerLabel:child.providerLabel,community:child.community||null});});var community=productCoordinator.groupedCommunity(group.logicalMarketId);return Object.assign({},group,{outcomes:outcomes,community:community});});}
+  function state(username){var ctx=context(username),wallet=ensureWallet_(ctx,username),portfolio=engine.getPortfolio(ctx,username),nowMs=now().getTime(),marketRows=engine.getMarkets()||[],communityByMarket=communityService?communityService.forMarkets(marketRows.map(function(m){return m.marketId;})):{},markets=marketRows.map(function(market){return Object.assign(predictionMarketPlayerR4MarketView_(market,nowMs),{community:communityByMarket[market.marketId]||null});});return{success:true,playerId:username,wallet:wallet,portfolio:portfolio,markets:markets,marketGroups:groupViews_(markets),groupedPortfolio:productCoordinator?productCoordinator.groupedPortfolio(portfolio):[]};}
+  function detail(username,payload){payload=payload||{};var ctx=context(username);ensureWallet_(ctx,username);var portfolio=engine.getPortfolio(ctx,username),map=marketMap_(),market=map[predictionMarketPlayerR4String_(payload.marketId)];if(!market)throw new Error("Prediction Market not found");var nowMs=now().getTime(),positions=(portfolio.positions||[]).filter(function(position){return position.marketId===market.marketId;}).map(function(position){return predictionMarketPlayerR4PositionView_(position,market);});return{success:true,market:Object.assign(predictionMarketPlayerR4MarketView_(market,nowMs),{community:communityService?communityService.market(market.marketId):null}),positions:positions,portfolio:portfolio};}
+  function bootstrap(username){var ctx=context(username);return{success:true,wallet:engine.bootstrapWallet(ctx,username),portfolio:engine.getPortfolio(ctx,username)};}
+  function trade(username,payload){payload=payload||{};var ctx=context(username);ensureWallet_(ctx,username);var request={transactionId:payload.transactionId,playerId:username,marketId:payload.marketId,side:payload.side,outcome:payload.outcome,quantity:payload.quantity,referencePrice:payload.referencePrice,expectedWalletVersion:payload.expectedWalletVersion,requestedAt:payload.requestedAt};var result=engine.executeTrade(ctx,request);if(repository&&typeof repository.getTransaction==="function"){var committed=repository.getTransaction(request.transactionId);if(committed&&committed.committedResult)result=committed.committedResult;}return{success:true,trade:result,portfolio:engine.getPortfolio(ctx,username)};}
+  function leaderboard(username){context(username);return{success:true,leaderboard:engine.getLeaderboard({role:"SYSTEM",playerId:username,username:username})};}
+  return{state:state,detail:detail,bootstrap:bootstrap,trade:trade,leaderboard:leaderboard};
 }
 
-function predictionMarketPlayerR4Context_(username) {
-  username = predictionMarketPlayerR4String_(username);
-  if (!username) throw new Error("Authenticated player username is required");
-  return { role: "PLAYER", playerId: username, username: username };
-}
-
-function predictionMarketPlayerR4Finite_(value, fallback) {
-  var n = Number(value);
-  return isFinite(n) ? n : (fallback == null ? 0 : fallback);
-}
-
-function predictionMarketPlayerR4FeeConfig_(market) {
-  if (typeof predictionMarketTradingFeesR1MarketConfig_ === "function") {
-    return predictionMarketTradingFeesR1MarketConfig_(market || {});
-  }
-  return { mode:"INHERIT", customFeeBps:null, effectiveFeeBps:0, effectiveFeePercent:0, source:"DEFAULT" };
-}
-
-function predictionMarketPlayerR4MarketView_(market, nowMs) {
-  market = market || {};
-  var status = predictionMarketPlayerR4String_(market.status).toUpperCase();
-  var asOfMs = Date.parse(predictionMarketPlayerR4String_(market.referencePriceAsOf));
-  var lockMs = Date.parse(predictionMarketPlayerR4String_(market.lockTime));
-  var maxAge = typeof PREDICTION_MARKET_R2_CONFIG !== "undefined"
-    ? Number(PREDICTION_MARKET_R2_CONFIG.maxReferencePriceAgeMs || 0)
-    : 15 * 60 * 1000;
-  var trusted = market.referencePriceTrusted === true;
-  var priceFresh = trusted && isFinite(asOfMs) && asOfMs <= nowMs && nowMs - asOfMs <= maxAge;
-  var beforeLock = isFinite(lockMs) && nowMs < lockMs;
-  var fee = predictionMarketPlayerR4FeeConfig_(market);
-  return Object.assign({}, market, {
-    priceFresh: priceFresh,
-    priceStale: !priceFresh,
-    tradingAvailable: status === "OPEN" && priceFresh && beforeLock,
-    providerLabel: predictionMarketPlayerR4String_(market.providerId || market.providerKind || "MANUAL"),
-    tradingFeeMode: fee.mode,
-    tradingFeeBps: fee.effectiveFeeBps,
-    tradingFeePercent: fee.effectiveFeePercent,
-    tradingFeeSource: fee.source
-  });
-}
-
-function predictionMarketPlayerR4PositionView_(position, market) {
-  position = position || {};
-  market = market || {};
-  var outcome = predictionMarketPlayerR4String_(position.outcome).toUpperCase();
-  var mark = outcome === "YES" ? predictionMarketPlayerR4Finite_(market.referenceYesPrice) : predictionMarketPlayerR4Finite_(market.referenceNoPrice);
-  return Object.assign({}, position, {
-    currentMark: mark,
-    marketTitle: predictionMarketPlayerR4String_(market.title || position.marketId),
-    marketStatus: predictionMarketPlayerR4String_(market.status),
-    winningOutcome: predictionMarketPlayerR4String_(market.winningOutcome)
-  });
-}
-
-function predictionMarketPlayerR4CreateService(options) {
-  options = options || {};
-  var engine = options.engine;
-  var repository = options.repository || null;
-  var now = typeof options.now === "function" ? options.now : function() { return new Date(); };
-  var communityService = options.communityService || null;
-  if (!engine) throw new Error("Prediction Market R2 engine is required");
-  if (!communityService && typeof predictionMarketCommunityR1CreateService === "function") {
-    communityService = predictionMarketCommunityR1CreateService({ repository:repository || engine.repository, now:now });
-  }
-
-  function context(username) { return predictionMarketPlayerR4Context_(username); }
-  function marketMap_() {
-    var map = {};
-    (engine.getMarkets() || []).forEach(function(market) { map[market.marketId] = market; });
-    return map;
-  }
-  function ensureWallet_(ctx, username) {
-    var wallet = engine.getWallet(ctx, username);
-    if (!wallet) wallet = engine.bootstrapWallet(ctx, username);
-    return wallet;
-  }
-  function state(username) {
-    var ctx = context(username);
-    var wallet = ensureWallet_(ctx, username);
-    var portfolio = engine.getPortfolio(ctx, username);
-    var nowMs = now().getTime();
-    var marketRows = engine.getMarkets() || [];
-    var communityByMarket = communityService ? communityService.forMarkets(marketRows.map(function(market) { return market.marketId; })) : {};
-    var markets = marketRows.map(function(market) {
-      return Object.assign(predictionMarketPlayerR4MarketView_(market, nowMs), { community:communityByMarket[market.marketId] || null });
-    });
-    return { success:true, playerId:username, wallet:wallet, portfolio:portfolio, markets:markets };
-  }
-  function detail(username, payload) {
-    payload = payload || {};
-    var ctx = context(username);
-    ensureWallet_(ctx, username);
-    var portfolio = engine.getPortfolio(ctx, username);
-    var map = marketMap_();
-    var market = map[predictionMarketPlayerR4String_(payload.marketId)];
-    if (!market) throw new Error("Prediction Market not found");
-    var nowMs = now().getTime();
-    var positions = (portfolio.positions || []).filter(function(position) {
-      return position.marketId === market.marketId;
-    }).map(function(position) {
-      return predictionMarketPlayerR4PositionView_(position, market);
-    });
-    return {
-      success:true,
-      market:Object.assign(predictionMarketPlayerR4MarketView_(market, nowMs), { community:communityService ? communityService.market(market.marketId) : null }),
-      positions:positions,
-      portfolio:portfolio
-    };
-  }
-  function bootstrap(username) {
-    var ctx = context(username);
-    return { success:true, wallet:engine.bootstrapWallet(ctx, username), portfolio:engine.getPortfolio(ctx, username) };
-  }
-  function trade(username, payload) {
-    payload = payload || {};
-    var ctx = context(username);
-    ensureWallet_(ctx, username);
-    var request = {
-      transactionId: payload.transactionId,
-      playerId: username,
-      marketId: payload.marketId,
-      side: payload.side,
-      outcome: payload.outcome,
-      quantity: payload.quantity,
-      referencePrice: payload.referencePrice,
-      expectedWalletVersion: payload.expectedWalletVersion,
-      requestedAt: payload.requestedAt
-    };
-    var result = engine.executeTrade(ctx, request);
-    if (repository && typeof repository.getTransaction === "function") {
-      var committed = repository.getTransaction(request.transactionId);
-      if (committed && committed.committedResult) result = committed.committedResult;
-    }
-    return {
-      success:true,
-      trade:result,
-      portfolio:engine.getPortfolio(ctx, username)
-    };
-  }
-  function leaderboard(username) {
-    context(username);
-    return { success:true, leaderboard:engine.getLeaderboard({ role:"SYSTEM", playerId:username, username:username }) };
-  }
-
-  return { state:state, detail:detail, bootstrap:bootstrap, trade:trade, leaderboard:leaderboard };
-}
-
-function predictionMarketPlayerR4ProductionService_() {
-  var baseRepository = predictionMarketR2CreateAppsScriptRepository();
-  var repository = typeof predictionMarketTradingFeesR1DecorateRepository === "function"
-    ? predictionMarketTradingFeesR1DecorateRepository(baseRepository)
-    : baseRepository;
-  var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });
-  var communityService = typeof predictionMarketCommunityR1CreateService === "function"
-    ? predictionMarketCommunityR1CreateService({ repository:repository })
-    : null;
-  return predictionMarketPlayerR4CreateService({ engine: engine, repository: repository, communityService:communityService });
-}
-
-function apiPredictionMarketPlayerR4Dispatch(action, payload) {
-  payload = payload || {};
-  var service = predictionMarketPlayerR4ProductionService_();
-  var username = predictionMarketPlayerR4String_(payload.username);
-  switch (String(action || "")) {
-    case "getPredictionMarketPlayerState": return service.state(username);
-    case "getPredictionMarketPlayerDetail": return service.detail(username, payload);
-    case "bootstrapPredictionMarketWallet": return service.bootstrap(username);
-    case "executePredictionMarketTrade": return service.trade(username, payload);
-    case "getPredictionMarketLeaderboard": return service.leaderboard(username);
-    default: throw new Error("Unsupported Prediction Market player action: " + action);
-  }
-}
-
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = {
-    predictionMarketPlayerR4CreateService: predictionMarketPlayerR4CreateService,
-    predictionMarketPlayerR4MarketView_: predictionMarketPlayerR4MarketView_,
-    predictionMarketPlayerR4Context_: predictionMarketPlayerR4Context_
-  };
-}
+function predictionMarketPlayerR4ProductionService_(){var baseRepository=predictionMarketR2CreateAppsScriptRepository(),repository=typeof predictionMarketTradingFeesR1DecorateRepository==="function"?predictionMarketTradingFeesR1DecorateRepository(baseRepository):baseRepository,engine=predictionMarketR2CreateEngine({repository:repository,providers:predictionMarketReferenceProvidersR5CreateR2PriceProviders()}),communityService=typeof predictionMarketCommunityR1CreateService==="function"?predictionMarketCommunityR1CreateService({repository:repository}):null,productCoordinator=typeof predictionMarketProductR2CreateCoordinator==="function"?predictionMarketProductR2CreateCoordinator({engine:engine,repository:repository}):null;return predictionMarketPlayerR4CreateService({engine:engine,repository:repository,communityService:communityService,productCoordinator:productCoordinator});}
+function apiPredictionMarketPlayerR4Dispatch(action,payload){payload=payload||{};var service=predictionMarketPlayerR4ProductionService_(),username=predictionMarketPlayerR4String_(payload.username);switch(String(action||"")){case"getPredictionMarketPlayerState":return service.state(username);case"getPredictionMarketPlayerDetail":return service.detail(username,payload);case"bootstrapPredictionMarketWallet":return service.bootstrap(username);case"executePredictionMarketTrade":return service.trade(username,payload);case"getPredictionMarketLeaderboard":return service.leaderboard(username);default:throw new Error("Unsupported Prediction Market player action: "+action);}}
+if(typeof module!=="undefined"&&module.exports){module.exports={predictionMarketPlayerR4CreateService:predictionMarketPlayerR4CreateService,predictionMarketPlayerR4MarketView_:predictionMarketPlayerR4MarketView_,predictionMarketPlayerR4Context_:predictionMarketPlayerR4Context_};}
