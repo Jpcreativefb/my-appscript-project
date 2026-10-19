@@ -2,17 +2,15 @@
 (function(root) {
   "use strict";
 
-  var STATE = { markets: [], editingMarketId: "" };
+  var STATE = { markets: [], editingMarketId: "", feeSettings:{defaultFeeBps:0,defaultFeePercent:0}, feeStats:{feeBearingTrades:0,chargedFeeCredits:0,refundedFeeCredits:0,netFeeCredits:0} };
   function s(v) { return String(v == null ? "" : v).trim(); }
+  function n(v) { var x=Number(v); return isFinite(x)?x:0; }
+  function credits(v) { return n(v).toFixed(2); }
+  function percent(v) { return n(v).toFixed(2).replace(/\.00$/,""); }
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function market(id) { return STATE.markets.find(function(row){ return s(row.marketId) === s(id); }) || null; }
   function statusClass(status) { return "admin-pill " + s(status).toLowerCase(); }
-  function message(text, state) {
-    var node = document.getElementById("adminPredictionMarketMessage");
-    if (!node) return;
-    node.textContent = s(text);
-    node.setAttribute("data-state", s(state));
-  }
+  function message(text, state) { var node=document.getElementById("adminPredictionMarketMessage"); if(!node)return; node.textContent=s(text);node.setAttribute("data-state",s(state)); }
   function value(form, name) { var f=form&&form.elements?form.elements[name]:null; return s(f&&f.value); }
   function numberValue(form, name) { var v=value(form,name); return v === "" ? "" : Number(v); }
   function isoValue(form, name) { var v=value(form,name); if (!v) return ""; var d=new Date(v); return isNaN(d.getTime()) ? v : d.toISOString(); }
@@ -41,24 +39,35 @@
     return out.join("");
   }
 
+  function renderFeeSettings() {
+    var input=document.getElementById("adminPredictionMarketDefaultFee");
+    if(input)input.value=Number(STATE.feeSettings.defaultFeePercent||0);
+    var stats=document.getElementById("adminPredictionMarketFeeStats");
+    if(stats)stats.innerHTML='<div class="admin-grid">'+
+      '<div><div class="admin-label">Net Fees Collected</div><div class="admin-value">'+credits(STATE.feeStats.netFeeCredits)+' virtual credits</div></div>'+
+      '<div><div class="admin-label">Fee-Bearing Trades</div><div class="admin-value">'+esc(STATE.feeStats.feeBearingTrades||0)+'</div></div>'+
+      '<div><div class="admin-label">Fees Charged</div><div class="admin-value">'+credits(STATE.feeStats.chargedFeeCredits)+'</div></div>'+
+      '<div><div class="admin-label">Fees Refunded on VOID</div><div class="admin-value">'+credits(STATE.feeStats.refundedFeeCredits)+'</div></div></div>';
+  }
+
   function renderMarkets() {
     var host = document.getElementById("adminPredictionMarketList");
     if (!host) return;
     if (!STATE.markets.length) { host.innerHTML = '<div class="admin-sub">No Prediction Markets are currently stored.</div>'; return; }
     host.innerHTML = STATE.markets.map(function(row){
       var winner = row.status === "RESOLVED" ? (" · Winner: " + esc(row.winningOutcome || "")) : "";
+      var feeSource = row.tradingFeeSource === "MARKET" ? "custom market fee" : "default fee";
       return '<div class="admin-category-card" data-prediction-market-id="'+esc(row.marketId)+'">'+
         '<div class="admin-category-header"><div><strong>'+esc(row.title)+'</strong><div class="admin-sub"><code>'+esc(row.marketId)+'</code> · '+esc(row.category||"Uncategorized")+'</div></div><span class="'+statusClass(row.status)+'">'+esc(row.status)+winner+'</span></div>'+
         '<div class="admin-grid">'+
           '<div><div class="admin-label">YES / NO</div><div class="admin-value">'+esc(row.referenceYesPrice)+' / '+esc(row.referenceNoPrice)+'</div></div>'+
+          '<div><div class="admin-label">Trading Fee</div><div class="admin-value">'+percent(row.tradingFeePercent)+'%</div><div class="admin-sub">'+esc(feeSource)+'</div></div>'+
           '<div><div class="admin-label">Price As Of</div><div class="admin-sub">'+esc(row.referencePriceAsOf||"—")+'</div></div>'+
-          '<div><div class="admin-label">Open</div><div class="admin-sub">'+esc(row.openTime||"—")+'</div></div>'+
           '<div><div class="admin-label">Lock</div><div class="admin-sub">'+esc(row.lockTime||"—")+'</div></div>'+
         '</div>'+
         '<div class="admin-sub"><strong>Provider / source:</strong> '+esc(providerText(row))+'</div>'+
         '<div class="admin-sub"><strong>Trading state:</strong> '+(row.tradingAvailable ? 'OPEN for accepted R2 trading' : 'Not available')+'</div>'+
-        '<div class="admin-actions" style="margin-top:10px">'+lifecycleButtons(row)+'</div>'+
-      '</div>';
+        '<div class="admin-actions" style="margin-top:10px">'+lifecycleButtons(row)+'</div></div>';
     }).join("");
   }
 
@@ -67,25 +76,38 @@
     try {
       var res = await call("adminGetPredictionMarkets", {});
       STATE.markets = Array.isArray(res.markets) ? res.markets : [];
-      renderMarkets();
-      message("Prediction Markets loaded.", "success");
+      STATE.feeSettings=res.tradingFeeSettings||STATE.feeSettings;
+      STATE.feeStats=res.tradingFeeStats||STATE.feeStats;
+      renderFeeSettings(); renderMarkets(); message("Prediction Markets loaded.", "success");
     } catch (err) {
-      STATE.markets = [];
-      renderMarkets();
-      message(err && err.message ? err.message : "Prediction Market list failed.", "error");
+      STATE.markets = []; renderMarkets(); message(err && err.message ? err.message : "Prediction Market list failed.", "error");
     }
   }
 
   function formPayload(form) {
+    var feeMode=value(form,"tradingFeeMode")||"INHERIT";
+    var customPercent=numberValue(form,"customTradingFeePercent");
     return {
       marketId:value(form,"marketId"), title:value(form,"title"), description:value(form,"description"), category:value(form,"category"),
       yesLabel:value(form,"yesLabel")||"YES", noLabel:value(form,"noLabel")||"NO",
       referenceYesPrice:numberValue(form,"referenceYesPrice"), referenceNoPrice:numberValue(form,"referenceNoPrice"),
       referencePriceAsOf:isoValue(form,"referencePriceAsOf"), referencePriceTrusted:true,
       providerKind:value(form,"providerKind")||"MANUAL", providerId:value(form,"providerId"), externalMarketId:value(form,"externalMarketId"), sourceUrl:value(form,"sourceUrl"),
-      providerMetadata:value(form,"providerMetadata")||"{}", openTime:isoValue(form,"openTime"), lockTime:isoValue(form,"lockTime")
+      providerMetadata:value(form,"providerMetadata")||"{}", tradingFeeMode:feeMode, tradingFeeBps:feeMode==="CUSTOM"?Math.round(n(customPercent)*100):"",
+      openTime:isoValue(form,"openTime"), lockTime:isoValue(form,"lockTime")
     };
   }
+
+  root.predictionMarketAdminR3SaveDefaultFee_ = async function() {
+    var input=document.getElementById("adminPredictionMarketDefaultFee"), pct=n(input&&input.value);
+    if(pct<0||pct>100){message("Default trading fee must be between 0% and 100%.","error");return false;}
+    try { var res=await call("adminEditPredictionMarket",{settingsOnly:true,defaultTradingFeeBps:Math.round(pct*100)}); STATE.feeSettings=res.tradingFeeSettings||STATE.feeSettings;STATE.feeStats=res.tradingFeeStats||STATE.feeStats;message("Default trading fee saved.","success");await load();return true; }
+    catch(err){message(err&&err.message?err.message:"Trading fee save failed.","error");return false;}
+  };
+  root.predictionMarketAdminR3FeeModeChanged_ = function() {
+    var form=document.getElementById("adminPredictionMarketForm"), custom=form&&form.elements.customTradingFeePercent;
+    if(custom)custom.disabled=value(form,"tradingFeeMode")!=="CUSTOM";
+  };
 
   root.predictionMarketAdminR3Submit_ = async function(event) {
     if (event && event.preventDefault) event.preventDefault();
@@ -94,7 +116,7 @@
     try {
       await call(editing ? "adminEditPredictionMarket" : "adminCreatePredictionMarket", formPayload(form));
       message(editing ? "Draft market updated." : "Draft market created.", "success");
-      STATE.editingMarketId = ""; form.reset();
+      STATE.editingMarketId = ""; form.reset(); if(form.elements.tradingFeeMode)form.elements.tradingFeeMode.value="INHERIT";root.predictionMarketAdminR3FeeModeChanged_();
       var id=form.elements.marketId; if(id) id.disabled=false;
       var submit=document.getElementById("adminPredictionMarketSubmit"); if(submit) submit.textContent="Create Draft Market";
       await load(); return true;
@@ -106,14 +128,16 @@
     STATE.editingMarketId=s(id);
     ["marketId","title","description","category","yesLabel","noLabel","referenceYesPrice","referenceNoPrice","providerKind","providerId","externalMarketId","sourceUrl"].forEach(function(name){ if(form.elements[name]) form.elements[name].value=row[name]==null?"":row[name]; });
     if(form.elements.providerMetadata) form.elements.providerMetadata.value=JSON.stringify(row.providerMetadata||{});
+    if(form.elements.tradingFeeMode)form.elements.tradingFeeMode.value=row.tradingFeeMode||"INHERIT";
+    if(form.elements.customTradingFeePercent)form.elements.customTradingFeePercent.value=row.customTradingFeeBps==null?"":Number(row.customTradingFeeBps)/100;
+    root.predictionMarketAdminR3FeeModeChanged_();
     ["referencePriceAsOf","openTime","lockTime"].forEach(function(name){ if(form.elements[name]) form.elements[name].value=localDateTime(row[name]); });
-    form.elements.marketId.disabled=true;
-    document.getElementById("adminPredictionMarketSubmit").textContent="Save Draft Changes";
+    form.elements.marketId.disabled=true; document.getElementById("adminPredictionMarketSubmit").textContent="Save Draft Changes";
     form.scrollIntoView({behavior:"smooth",block:"start"}); return true;
   };
 
   root.predictionMarketAdminR3CancelEdit_ = function() {
-    STATE.editingMarketId=""; var form=document.getElementById("adminPredictionMarketForm"); if(form){form.reset();form.elements.marketId.disabled=false;}
+    STATE.editingMarketId=""; var form=document.getElementById("adminPredictionMarketForm"); if(form){form.reset();form.elements.marketId.disabled=false;if(form.elements.tradingFeeMode)form.elements.tradingFeeMode.value="INHERIT";root.predictionMarketAdminR3FeeModeChanged_();}
     var submit=document.getElementById("adminPredictionMarketSubmit");if(submit)submit.textContent="Create Draft Market"; return true;
   };
 
@@ -128,15 +152,8 @@
   root.predictionMarketAdminR5RefreshProvider_ = async function(id) {
     var row=market(id); if(!row) return false;
     message("Refreshing "+s(row.providerKind)+" reference price…","working");
-    try {
-      var res=await call("adminRefreshPredictionMarketReference",{marketId:id});
-      var proposed=res.proposed||{};
-      message("Reference price refreshed: YES "+s(proposed.referenceYesPrice)+" / NO "+s(proposed.referenceNoPrice)+" · "+s(proposed.referencePriceAsOf),"success");
-      await load(); return true;
-    } catch(err) {
-      message(err&&err.message?err.message:"Provider refresh failed. Last accepted price was retained.","error");
-      await load(); return false;
-    }
+    try { var res=await call("adminRefreshPredictionMarketReference",{marketId:id});var proposed=res.proposed||{};message("Reference price refreshed: YES "+s(proposed.referenceYesPrice)+" / NO "+s(proposed.referenceNoPrice)+" · "+s(proposed.referencePriceAsOf),"success");await load();return true; }
+    catch(err){message(err&&err.message?err.message:"Provider refresh failed. Last accepted price was retained.","error");await load();return false;}
   };
 
   root.predictionMarketAdminR3Lifecycle_ = async function(action,id) {
@@ -145,10 +162,9 @@
     if(action==="lock") apiAction="adminLockPredictionMarket";
     if(action==="resolve-yes"){apiAction="adminResolvePredictionMarket";payload.winningOutcome="YES";finalText="Resolve this market YES? This is a final market resolution.";}
     if(action==="resolve-no"){apiAction="adminResolvePredictionMarket";payload.winningOutcome="NO";finalText="Resolve this market NO? This is a final market resolution.";}
-    if(action==="void"){apiAction="adminVoidPredictionMarket";finalText="Void this market? Open cost basis is returned by the accepted R2 settlement authority.";}
-    if(!apiAction)return false;
-    if(finalText && !window.confirm(finalText)) return false;
-    try { await call(apiAction,payload); message("Market lifecycle updated.","success"); await load(); return true; }
+    if(action==="void"){apiAction="adminVoidPredictionMarket";finalText="Void this market? Open cost basis and related trading fees are returned by settlement.";}
+    if(!apiAction)return false;if(finalText&&!window.confirm(finalText))return false;
+    try { await call(apiAction,payload);message("Market lifecycle updated.","success");await load();return true; }
     catch(err){message(err&&err.message?err.message:"Lifecycle update failed.","error");return false;}
   };
 
@@ -156,15 +172,17 @@
     window.setTimeout(load,0);
     return '<div class="page admin-page" data-admin-prediction-markets-r3="1">'+
       '<div class="admin-sub"><button type="button" class="admin-small-button secondary" onclick="navigate(\'admin\')">Admin</button> → Games &amp; Design → Prediction Markets</div>'+
-      '<div class="admin-page-header"><div><h1>Prediction Markets</h1><div class="admin-sub">Create and operate binary Prediction Markets through the accepted R2 engine. External providers are reference-only; Admin-triggered refresh never bypasses R2 price authority or edits storage directly.</div></div></div>'+
+      '<div class="admin-page-header"><div><h1>Prediction Markets</h1><div class="admin-sub">Create and operate binary Prediction Markets through the accepted R2 engine. Trading fees use virtual PATTC credits only.</div></div></div>'+
       '<div id="adminPredictionMarketMessage" class="admin-message" aria-live="polite"></div>'+
+      '<div class="card admin-card"><h2>Trading Fees</h2><div class="admin-sub">Global default applies to markets set to Use Default. A market can use its own custom fee. No settlement fee is charged; VOID settlement refunds related trading fees.</div><div class="admin-control-grid" style="margin-top:10px"><label class="admin-field"><span>Default Trading Fee (%)</span><input id="adminPredictionMarketDefaultFee" type="number" min="0" max="100" step="0.01" value="0"></label></div><div class="admin-actions"><button type="button" class="button admin-button" onclick="predictionMarketAdminR3SaveDefaultFee_()">Save Default Fee</button></div><div id="adminPredictionMarketFeeStats"></div></div>'+
       '<div class="card admin-card"><h2>Create / Edit Draft Market</h2><form id="adminPredictionMarketForm" onsubmit="predictionMarketAdminR3Submit_(event);return false;"><div class="admin-control-grid">'+
         '<label class="admin-field"><span>Market ID</span><input name="marketId" required></label><label class="admin-field"><span>Title</span><input name="title" required></label><label class="admin-field"><span>Category</span><input name="category"></label><label class="admin-field"><span>Description</span><input name="description"></label>'+
         '<label class="admin-field"><span>YES Price</span><input name="referenceYesPrice" type="number" min="0" max="1" step="0.01" required></label><label class="admin-field"><span>NO Price</span><input name="referenceNoPrice" type="number" min="0" max="1" step="0.01" required></label><label class="admin-field"><span>YES Label</span><input name="yesLabel" value="YES"></label><label class="admin-field"><span>NO Label</span><input name="noLabel" value="NO"></label>'+
+        '<label class="admin-field"><span>Market Trading Fee</span><select name="tradingFeeMode" onchange="predictionMarketAdminR3FeeModeChanged_()"><option value="INHERIT">Use Default</option><option value="CUSTOM">Custom</option></select></label><label class="admin-field"><span>Custom Fee (%)</span><input name="customTradingFeePercent" type="number" min="0" max="100" step="0.01" disabled></label>'+
         '<label class="admin-field"><span>Reference Price As Of</span><input name="referencePriceAsOf" type="datetime-local" required></label><label class="admin-field"><span>Open Time</span><input name="openTime" type="datetime-local"></label><label class="admin-field"><span>Lock Time</span><input name="lockTime" type="datetime-local" required></label><label class="admin-field"><span>Provider Kind</span><input name="providerKind" value="MANUAL"></label>'+
         '<label class="admin-field"><span>Provider ID</span><input name="providerId"></label><label class="admin-field"><span>External Market ID</span><input name="externalMarketId"></label><label class="admin-field"><span>Source URL</span><input name="sourceUrl" type="url"></label><label class="admin-field"><span>Provider Metadata JSON</span><input name="providerMetadata" value="{}"></label></div>'+
         '<div class="admin-actions"><button id="adminPredictionMarketSubmit" type="submit" class="button admin-button">Create Draft Market</button><button type="button" class="button admin-button secondary" onclick="predictionMarketAdminR3CancelEdit_()">Clear / Cancel Edit</button></div></form></div>'+
-      '<div class="card admin-card"><div class="admin-category-header"><div><h2>Markets</h2><div class="admin-sub">DRAFT · OPEN · LOCKED · RESOLVED · VOID. Buttons are derived from the accepted lifecycle; the server remains authoritative.</div></div><button type="button" class="button admin-button secondary" onclick="predictionMarketAdminR3Refresh_()">Refresh</button></div><div id="adminPredictionMarketList" class="admin-list"></div></div></div>';
+      '<div class="card admin-card"><div class="admin-category-header"><div><h2>Markets</h2><div class="admin-sub">DRAFT · OPEN · LOCKED · RESOLVED · VOID. Server lifecycle, pricing, fee accounting, and idempotency remain authoritative.</div></div><button type="button" class="button admin-button secondary" onclick="predictionMarketAdminR3Refresh_()">Refresh</button></div><div id="adminPredictionMarketList" class="admin-list"></div></div></div>';
   };
 
   root.predictionMarketAdminR3Refresh_ = load;
