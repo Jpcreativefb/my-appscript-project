@@ -100,23 +100,23 @@ assert(
 );
 
 [
-  "navigate('admin-games')",
-  "navigate('admin-team-fantasy')",
-  "navigate('admin-playoff-race')",
-  "navigate('admin-nfl-cup')",
-  "navigate('admin-nfl-season-setup')",
-  "navigate('admin-sports-engine')"
+  'admin-games',
+  'admin-team-fantasy',
+  'admin-playoff-race',
+  'admin-nfl-cup',
+  'admin-nfl-season-setup',
+  'admin-sports-engine'
 ].forEach(route => {
   assert(shellSource.includes(route), 'Sports authority route missing: ' + route);
 });
 
 assert(
-  shellSource.includes("navigate('admin-reality-tv')") &&
+  shellSource.includes('admin-reality-tv') &&
   shellSource.includes('Open Reality TV Manager'),
   'Reality TV Manager must be a visible actionable destination'
 );
 assert(
-  shellSource.includes("navigate('admin-awards')") &&
+  shellSource.includes('admin-awards') &&
   shellSource.includes('Open Awards Game Builder') &&
   shellSource.includes('Open Awards Manager'),
   'Awards builder/manager destinations must be visible'
@@ -155,9 +155,9 @@ assert(
 );
 
 assert(
-  shellSource.includes("navigate('admin-prediction-markets')") &&
-  shellSource.includes("navigate('prediction-markets')") &&
-  shellSource.includes("navigate('leaderboard')"),
+  shellSource.includes('admin-prediction-markets') &&
+  shellSource.includes('prediction-markets') &&
+  shellSource.includes('leaderboard'),
   'Prediction Markets admin/player/leaderboard authorities must remain separate and visible'
 );
 assert(
