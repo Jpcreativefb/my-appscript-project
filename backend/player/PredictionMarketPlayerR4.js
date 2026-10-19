@@ -68,7 +68,11 @@ function predictionMarketPlayerR4CreateService(options) {
   var engine = options.engine;
   var repository = options.repository || null;
   var now = typeof options.now === "function" ? options.now : function() { return new Date(); };
+  var communityService = options.communityService || null;
   if (!engine) throw new Error("Prediction Market R2 engine is required");
+  if (!communityService && typeof predictionMarketCommunityR1CreateService === "function") {
+    communityService = predictionMarketCommunityR1CreateService({ repository:repository || engine.repository, now:now });
+  }
 
   function context(username) { return predictionMarketPlayerR4Context_(username); }
   function marketMap_() {
@@ -86,8 +90,10 @@ function predictionMarketPlayerR4CreateService(options) {
     var wallet = ensureWallet_(ctx, username);
     var portfolio = engine.getPortfolio(ctx, username);
     var nowMs = now().getTime();
-    var markets = (engine.getMarkets() || []).map(function(market) {
-      return predictionMarketPlayerR4MarketView_(market, nowMs);
+    var marketRows = engine.getMarkets() || [];
+    var communityByMarket = communityService ? communityService.forMarkets(marketRows.map(function(market) { return market.marketId; })) : {};
+    var markets = marketRows.map(function(market) {
+      return Object.assign(predictionMarketPlayerR4MarketView_(market, nowMs), { community:communityByMarket[market.marketId] || null });
     });
     return { success:true, playerId:username, wallet:wallet, portfolio:portfolio, markets:markets };
   }
@@ -107,7 +113,7 @@ function predictionMarketPlayerR4CreateService(options) {
     });
     return {
       success:true,
-      market:predictionMarketPlayerR4MarketView_(market, nowMs),
+      market:Object.assign(predictionMarketPlayerR4MarketView_(market, nowMs), { community:communityService ? communityService.market(market.marketId) : null }),
       positions:positions,
       portfolio:portfolio
     };
@@ -156,7 +162,10 @@ function predictionMarketPlayerR4ProductionService_() {
     ? predictionMarketTradingFeesR1DecorateRepository(baseRepository)
     : baseRepository;
   var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });
-  return predictionMarketPlayerR4CreateService({ engine: engine, repository: repository });
+  var communityService = typeof predictionMarketCommunityR1CreateService === "function"
+    ? predictionMarketCommunityR1CreateService({ repository:repository })
+    : null;
+  return predictionMarketPlayerR4CreateService({ engine: engine, repository: repository, communityService:communityService });
 }
 
 function apiPredictionMarketPlayerR4Dispatch(action, payload) {
