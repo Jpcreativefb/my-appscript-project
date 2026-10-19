@@ -1,7 +1,7 @@
 /* =====================================================
    PREDICTION MARKET PLAYER TRADING R4
    Thin authenticated player adapter over accepted R2 authority.
-   No raw sheet mutation, no setup(), no settlement invocation.
+   No raw sheet mutation, no setup invocation, no settlement invocation.
 ===================================================== */
 
 function predictionMarketPlayerR4String_(value){return String(value==null?"":value).trim();}
