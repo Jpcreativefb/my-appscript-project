@@ -139,5 +139,6 @@ assert(backendApiSource.includes('apiPredictionMarketPlayerR4Dispatch'));
 assert(apiSource.includes('function apiPredictionMarketPlayerR4'));
 assert(pageSource.includes('window.confirm'));
 assert(pageSource.includes('Final accepted server reference price and fee calculation are authoritative'));
+assert(playerAdapterSource.includes('var result = engine.executeTrade(ctx, request);'));
 
 console.log('PASS prediction_market_player_r4_tests');
