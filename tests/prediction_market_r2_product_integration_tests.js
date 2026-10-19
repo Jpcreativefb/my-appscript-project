@@ -26,7 +26,25 @@ const playerCtx = {role:'PLAYER',playerId:'alice',username:'alice'};
 feeApi.predictionMarketTradingFeesR1SetDefaultFeeBps_(100);
 const base = engineApi.predictionMarketR2CreateMemoryRepository();
 const repository = feeApi.predictionMarketTradingFeesR1DecorateRepository(base);
-const engine = engineApi.predictionMarketR2CreateEngine({repository,now:()=>new Date(NOW)});
+const passthroughProvider = {
+  getReferencePrices(market) {
+    return {
+      YES:Number(market.referenceYesPrice),
+      NO:Number(market.referenceNoPrice),
+      asOf:market.referencePriceAsOf,
+      trusted:market.referencePriceTrusted === true
+    };
+  }
+};
+const engine = engineApi.predictionMarketR2CreateEngine({
+  repository,
+  now:()=>new Date(NOW),
+  providers:{
+    MANUAL:engineApi.predictionMarketR2CreateManualProvider(),
+    KALSHI:passthroughProvider,
+    POLYMARKET:passthroughProvider
+  }
+});
 let detailByEvent = Object.create(null);
 const providerState = Object.create(null);
 const providerResolution = providerApi.predictionMarketProviderResolutionR2CreateService({
