@@ -54,7 +54,7 @@ function predictionMarketTradingFeesR1FeeCharges_(repository,playerId,marketId) 
   return predictionMarketTradingFeesR1Transactions_(repository).filter(function(tx){return String(tx.status||"COMMITTED").toUpperCase()==="COMMITTED"&&(!playerId||String(tx.playerId)===String(playerId))&&(!marketId||String(tx.marketId)===String(marketId));}).map(function(tx){var r=tx.committedResult||{};return{playerId:tx.playerId,marketId:tx.marketId,outcome:String(tx.outcome||r.outcome||"").toUpperCase(),feeCredits:predictionMarketTradingFeesR1Round_(Number(r.feeCredits||0))};}).filter(function(row){return row.feeCredits>0;});
 }
 function predictionMarketTradingFeesR1Stats_(repository) {
-  var charges=predictionMarketTradingFeesR1FeeCharges_(repository),charged=charges.reduce(function(sum,row){return sum+row.feeCredits;},0),refunded=predictionMarketTradingFeesR1Settlements_(repository).reduce(function(sum,row){var r=row.committedResult||row||{};return sum+Number(r.returnedTradingFeeCredits||0);},0);
+  var charges=predictionMarketTradingFeesR1FeeCharges_(repository),charged=charges.reduce(function(sum,row){return sum+row.feeCredits;},0),refunded=predictionMarketTradingFeesR1Settlements_(repository).filter(function(row){return String(row.status||"COMMITTED").toUpperCase()==="COMMITTED";}).reduce(function(sum,row){var r=row.committedResult||row||{};return sum+Number(r.returnedTradingFeeCredits||0);},0);
   charged=predictionMarketTradingFeesR1Round_(charged);refunded=predictionMarketTradingFeesR1Round_(refunded);return{feeBearingTrades:charges.length,chargedFeeCredits:charged,refundedFeeCredits:refunded,netFeeCredits:predictionMarketTradingFeesR1Round_(charged-refunded)};
 }
 
