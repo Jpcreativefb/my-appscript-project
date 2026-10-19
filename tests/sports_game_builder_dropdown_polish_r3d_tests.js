@@ -15,7 +15,7 @@ assert(shellSource.includes('sectionHtml_("sports", "Sports"'), 'Sports must rem
 assert(shellSource.includes('class="card admin-card admin-collapsible-card admin-games-design-section"'), 'top-level Games & Design sections must reuse the Manage Games collapsible card pattern');
 assert(shellSource.includes('class="admin-card-summary"'), 'collapsible sections must reuse the existing Admin summary pattern');
 assert(shellSource.includes('class="admin-collapse-icon"'), 'collapsible sections must reuse the existing Admin collapse affordance');
-assert(shellSource.includes('Admin → Games & Design → Sports → League → NFL → 2026'), 'Sports hierarchy must expose League -> NFL -> 2026');
+assert(shellSource.includes('Admin → Games &amp; Design → Sports → League → NFL → 2026'), 'Sports hierarchy must expose League -> NFL -> 2026');
 for (const level of ['league', 'league-name', 'season']) {
   assert(shellSource.includes(`data-admin-sports-level="${level}"`), 'Sports hierarchy missing level: ' + level);
 }
