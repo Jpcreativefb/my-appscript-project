@@ -294,10 +294,8 @@ function predictionMarketProviderResolutionR2CreateService(options) {
     }
 
     var ctx = systemContext(username);
-    if (result.lifecycle === PREDICTION_MARKET_PROVIDER_RESOLUTION_R2.OPEN && currentStatus === "DRAFT") {
-      market = engine.openMarket(ctx, marketId);
-      currentStatus = "OPEN";
-    }
+    // Provider OPEN is observational only for PATTC DRAFTs. Imported markets
+    // remain DRAFT until an Admin explicitly opens them.
     if (result.tradingClosed === true && currentStatus === "OPEN") {
       market = engine.lockMarket(ctx, marketId);
       currentStatus = "LOCKED";
