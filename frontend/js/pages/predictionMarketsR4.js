@@ -21,6 +21,14 @@ function predictionMarketR4Esc_(value) {
 function predictionMarketR4Num_(value) { var n=Number(value); return isFinite(n)?n:0; }
 function predictionMarketR4Credits_(value) { return predictionMarketR4Num_(value).toFixed(2); }
 function predictionMarketR4Price_(value) { return predictionMarketR4Num_(value).toFixed(3); }
+function predictionMarketR4Percent_(value) { return predictionMarketR4Num_(value).toFixed(2).replace(/\.00$/,""); }
+function predictionMarketR4Round_(value) { return Math.round(predictionMarketR4Num_(value)*1000000)/1000000; }
+function predictionMarketR4FeeEstimate_(market,quantity,price,side) {
+  var gross=predictionMarketR4Round_(predictionMarketR4Num_(quantity)*predictionMarketR4Num_(price));
+  var bps=predictionMarketR4Num_(market&&market.tradingFeeBps);
+  var fee=predictionMarketR4Round_(gross*bps/10000);
+  return {gross:gross,fee:fee,net:predictionMarketR4Round_(side==="BUY"?gross+fee:gross-fee)};
+}
 function predictionMarketR4Date_(value) {
   var d=new Date(String(value||""));
   return isNaN(d.getTime()) ? "—" : d.toLocaleString();
@@ -36,13 +44,7 @@ function predictionMarketR4IntentKey_(intent) {
 function predictionMarketR4PrepareSubmission_(intent, prior) {
   var key=predictionMarketR4IntentKey_(intent);
   if (prior && prior.key===key && prior.uncertain===true) return prior;
-  return {
-    key:key,
-    transactionId:predictionMarketR4NewTransactionId_(),
-    uncertain:false,
-    inFlight:false,
-    payload:Object.assign({},intent)
-  };
+  return {key:key,transactionId:predictionMarketR4NewTransactionId_(),uncertain:false,inFlight:false,payload:Object.assign({},intent)};
 }
 function predictionMarketR4FailureUncertain_(result) {
   var text=String(result && (result.error||result.message)||"").toLowerCase();
@@ -82,61 +84,60 @@ function predictionMarketR4MarketCard_(market) {
     <span class="pmr4-card-top"><strong>${predictionMarketR4Esc_(market.title)}</strong><span class="pmr4-status pmr4-${predictionMarketR4Esc_(String(market.status||"").toLowerCase())}">${predictionMarketR4Esc_(market.status)}</span></span>
     <span class="pmr4-meta">${predictionMarketR4Esc_(market.category||"Prediction Market")} · locks ${predictionMarketR4Esc_(predictionMarketR4Date_(market.lockTime))}</span>
     <span class="pmr4-prices"><b>YES ${predictionMarketR4Price_(market.referenceYesPrice)}</b><b>NO ${predictionMarketR4Price_(market.referenceNoPrice)}</b></span>
-    <span class="pmr4-meta">Price ${predictionMarketR4Esc_(predictionMarketR4Date_(market.referencePriceAsOf))} · ${predictionMarketR4Esc_(market.providerLabel||market.providerKind||"MANUAL")}</span>
+    <span class="pmr4-meta">Price ${predictionMarketR4Esc_(predictionMarketR4Date_(market.referencePriceAsOf))} · ${predictionMarketR4Esc_(market.providerLabel||market.providerKind||"MANUAL")} · fee ${predictionMarketR4Percent_(market.tradingFeePercent)}%</span>
     <span class="pmr4-trade-state ${market.tradingAvailable?"available":"blocked"}">${market.tradingAvailable?"Trading available":(stale?"Price stale / unavailable":"Not currently tradable")}</span>
   </button>`;
 }
 
 function predictionMarketR4PositionLine_(position,outcome) {
   position=position||{outcome:outcome,quantity:0,costBasisCredits:0,averageCostCredits:0,markedValueCredits:0,unrealizedCredits:0,realizedCredits:0,settled:false,settledCredits:0};
-  return `<div class="pmr4-position-line"><strong>${predictionMarketR4Esc_(outcome)}</strong><span>${predictionMarketR4Credits_(position.quantity)} shares</span><span>Avg ${predictionMarketR4Credits_(position.averageCostCredits)}</span><span>Basis ${predictionMarketR4Credits_(position.costBasisCredits)}</span><span>Value ${predictionMarketR4Credits_(position.markedValueCredits)}</span><span>U/P&L ${predictionMarketR4Credits_(position.unrealizedCredits)}</span><span>R/P&L ${predictionMarketR4Credits_(position.realizedCredits)}</span><span>${position.settled?"Settled "+predictionMarketR4Credits_(position.settledCredits):"Open"}</span></div>`;
+  return `<div class="pmr4-position-line"><strong>${predictionMarketR4Esc_(outcome)}</strong><span>${predictionMarketR4Credits_(position.quantity)} shares</span><span>Avg ${predictionMarketR4Credits_(position.averageCostCredits)}</span><span>Basis ${predictionMarketR4Credits_(position.costBasisCredits)}</span><span>Value ${predictionMarketR4Credits_(position.markedValueCredits)}</span><span>U/P&amp;L ${predictionMarketR4Credits_(position.unrealizedCredits)}</span><span>R/P&amp;L ${predictionMarketR4Credits_(position.realizedCredits)}</span><span>${position.settled?"Settled "+predictionMarketR4Credits_(position.settledCredits):"Open"}</span></div>`;
+}
+
+function predictionMarketR4EstimateHtml_(market,quantity,price,side) {
+  var estimate=predictionMarketR4FeeEstimate_(market,quantity,price,side);
+  var finalLabel=side==="BUY"?"Total debit":"Net proceeds";
+  return `Displayed price ${predictionMarketR4Price_(price)} · ${side==="BUY"?"Trade cost":"Gross proceeds"} ${predictionMarketR4Credits_(estimate.gross)} · Trading fee (${predictionMarketR4Percent_(market&&market.tradingFeePercent)}%) ${predictionMarketR4Credits_(estimate.fee)} · ${finalLabel} ${predictionMarketR4Credits_(estimate.net)} credits`;
 }
 
 function predictionMarketR4DetailHtml_() {
   var market=predictionMarketR4Market_(PREDICTION_MARKET_R4_STATE.selectedMarketId);
   if (!market) return `<div class="card">No Prediction Markets are available.</div>`;
-  var yes=predictionMarketR4Position_(market.marketId,"YES");
-  var no=predictionMarketR4Position_(market.marketId,"NO");
-  var outcome=PREDICTION_MARKET_R4_STATE.selectedOutcome;
-  var side=PREDICTION_MARKET_R4_STATE.selectedSide;
+  var yes=predictionMarketR4Position_(market.marketId,"YES"), no=predictionMarketR4Position_(market.marketId,"NO");
+  var outcome=PREDICTION_MARKET_R4_STATE.selectedOutcome, side=PREDICTION_MARKET_R4_STATE.selectedSide;
   var owned=predictionMarketR4Position_(market.marketId,outcome);
   var price=outcome==="YES"?market.referenceYesPrice:market.referenceNoPrice;
-  var trading=market.tradingAvailable===true;
-  var canSell=trading && owned && Number(owned.quantity)>0;
+  var trading=market.tradingAvailable===true, canSell=trading && owned && Number(owned.quantity)>0;
   return `<section class="pmr4-detail card">
     <div class="pmr4-card-top"><div><div class="pmr4-kicker">${predictionMarketR4Esc_(market.category||"Prediction Market")}</div><h2>${predictionMarketR4Esc_(market.title)}</h2></div><span class="pmr4-status pmr4-${predictionMarketR4Esc_(String(market.status||"").toLowerCase())}">${predictionMarketR4Esc_(market.status)}</span></div>
     <p>${predictionMarketR4Esc_(market.description||"")}</p>
-    <div class="pmr4-facts"><span>${predictionMarketR4Esc_(market.yesLabel||"YES")}: <b>${predictionMarketR4Price_(market.referenceYesPrice)}</b></span><span>${predictionMarketR4Esc_(market.noLabel||"NO")}: <b>${predictionMarketR4Price_(market.referenceNoPrice)}</b></span><span>Price time: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.referencePriceAsOf))}</span><span>Locks: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.lockTime))}</span><span>Source: ${predictionMarketR4Esc_(market.providerLabel||market.providerKind||"MANUAL")}</span></div>
+    <div class="pmr4-facts"><span>${predictionMarketR4Esc_(market.yesLabel||"YES")}: <b>${predictionMarketR4Price_(market.referenceYesPrice)}</b></span><span>${predictionMarketR4Esc_(market.noLabel||"NO")}: <b>${predictionMarketR4Price_(market.referenceNoPrice)}</b></span><span>Trading fee: <b>${predictionMarketR4Percent_(market.tradingFeePercent)}%</b></span><span>Price time: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.referencePriceAsOf))}</span><span>Locks: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.lockTime))}</span><span>Source: ${predictionMarketR4Esc_(market.providerLabel||market.providerKind||"MANUAL")}</span></div>
     ${market.priceStale?`<div class="pmr4-alert">Reference pricing is stale or unavailable. Trading is disabled until R2 accepts fresh pricing.</div>`:""}
     ${market.status==="RESOLVED"?`<div class="pmr4-alert">Resolved ${predictionMarketR4Esc_(market.winningOutcome||"")}. Settlement is shown when the accepted backend has completed it.</div>`:""}
-    ${market.status==="VOID"?`<div class="pmr4-alert">This market is VOID. Settlement is shown when the accepted backend has completed it.</div>`:""}
+    ${market.status==="VOID"?`<div class="pmr4-alert">This market is VOID. Open cost basis and related trading fees are refunded by settlement.</div>`:""}
     <div class="pmr4-position-grid">${predictionMarketR4PositionLine_(yes,"YES")}${predictionMarketR4PositionLine_(no,"NO")}</div>
-    <div class="pmr4-ticket">
-      <h3>Trade ticket</h3>
+    <div class="pmr4-ticket"><h3>Trade ticket</h3>
       <div class="pmr4-segment"><button class="${outcome==="YES"?"active":""}" onclick="predictionMarketR4SetOutcome_('YES')">YES</button><button class="${outcome==="NO"?"active":""}" onclick="predictionMarketR4SetOutcome_('NO')">NO</button></div>
       <div class="pmr4-segment"><button class="${side==="BUY"?"active":""}" onclick="predictionMarketR4SetSide_('BUY')">BUY</button><button class="${side==="SELL"?"active":""}" onclick="predictionMarketR4SetSide_('SELL')" ${canSell?"":"disabled"}>SELL</button></div>
       <label>Quantity<input id="pmr4Quantity" inputmode="decimal" type="number" min="0.000001" step="0.01" value="1" oninput="predictionMarketR4TicketEstimate_()"></label>
-      <div id="pmr4Estimate" class="pmr4-estimate">Displayed price ${predictionMarketR4Price_(price)} · estimated ${side==="BUY"?"cost":"proceeds"} ${predictionMarketR4Credits_(price)} credits</div>
+      <div id="pmr4Estimate" class="pmr4-estimate">${predictionMarketR4EstimateHtml_(market,1,price,side)}</div>
       ${side==="SELL"?`<div class="pmr4-meta">Owned ${predictionMarketR4Credits_(owned&&owned.quantity)} · average cost ${predictionMarketR4Credits_(owned&&owned.averageCostCredits)}</div>`:""}
       <button id="pmr4Submit" class="button pmr4-submit" onclick="predictionMarketR4Submit_()" ${trading && (side!=="SELL"||canSell)?"":"disabled"}>${side} ${outcome}</button>
-      <div class="pmr4-meta">Final accepted server reference price is authoritative.</div>
+      <div class="pmr4-meta">Final accepted server reference price and fee calculation are authoritative.</div>
     </div>
   </section>`;
 }
 
 function predictionMarketR4PortfolioHtml_() {
   var p=PREDICTION_MARKET_R4_STATE.payload && PREDICTION_MARKET_R4_STATE.payload.portfolio || {};
-  return `<section class="pmr4-summary card"><h2>Wallet & portfolio</h2><div class="pmr4-summary-grid">
-    <span><small>Available</small><b>${predictionMarketR4Credits_(p.availableCredits)}</b></span><span><small>Reserved</small><b>${predictionMarketR4Credits_(p.reservedCredits)}</b></span><span><small>Marked positions</small><b>${predictionMarketR4Credits_(p.currentMarkedPositionValueCredits)}</b></span><span><small>Unrealized P/L</small><b>${predictionMarketR4Credits_(p.unrealizedGainLossCredits)}</b></span><span><small>Realized P/L</small><b>${predictionMarketR4Credits_(p.realizedGainLossCredits)}</b></span><span><small>Settled credits</small><b>${predictionMarketR4Credits_(p.settledValueCredits)}</b></span><span><small>Total portfolio</small><b>${predictionMarketR4Credits_(p.portfolioValueCredits)}</b></span></div></section>`;
+  return `<section class="pmr4-summary card"><h2>Wallet &amp; portfolio</h2><div class="pmr4-summary-grid"><span><small>Available</small><b>${predictionMarketR4Credits_(p.availableCredits)}</b></span><span><small>Reserved</small><b>${predictionMarketR4Credits_(p.reservedCredits)}</b></span><span><small>Marked positions</small><b>${predictionMarketR4Credits_(p.currentMarkedPositionValueCredits)}</b></span><span><small>Unrealized P/L</small><b>${predictionMarketR4Credits_(p.unrealizedGainLossCredits)}</b></span><span><small>Realized P/L</small><b>${predictionMarketR4Credits_(p.realizedGainLossCredits)}</b></span><span><small>Settled credits</small><b>${predictionMarketR4Credits_(p.settledValueCredits)}</b></span><span><small>Total portfolio</small><b>${predictionMarketR4Credits_(p.portfolioValueCredits)}</b></span></div></section>`;
 }
-
 function predictionMarketR4HoldingsHtml_() {
-  var p=PREDICTION_MARKET_R4_STATE.payload && PREDICTION_MARKET_R4_STATE.payload.portfolio || {};
-  var markets={}; (PREDICTION_MARKET_R4_STATE.payload.markets||[]).forEach(function(m){markets[m.marketId]=m;});
-  var rows=(p.positions||[]).map(function(pos){var m=markets[pos.marketId]||{};return `<div class="pmr4-holding"><strong>${predictionMarketR4Esc_(m.title||pos.marketId)} · ${predictionMarketR4Esc_(pos.outcome)}</strong><span>${predictionMarketR4Credits_(pos.quantity)} shares · basis ${predictionMarketR4Credits_(pos.costBasisCredits)} · avg ${predictionMarketR4Credits_(pos.averageCostCredits)}</span><span>mark ${predictionMarketR4Price_(pos.outcome==="YES"?m.referenceYesPrice:m.referenceNoPrice)} · value ${predictionMarketR4Credits_(pos.markedValueCredits)} · U/P&L ${predictionMarketR4Credits_(pos.unrealizedCredits)} · R/P&L ${predictionMarketR4Credits_(pos.realizedCredits)}</span><span>${pos.settled?"Settled":"Open"}</span></div>`;}).join("");
+  var p=PREDICTION_MARKET_R4_STATE.payload && PREDICTION_MARKET_R4_STATE.payload.portfolio || {}, markets={};
+  (PREDICTION_MARKET_R4_STATE.payload.markets||[]).forEach(function(m){markets[m.marketId]=m;});
+  var rows=(p.positions||[]).map(function(pos){var m=markets[pos.marketId]||{};return `<div class="pmr4-holding"><strong>${predictionMarketR4Esc_(m.title||pos.marketId)} · ${predictionMarketR4Esc_(pos.outcome)}</strong><span>${predictionMarketR4Credits_(pos.quantity)} shares · basis ${predictionMarketR4Credits_(pos.costBasisCredits)} · avg ${predictionMarketR4Credits_(pos.averageCostCredits)}</span><span>mark ${predictionMarketR4Price_(pos.outcome==="YES"?m.referenceYesPrice:m.referenceNoPrice)} · value ${predictionMarketR4Credits_(pos.markedValueCredits)} · U/P&amp;L ${predictionMarketR4Credits_(pos.unrealizedCredits)} · R/P&amp;L ${predictionMarketR4Credits_(pos.realizedCredits)}</span><span>${pos.settled?"Settled":"Open"}</span></div>`;}).join("");
   return `<section class="card"><h2>Holdings</h2>${rows||`<p class="pmr4-meta">No Prediction Market positions yet.</p>`}</section>`;
 }
-
 async function predictionMarketR4LeaderboardHtml_() {
   var res=await predictionMarketR4Api_("getPredictionMarketLeaderboard",{});
   if (!res || res.success===false) return `<section class="card"><h2>Prediction Market leaderboard</h2><p>${predictionMarketR4Esc_(res&&(res.error||res.message)||"Unavailable")}</p></section>`;
@@ -149,8 +150,7 @@ function predictionMarketR4Styles_() { return `<style>
 
 async function renderPredictionMarketsPage() {
   await predictionMarketR4Load_(true);
-  var leaderboard=await predictionMarketR4LeaderboardHtml_();
-  var payload=PREDICTION_MARKET_R4_STATE.payload||{};
+  var leaderboard=await predictionMarketR4LeaderboardHtml_(), payload=PREDICTION_MARKET_R4_STATE.payload||{};
   return `${predictionMarketR4Styles_()}<div class="page pmr4-page"><div class="page-header"><div><h1>Prediction Markets</h1><p>Virtual PATTC credits · reference-price trading · no cash value</p></div></div><div id="pmr4Message">${PREDICTION_MARKET_R4_STATE.message?`<div class="pmr4-message">${predictionMarketR4Esc_(PREDICTION_MARKET_R4_STATE.message)}</div>`:""}</div>${predictionMarketR4PortfolioHtml_()}<div class="pmr4-shell"><div class="pmr4-markets">${(payload.markets||[]).map(predictionMarketR4MarketCard_).join("")||`<div class="card">No markets available.</div>`}</div><div id="pmr4Detail">${predictionMarketR4DetailHtml_()}</div></div>${predictionMarketR4HoldingsHtml_()}${leaderboard}</div>`;
 }
 
@@ -158,28 +158,27 @@ function predictionMarketR4SelectMarket_(marketId){PREDICTION_MARKET_R4_STATE.se
 function predictionMarketR4SetOutcome_(outcome){PREDICTION_MARKET_R4_STATE.selectedOutcome=outcome;PREDICTION_MARKET_R4_STATE.pendingTrade=null;predictionMarketR4RefreshDetail_();}
 function predictionMarketR4SetSide_(side){PREDICTION_MARKET_R4_STATE.selectedSide=side;PREDICTION_MARKET_R4_STATE.pendingTrade=null;predictionMarketR4RefreshDetail_();}
 function predictionMarketR4RefreshDetail_(){var node=document.getElementById("pmr4Detail");if(node)node.innerHTML=predictionMarketR4DetailHtml_();}
-function predictionMarketR4TicketEstimate_(){var m=predictionMarketR4Market_(PREDICTION_MARKET_R4_STATE.selectedMarketId);var q=predictionMarketR4Num_(document.getElementById("pmr4Quantity")&&document.getElementById("pmr4Quantity").value);var p=PREDICTION_MARKET_R4_STATE.selectedOutcome==="YES"?m&&m.referenceYesPrice:m&&m.referenceNoPrice;var node=document.getElementById("pmr4Estimate");if(node)node.textContent="Displayed price "+predictionMarketR4Price_(p)+" · estimated "+(PREDICTION_MARKET_R4_STATE.selectedSide==="BUY"?"cost ":"proceeds ")+predictionMarketR4Credits_(q*predictionMarketR4Num_(p))+" credits";PREDICTION_MARKET_R4_STATE.pendingTrade=null;}
+function predictionMarketR4TicketEstimate_(){var m=predictionMarketR4Market_(PREDICTION_MARKET_R4_STATE.selectedMarketId);var q=predictionMarketR4Num_(document.getElementById("pmr4Quantity")&&document.getElementById("pmr4Quantity").value);var p=PREDICTION_MARKET_R4_STATE.selectedOutcome==="YES"?m&&m.referenceYesPrice:m&&m.referenceNoPrice;var node=document.getElementById("pmr4Estimate");if(node)node.textContent=predictionMarketR4EstimateHtml_(m,q,p,PREDICTION_MARKET_R4_STATE.selectedSide);PREDICTION_MARKET_R4_STATE.pendingTrade=null;}
 
 async function predictionMarketR4Submit_(){
   if(PREDICTION_MARKET_R4_STATE.busy)return;
-  var market=predictionMarketR4Market_(PREDICTION_MARKET_R4_STATE.selectedMarketId);var portfolio=PREDICTION_MARKET_R4_STATE.payload&&PREDICTION_MARKET_R4_STATE.payload.portfolio||{};var q=predictionMarketR4Num_(document.getElementById("pmr4Quantity")&&document.getElementById("pmr4Quantity").value);var outcome=PREDICTION_MARKET_R4_STATE.selectedOutcome;var side=PREDICTION_MARKET_R4_STATE.selectedSide;var price=outcome==="YES"?market.referenceYesPrice:market.referenceNoPrice;
+  var market=predictionMarketR4Market_(PREDICTION_MARKET_R4_STATE.selectedMarketId), portfolio=PREDICTION_MARKET_R4_STATE.payload&&PREDICTION_MARKET_R4_STATE.payload.portfolio||{}, q=predictionMarketR4Num_(document.getElementById("pmr4Quantity")&&document.getElementById("pmr4Quantity").value), outcome=PREDICTION_MARKET_R4_STATE.selectedOutcome, side=PREDICTION_MARKET_R4_STATE.selectedSide;
   if(!market||!market.tradingAvailable||q<=0)return;
-  var owned=predictionMarketR4Position_(market.marketId,outcome);if(side==="SELL"&&(!owned||q>Number(owned.quantity))){PREDICTION_MARKET_R4_STATE.message="You cannot sell more shares than you own.";return predictionMarketR4Rerender_();}
+  var price=outcome==="YES"?market.referenceYesPrice:market.referenceNoPrice, owned=predictionMarketR4Position_(market.marketId,outcome);
+  if(side==="SELL"&&(!owned||q>Number(owned.quantity))){PREDICTION_MARKET_R4_STATE.message="You cannot sell more shares than you own.";return predictionMarketR4Rerender_();}
+  var estimate=predictionMarketR4FeeEstimate_(market,q,price,side);
   var intent={marketId:market.marketId,side:side,outcome:outcome,quantity:q,expectedWalletVersion:portfolio.walletVersion,referencePrice:price,requestedAt:new Date().toISOString()};
   var pending=predictionMarketR4PrepareSubmission_(intent,PREDICTION_MARKET_R4_STATE.pendingTrade);
-  if(!window.confirm(side+" "+q+" "+outcome+" shares of “"+market.title+"” at displayed reference "+predictionMarketR4Price_(price)+" (estimated "+predictionMarketR4Credits_(q*price)+" credits)? Final server reference price is authoritative."))return;
+  var financial=side==="BUY"?("Trade cost "+predictionMarketR4Credits_(estimate.gross)+" + fee "+predictionMarketR4Credits_(estimate.fee)+" = total debit "+predictionMarketR4Credits_(estimate.net)):("Gross proceeds "+predictionMarketR4Credits_(estimate.gross)+" - fee "+predictionMarketR4Credits_(estimate.fee)+" = net proceeds "+predictionMarketR4Credits_(estimate.net));
+  if(!window.confirm(side+" "+q+" "+outcome+" shares of “"+market.title+"” at displayed reference "+predictionMarketR4Price_(price)+". "+financial+" credits (fee "+predictionMarketR4Percent_(market.tradingFeePercent)+"%). Final server reference price and fee are authoritative."))return;
   pending.inFlight=true;PREDICTION_MARKET_R4_STATE.pendingTrade=pending;PREDICTION_MARKET_R4_STATE.busy=true;var button=document.getElementById("pmr4Submit");if(button)button.disabled=true;
-  var res;
-  try{res=await predictionMarketR4Api_("executePredictionMarketTrade",Object.assign({transactionId:pending.transactionId},pending.payload));}
-  catch(err){res={success:false,error:err&&err.message||"Network error"};}
+  var res; try{res=await predictionMarketR4Api_("executePredictionMarketTrade",Object.assign({transactionId:pending.transactionId},pending.payload));}catch(err){res={success:false,error:err&&err.message||"Network error"};}
   PREDICTION_MARKET_R4_STATE.busy=false;pending.inFlight=false;
-  if(res&&res.success!==false){var t=res.trade||{};PREDICTION_MARKET_R4_STATE.pendingTrade=null;PREDICTION_MARKET_R4_STATE.message=side+" confirmed at "+predictionMarketR4Price_(t.executionReferencePrice)+" · "+predictionMarketR4Credits_(t.grossCredits)+" credits · wallet "+predictionMarketR4Credits_(t.wallet&&t.wallet.availableCredits)+" · position "+predictionMarketR4Credits_(t.position&&t.position.quantity)+" shares.";await predictionMarketR4Load_(true);return predictionMarketR4Rerender_();}
+  if(res&&res.success!==false){var t=res.trade||{};PREDICTION_MARKET_R4_STATE.pendingTrade=null;PREDICTION_MARKET_R4_STATE.message=side+" confirmed at "+predictionMarketR4Price_(t.executionReferencePrice)+" · gross "+predictionMarketR4Credits_(t.grossCredits)+" · fee "+predictionMarketR4Credits_(t.feeCredits)+" · "+(side==="BUY"?"total debit ":"net proceeds ")+predictionMarketR4Credits_(t.netCredits)+" · wallet "+predictionMarketR4Credits_(t.wallet&&t.wallet.availableCredits)+" · position "+predictionMarketR4Credits_(t.position&&t.position.quantity)+" shares.";await predictionMarketR4Load_(true);return predictionMarketR4Rerender_();}
   pending.uncertain=predictionMarketR4FailureUncertain_(res);var error=String(res&&(res.error||res.message)||"Trade was not accepted.");PREDICTION_MARKET_R4_STATE.message=pending.uncertain?error+" The same transaction ID will be reused if you retry this unchanged trade.":error+" State has been refreshed; review the ticket before submitting again.";
-  try{await predictionMarketR4Load_(true);}catch(ignore){}
-  if(!pending.uncertain)PREDICTION_MARKET_R4_STATE.pendingTrade=null;
-  predictionMarketR4Rerender_();
+  try{await predictionMarketR4Load_(true);}catch(ignore){} if(!pending.uncertain)PREDICTION_MARKET_R4_STATE.pendingTrade=null; predictionMarketR4Rerender_();
 }
 
 async function predictionMarketR4Rerender_(){var app=document.getElementById("app");if(app)app.innerHTML=await renderPredictionMarketsPage();}
 
-if(typeof module!=="undefined"&&module.exports){module.exports={predictionMarketR4IntentKey_:predictionMarketR4IntentKey_,predictionMarketR4PrepareSubmission_:predictionMarketR4PrepareSubmission_,predictionMarketR4FailureUncertain_:predictionMarketR4FailureUncertain_};}
+if(typeof module!=="undefined"&&module.exports){module.exports={predictionMarketR4IntentKey_:predictionMarketR4IntentKey_,predictionMarketR4PrepareSubmission_:predictionMarketR4PrepareSubmission_,predictionMarketR4FailureUncertain_:predictionMarketR4FailureUncertain_,predictionMarketR4FeeEstimate_:predictionMarketR4FeeEstimate_};}
