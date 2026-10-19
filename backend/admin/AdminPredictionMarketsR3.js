@@ -118,8 +118,7 @@ function predictionMarketAdminR3CreateService(options) {
       var bps = predictionMarketTradingFeesR1SetDefaultFeeBps_(payload.defaultTradingFeeBps);
       return { success:true, tradingFeeSettings:{ defaultFeeBps:bps, defaultFeePercent:bps / 100 }, tradingFeeStats:feeStats_() };
     }
-    var current = (engine.getMarkets() || []).filter(function(row) { return predictionMarketAdminR3String_(row.marketId) === predictionMarketAdminR3String_(payload.marketId); })[0];
-    if (!current) throw new Error("Prediction Market not found");
+    var current = (engine.getMarkets() || []).filter(function(row) { return predictionMarketAdminR3String_(row.marketId) === predictionMarketAdminR3String_(payload.marketId); })[0] || null;
     var result = engine.editDraftMarket(actor(username), payload.marketId, {
       title: payload.title,
       description: payload.description,
@@ -134,7 +133,7 @@ function predictionMarketAdminR3CreateService(options) {
       providerId: payload.providerId,
       externalMarketId: payload.externalMarketId,
       sourceUrl: payload.sourceUrl,
-      providerMetadata: feeMetadata_(payload, current.providerMetadata || {}),
+      providerMetadata: feeMetadata_(payload, current && current.providerMetadata || {}),
       openTime: payload.openTime,
       lockTime: payload.lockTime
     });
