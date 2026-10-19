@@ -161,16 +161,23 @@ async function submit(context, form, choice) {
     const state = makeContext();
     assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'R2 shell should mount');
     const html = state.host.innerHTML;
-    for (const heading of ['1. Game Builder','2. Manage Existing Games','3. Competitions','4. League / Season Data','5. Operations']) {
-      assert(html.includes(heading), 'R2 lifecycle group missing: ' + heading);
+    for (const heading of ['Game Builder','Manage Existing Games','Competitions','League / Season Data','Operations']) {
+      assert(html.includes(heading), 'sports lifecycle group missing: ' + heading);
     }
+    for (const hierarchy of ['>League<','>NFL<','>2026<']) {
+      assert(html.includes(hierarchy), 'Sports League / NFL / 2026 hierarchy missing: ' + hierarchy);
+    }
+    for (const section of ['Sports','Reality TV','Awards','Other Games','Prediction Markets','Appearance / Visual Design']) {
+      assert(html.includes(section), 'Games & Design section missing: ' + section);
+    }
+    assert(html.includes('admin-card admin-collapsible-card admin-games-design-section'), 'Games & Design must reuse Manage Games accordion card pattern');
+    assert(html.includes('class="admin-card-summary"') && html.includes('admin-collapse-icon'), 'Games & Design must reuse Manage Games summary interaction pattern');
     for (const route of ['admin-games','admin-nfl-cup','admin-nfl-season-setup','admin-sports-engine']) {
       assert(html.includes(route), 'preserved R2 route missing: ' + route);
     }
-    assert(html.includes('Manage Games keeps its existing New Game capability.'), 'Manage Games New Game preservation must remain explicit');
     assert(html.includes('Playoff / Forecast'), 'Playoff / Forecast choice must remain visible');
     assert(html.includes('Game Builder Workspace'), 'selected builder must use a dedicated full-width workspace');
-    assert(html.indexOf('data-admin-r3b-builder-host') > html.indexOf('5. Operations'), 'workspace must render after lifecycle navigation cards');
+    assert(html.indexOf('data-admin-r3b-builder-host') > html.indexOf('<h3>Operations</h3>'), 'workspace must render after lifecycle navigation cards');
     assert(!html.includes('Open Existing Team Fantasy Manager'), 'Team Fantasy manager action must not be duplicated permanently in navigation');
     assert(!html.includes('Open Existing Playoff Race Configuration'), 'Playoff Race manager action must not be duplicated permanently in navigation');
     assert(!html.includes('value="playoff-race"') && !html.includes('value="forecast"'), 'unsupported Playoff / Forecast types must not be emitted');
@@ -203,5 +210,5 @@ async function submit(context, form, choice) {
     assert(teamFantasyHtml.includes('Open Existing Team Fantasy Manager'), 'Team Fantasy selected workspace must offer one existing-manager action');
   }
 
-  console.log('PASS sports game builder orchestration R3B behavior and Preview polish');
+  console.log('PASS sports game builder orchestration R3B behavior and Games & Design organization');
 })().catch(err => { console.error(err); process.exit(1); });
