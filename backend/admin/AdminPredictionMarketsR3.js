@@ -29,31 +29,62 @@ function predictionMarketAdminR3AllowedActions_(status) {
   return [];
 }
 
+function predictionMarketAdminR3FeeConfig_(market) {
+  if (typeof predictionMarketTradingFeesR1MarketConfig_ === "function") return predictionMarketTradingFeesR1MarketConfig_(market || {});
+  return { mode:"INHERIT", customFeeBps:null, effectiveFeeBps:0, effectiveFeePercent:0, source:"DEFAULT" };
+}
+
 function predictionMarketAdminR3MarketView_(market) {
   market = market || {};
   var allowed = predictionMarketAdminR3AllowedActions_(market.status).slice();
   var status = predictionMarketAdminR3String_(market.status).toUpperCase();
   var providerKind = predictionMarketAdminR3String_(market.providerKind || "MANUAL").toUpperCase();
+  var fee = predictionMarketAdminR3FeeConfig_(market);
   if (providerKind !== "MANUAL" && status !== "RESOLVED" && status !== "VOID") allowed.push("REFRESH_PROVIDER");
   return Object.assign({}, market, {
     allowedAdminActions: allowed,
     tradingAvailable: status === "OPEN",
-    providerRefreshAvailable: allowed.indexOf("REFRESH_PROVIDER") !== -1
+    providerRefreshAvailable: allowed.indexOf("REFRESH_PROVIDER") !== -1,
+    tradingFeeMode: fee.mode,
+    customTradingFeeBps: fee.customFeeBps,
+    tradingFeeBps: fee.effectiveFeeBps,
+    tradingFeePercent: fee.effectiveFeePercent,
+    tradingFeeSource: fee.source
   });
 }
 
 function predictionMarketAdminR3CreateService(options) {
   options = options || {};
   var engine = options.engine;
+  var repository = options.repository || null;
   var providerRegistry = options.providerRegistry || null;
   if (!engine) throw new Error("Prediction Market R2 engine is required");
 
   function actor(username) { return predictionMarketAdminR3Context_(username); }
+  function defaultFeeBps_() {
+    return typeof predictionMarketTradingFeesR1GetDefaultFeeBps_ === "function" ? predictionMarketTradingFeesR1GetDefaultFeeBps_() : 0;
+  }
+  function feeStats_() {
+    if (repository && typeof repository.tradingFeeStats === "function") return repository.tradingFeeStats();
+    return { feeBearingTrades:0, chargedFeeCredits:0, refundedFeeCredits:0, netFeeCredits:0 };
+  }
+  function feeMetadata_(payload, fallbackMetadata) {
+    payload = payload || {};
+    var metadata = predictionMarketAdminR3Json_(payload.providerMetadata, fallbackMetadata || {});
+    var fallbackMode = fallbackMetadata && fallbackMetadata.tradingFeeMode ? fallbackMetadata.tradingFeeMode : "INHERIT";
+    var mode = payload.tradingFeeMode == null || payload.tradingFeeMode === "" ? fallbackMode : payload.tradingFeeMode;
+    var custom = payload.tradingFeeBps == null || payload.tradingFeeBps === "" ? (fallbackMetadata || {}).tradingFeeBps : payload.tradingFeeBps;
+    if (typeof predictionMarketTradingFeesR1ApplyMarketConfig_ === "function") return predictionMarketTradingFeesR1ApplyMarketConfig_(metadata, mode, custom);
+    return metadata;
+  }
   function list(username) {
     actor(username);
+    var defaultBps = defaultFeeBps_();
     return {
       success: true,
-      markets: (engine.getMarkets() || []).map(predictionMarketAdminR3MarketView_)
+      markets: (engine.getMarkets() || []).map(predictionMarketAdminR3MarketView_),
+      tradingFeeSettings: { defaultFeeBps:defaultBps, defaultFeePercent:defaultBps / 100 },
+      tradingFeeStats: feeStats_()
     };
   }
   function create(username, payload) {
@@ -73,7 +104,7 @@ function predictionMarketAdminR3CreateService(options) {
       providerId: payload.providerId,
       externalMarketId: payload.externalMarketId,
       sourceUrl: payload.sourceUrl,
-      providerMetadata: predictionMarketAdminR3Json_(payload.providerMetadata, {}),
+      providerMetadata: feeMetadata_(payload, {}),
       openTime: payload.openTime,
       lockTime: payload.lockTime
     });
@@ -81,6 +112,14 @@ function predictionMarketAdminR3CreateService(options) {
   }
   function edit(username, payload) {
     payload = payload || {};
+    actor(username);
+    if (payload.settingsOnly === true || String(payload.settingsOnly).toLowerCase() === "true") {
+      if (typeof predictionMarketTradingFeesR1SetDefaultFeeBps_ !== "function") throw new Error("Prediction Market trading fee authority is unavailable");
+      var bps = predictionMarketTradingFeesR1SetDefaultFeeBps_(payload.defaultTradingFeeBps);
+      return { success:true, tradingFeeSettings:{ defaultFeeBps:bps, defaultFeePercent:bps / 100 }, tradingFeeStats:feeStats_() };
+    }
+    var current = (engine.getMarkets() || []).filter(function(row) { return predictionMarketAdminR3String_(row.marketId) === predictionMarketAdminR3String_(payload.marketId); })[0];
+    if (!current) throw new Error("Prediction Market not found");
     var result = engine.editDraftMarket(actor(username), payload.marketId, {
       title: payload.title,
       description: payload.description,
@@ -95,7 +134,7 @@ function predictionMarketAdminR3CreateService(options) {
       providerId: payload.providerId,
       externalMarketId: payload.externalMarketId,
       sourceUrl: payload.sourceUrl,
-      providerMetadata: predictionMarketAdminR3Json_(payload.providerMetadata, {}),
+      providerMetadata: feeMetadata_(payload, current.providerMetadata || {}),
       openTime: payload.openTime,
       lockTime: payload.lockTime
     });
@@ -121,6 +160,10 @@ function predictionMarketAdminR3CreateService(options) {
       return { success:false, providerStatus:(fetched && fetched.providerStatus) || "PROVIDER_ERROR", message:(fetched && fetched.message) || "Provider refresh failed", market:predictionMarketAdminR3MarketView_(current) };
     }
     var snapshot = fetched.snapshot;
+    var refreshedMetadata = Object.assign({}, snapshot.providerMetadata || {});
+    if (current.providerMetadata && current.providerMetadata.tradingFeeMode) refreshedMetadata.tradingFeeMode = current.providerMetadata.tradingFeeMode;
+    if (current.providerMetadata && current.providerMetadata.tradingFeeBps != null) refreshedMetadata.tradingFeeBps = current.providerMetadata.tradingFeeBps;
+    snapshot = Object.assign({}, snapshot, { providerMetadata:refreshedMetadata });
     var prospective = Object.assign({}, current, {
       referenceYesPrice:snapshot.referenceYesPrice, referenceNoPrice:snapshot.referenceNoPrice,
       referencePriceAsOf:snapshot.referencePriceAsOf, referencePriceTrusted:snapshot.trusted,
@@ -159,10 +202,13 @@ function predictionMarketAdminR3CreateService(options) {
 }
 
 function predictionMarketAdminR3ProductionService_() {
-  var repository = predictionMarketR2CreateAppsScriptRepository();
+  var baseRepository = predictionMarketR2CreateAppsScriptRepository();
+  var repository = typeof predictionMarketTradingFeesR1DecorateRepository === "function"
+    ? predictionMarketTradingFeesR1DecorateRepository(baseRepository)
+    : baseRepository;
   var engine = predictionMarketR2CreateEngine({ repository: repository, providers: predictionMarketReferenceProvidersR5CreateR2PriceProviders() });
   var providerRegistry = predictionMarketReferenceProvidersR5CreateRegistry({ maxAgeMs: PREDICTION_MARKET_R2_CONFIG.maxReferencePriceAgeMs });
-  return predictionMarketAdminR3CreateService({ engine: engine, providerRegistry: providerRegistry });
+  return predictionMarketAdminR3CreateService({ engine: engine, repository: repository, providerRegistry: providerRegistry });
 }
 
 function apiAdminPredictionMarketR3Dispatch(action, payload) {
