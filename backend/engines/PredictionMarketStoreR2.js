@@ -132,8 +132,10 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
   function listWallets() { return readRows("wallets").map(walletFromSheet); }
   function saveWallet(w) { return writeRecord("wallets","PlayerId",w.playerId,w,walletToSheet); }
   function getTransaction(id) { var r=findRow("transactions","TransactionId",id); return r?txFromSheet(r):null; }
+  function listTransactions() { return readRows("transactions").map(txFromSheet); }
   function saveTransaction(t) { return writeRecord("transactions","TransactionId",t.transactionId,t,txToSheet); }
   function getPosition(playerId,marketId,outcome) { var key=predictionMarketR2PositionKey_(playerId,marketId,outcome); var rows=readRows("positions"); for(var i=0;i<rows.length;i+=1){ if(predictionMarketR2PositionKey_(rows[i].PlayerId,rows[i].MarketId,rows[i].Outcome)===key)return positionFromSheet(rows[i]); } return null; }
+  function listPositions() { return readRows("positions").map(positionFromSheet); }
   function listPositionsByPlayer(playerId) { return readRows("positions").filter(function(r){return predictionMarketR2String_(r.PlayerId)===playerId;}).map(positionFromSheet); }
   function listPositionsByPlayerMarket(playerId,marketId) { return readRows("positions").filter(function(r){return predictionMarketR2String_(r.PlayerId)===playerId&&predictionMarketR2String_(r.MarketId)===marketId;}).map(positionFromSheet); }
   function savePosition(p) { var key=predictionMarketR2PositionKey_(p.playerId,p.marketId,p.outcome); var rows=readRows("positions"), found=null; for(var i=0;i<rows.length;i+=1){if(predictionMarketR2PositionKey_(rows[i].PlayerId,rows[i].MarketId,rows[i].Outcome)===key){found=rows[i];break;}} var sh=getSheet("positions"),headers=headersFor(sh),values=headers.map(function(h){return positionToSheet(p)[h];}); if(found)sh.getRange(found.__rowNumber,1,1,headers.length).setValues([values]); else sh.appendRow(values); return p; }
@@ -199,7 +201,7 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
     }
   }
 
-  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,setupStore:setupStore,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,saveTransaction:saveTransaction,getPosition:getPosition,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
+  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,setupStore:setupStore,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,listTransactions:listTransactions,saveTransaction:saveTransaction,getPosition:getPosition,listPositions:listPositions,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
 }
 
 if (typeof module !== "undefined" && module.exports) {

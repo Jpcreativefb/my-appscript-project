@@ -1059,7 +1059,7 @@
   "canProceedToPermanentDelete": false,
   "productionPurgeEnabled": true,
   "auditRecordPreview": {
-    "Timestamp": "2026-09-16T07:09:47.419Z",
+    "Timestamp": "2026-10-19T17:09:02.789Z",
     "Action": "DRY_RUN",
     "GameId": "fixture-purge-2026",
     "GameName": "Fixture Purge Game",

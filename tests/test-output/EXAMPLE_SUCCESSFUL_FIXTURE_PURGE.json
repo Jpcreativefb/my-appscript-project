@@ -466,7 +466,7 @@
     "intentionalAuditReferenceExcluded": true
   },
   "auditRecord": {
-    "Timestamp": "2026-09-16T07:09:47.434Z",
+    "Timestamp": "2026-10-19T17:09:02.804Z",
     "Action": "PURGE",
     "GameId": "fixture-purge-2026",
     "GameName": "Fixture Purge Game",

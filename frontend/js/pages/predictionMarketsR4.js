@@ -92,6 +92,31 @@ function predictionMarketR4PositionLine_(position,outcome) {
   return `<div class="pmr4-position-line"><strong>${predictionMarketR4Esc_(outcome)}</strong><span>${predictionMarketR4Credits_(position.quantity)} shares</span><span>Avg ${predictionMarketR4Credits_(position.averageCostCredits)}</span><span>Basis ${predictionMarketR4Credits_(position.costBasisCredits)}</span><span>Value ${predictionMarketR4Credits_(position.markedValueCredits)}</span><span>U/P&L ${predictionMarketR4Credits_(position.unrealizedCredits)}</span><span>R/P&L ${predictionMarketR4Credits_(position.realizedCredits)}</span><span>${position.settled?"Settled "+predictionMarketR4Credits_(position.settledCredits):"Open"}</span></div>`;
 }
 
+function predictionMarketR4CommunityHtml_(community) {
+  community=community||{};
+  var yes=community.yesPositioningPercent;
+  var no=community.noPositioningPercent;
+  var hasPositioning=yes!=null && no!=null;
+  var movement=function(row,label){
+    if (!row || row.supported!==true || row.yesPointChange==null) return `${label}: not enough history`;
+    var value=predictionMarketR4Num_(row.yesPointChange);
+    return `${label}: ${value>0?"+":""}${value.toFixed(1)} pts toward YES`;
+  };
+  var trend=(community.activity||[]).slice(-7).map(function(point){
+    var value=point.yesPositioningPercent;
+    var height=value==null?4:Math.max(4,Math.min(100,predictionMarketR4Num_(value)));
+    return `<span title="${predictionMarketR4Esc_(point.date)} · ${value==null?"no positioning":predictionMarketR4Num_(value).toFixed(1)+"% YES"} · ${predictionMarketR4Credits_(point.volumeCredits)} credits" style="display:inline-block;width:12px;height:${height}px;max-height:52px;background:currentColor;opacity:.62;border-radius:4px 4px 0 0"></span>`;
+  }).join("");
+  return `<div class="pmr4-community" style="margin:14px 0;padding:14px;border:1px solid rgba(127,127,127,.24);border-radius:12px">
+    <div class="pmr4-card-top"><div><div class="pmr4-kicker">PATTC Community</div><h3 style="margin:.2rem 0">PATTC Positioning</h3></div><span class="pmr4-meta">${predictionMarketR4Esc_(community.participatingPlayers||0)} participating players</span></div>
+    ${hasPositioning?`<div class="pmr4-prices"><b>YES ${predictionMarketR4Num_(yes).toFixed(1)}%</b><b>NO ${predictionMarketR4Num_(no).toFixed(1)}%</b></div>`:`<div class="pmr4-meta">No active PATTC positioning yet.</div>`}
+    <div class="pmr4-facts"><span>YES shares <b>${predictionMarketR4Credits_(community.yesShareQuantity)}</b></span><span>NO shares <b>${predictionMarketR4Credits_(community.noShareQuantity)}</b></span><span>BUY volume <b>${predictionMarketR4Credits_(community.buyVolumeCredits)}</b></span><span>SELL volume <b>${predictionMarketR4Credits_(community.sellVolumeCredits)}</b></span><span>Total traded <b>${predictionMarketR4Credits_(community.tradingVolumeCredits)}</b> credits</span></div>
+    <div class="pmr4-meta">${predictionMarketR4Esc_(movement(community.movement24h,"24h"))} · ${predictionMarketR4Esc_(movement(community.movement7d,"7d"))}</div>
+    ${trend?`<div style="display:flex;align-items:flex-end;gap:4px;height:56px;margin-top:10px" aria-label="PATTC Community positioning trend">${trend}</div>`:""}
+    <div class="pmr4-meta">Aggregate PATTC activity only. This does not set or move the external reference price.</div>
+  </div>`;
+}
+
 function predictionMarketR4DetailHtml_() {
   var market=predictionMarketR4Market_(PREDICTION_MARKET_R4_STATE.selectedMarketId);
   if (!market) return `<div class="card">No Prediction Markets are available.</div>`;
@@ -106,7 +131,8 @@ function predictionMarketR4DetailHtml_() {
   return `<section class="pmr4-detail card">
     <div class="pmr4-card-top"><div><div class="pmr4-kicker">${predictionMarketR4Esc_(market.category||"Prediction Market")}</div><h2>${predictionMarketR4Esc_(market.title)}</h2></div><span class="pmr4-status pmr4-${predictionMarketR4Esc_(String(market.status||"").toLowerCase())}">${predictionMarketR4Esc_(market.status)}</span></div>
     <p>${predictionMarketR4Esc_(market.description||"")}</p>
-    <div class="pmr4-facts"><span>${predictionMarketR4Esc_(market.yesLabel||"YES")}: <b>${predictionMarketR4Price_(market.referenceYesPrice)}</b></span><span>${predictionMarketR4Esc_(market.noLabel||"NO")}: <b>${predictionMarketR4Price_(market.referenceNoPrice)}</b></span><span>Price time: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.referencePriceAsOf))}</span><span>Locks: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.lockTime))}</span><span>Source: ${predictionMarketR4Esc_(market.providerLabel||market.providerKind||"MANUAL")}</span></div>
+    <div class="pmr4-facts"><span>External market ${predictionMarketR4Esc_(market.yesLabel||"YES")}: <b>${predictionMarketR4Price_(market.referenceYesPrice)}</b></span><span>External market ${predictionMarketR4Esc_(market.noLabel||"NO")}: <b>${predictionMarketR4Price_(market.referenceNoPrice)}</b></span><span>Price time: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.referencePriceAsOf))}</span><span>Locks: ${predictionMarketR4Esc_(predictionMarketR4Date_(market.lockTime))}</span><span>Source: ${predictionMarketR4Esc_(market.providerLabel||market.providerKind||"MANUAL")}</span></div>
+    ${predictionMarketR4CommunityHtml_(market.community)}
     ${market.priceStale?`<div class="pmr4-alert">Reference pricing is stale or unavailable. Trading is disabled until R2 accepts fresh pricing.</div>`:""}
     ${market.status==="RESOLVED"?`<div class="pmr4-alert">Resolved ${predictionMarketR4Esc_(market.winningOutcome||"")}. Settlement is shown when the accepted backend has completed it.</div>`:""}
     ${market.status==="VOID"?`<div class="pmr4-alert">This market is VOID. Settlement is shown when the accepted backend has completed it.</div>`:""}
