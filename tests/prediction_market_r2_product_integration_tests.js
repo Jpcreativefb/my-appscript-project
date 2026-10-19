@@ -64,6 +64,7 @@ function groupImport(eventId, labels) {
   detailByEvent[eventId] = detail;
   return product.importExternalGroup('admin',{
     externalGroup:detail,
+    logicalMarketId:eventId,
     logicalTitle:detail.logicalQuestion,
     logicalQuestion:detail.logicalQuestion,
     tradingFeeMode:'INHERIT',
@@ -71,12 +72,10 @@ function groupImport(eventId, labels) {
   }).group;
 }
 
-// 1. Binary manual market still works.
 const binary = admin.create('admin',{marketId:'binary-manual',title:'Binary manual?',referenceYesPrice:0.55,referenceNoPrice:0.45,referencePriceAsOf:NOW,providerKind:'MANUAL',lockTime:LOCK,tradingFeeMode:'INHERIT'});
 assert.strictEqual(binary.market.status,'DRAFT');
 assert.strictEqual(binary.market.tradingFeeBps,100);
 
-// 2. Manual multi-outcome Draft creation + Draft edit/add/remove.
 const manualGroup = admin.create('admin',{
   marketType:'MULTI_OUTCOME',logicalMarketId:'manual-multi',logicalTitle:'Manual favorite?',logicalQuestion:'Manual favorite?',category:'Awards',referencePriceAsOf:NOW,referencePriceTrusted:true,providerKind:'MANUAL',lockTime:LOCK,tradingFeeMode:'INHERIT',
   outcomes:[{outcomeId:'a',outcomeLabel:'A',marketId:'manual-a',referenceProbability:0.5},{outcomeId:'b',outcomeLabel:'B',marketId:'manual-b',referenceProbability:0.3},{outcomeId:'c',outcomeLabel:'C',marketId:'manual-c',referenceProbability:0.2}]
@@ -89,30 +88,23 @@ assert.deepStrictEqual(editedManual.map(x=>multiApi.predictionMarketMultiOutcome
 assert.strictEqual(base.getMarket('manual-c').status,'VOID');
 assert(base.getMarket('manual-c').providerMetadata.retiredFromMultiOutcomeR2);
 
-// 3. External grouped multi-outcome import.
 const extGroup = groupImport('BEST-ACTOR',['Actor A','Actor B','Actor C']);
 assert.strictEqual(extGroup.outcomes.length,3);
 assert.strictEqual(extGroup.logicalQuestion,'Who will win Best Actor?');
 
-// 4. External binary import remains supported.
 const binaryImported = admin.importExternalDrafts('admin',{externalImportItems:[{market:{provider:'kalshi',externalEventId:'BIN-EVENT',externalMarketId:'BIN-MKT',eventName:'Binary event',marketQuestion:'Will it happen?',outcomes:['Yes','No'],prices:{Yes:60,No:40},referencePriceAsOf:NOW,closeTime:LOCK,sourceUrl:'https://kalshi.com/markets/BIN-MKT'},config:{category:'Integration'}}]});
 assert.strictEqual(binaryImported.created,1);
-
-// 5. All imported markets remain DRAFT.
 assert.strictEqual(binaryImported.results[0].market.status,'DRAFT');
 assert(extGroup.outcomes.every(o=>o.status==='DRAFT'));
 
-// 6. Provider OPEN does not auto-open DRAFT.
 extGroup.outcomes.forEach(o=>{providerState[o.externalMarketId]={status:'active',result:''};});
 const draftOpenSync = product.syncProviderGroup('admin','BEST-ACTOR');
 assert.strictEqual(draftOpenSync.group.status,'DRAFT');
 assert.strictEqual(draftOpenSync.providerLifecycle,'OPEN');
 
-// 7. Admin explicitly opens group.
 const opened = admin.open('admin',{logicalMarketId:'BEST-ACTOR'}).group;
 assert.strictEqual(opened.status,'OPEN');
 
-// Make one real in-memory player trade for portfolio/community/fees/settlement tests.
 engine.bootstrapWallet(playerCtx,'alice');
 const winnerChild = product.getGroup('BEST-ACTOR').outcomes[2];
 const refBefore = base.getMarket(winnerChild.marketId).referenceYesPrice;
@@ -120,13 +112,11 @@ engine.executeTrade(playerCtx,{transactionId:'group-buy-c',playerId:'alice',mark
 const committed = base.getTransaction('group-buy-c').committedResult;
 assert.strictEqual(committed.feeCredits,Math.round((10*winnerChild.referenceProbability)*0.01*1000000)/1000000);
 
-// 8. Provider CLOSED locks group, but CLOSED is not resolved.
 extGroup.outcomes.forEach(o=>{providerState[o.externalMarketId]={status:'closed',result:''};});
 const closedSync = product.syncProviderGroup('admin','BEST-ACTOR');
 assert.strictEqual(closedSync.group.status,'LOCKED');
 assert(closedSync.group.outcomes.every(o=>o.status==='LOCKED'));
 
-// 9 + 10. Provider FINAL resolves the correct winner YES and every sibling NO.
 extGroup.outcomes.forEach((o,i)=>{providerState[o.externalMarketId]={status:'finalized',result:i===2?'yes':'no'};});
 const finalSync = product.syncProviderGroup('admin','BEST-ACTOR');
 assert.strictEqual(finalSync.group.status,'RESOLVED');
@@ -136,7 +126,6 @@ assert.strictEqual(resolvedByLabel['Actor A'],'NO');
 assert.strictEqual(resolvedByLabel['Actor B'],'NO');
 assert(finalSync.settlements.length>=1);
 
-// 11. Repeated provider sync is harmless and does not settle twice.
 const settlementBefore = finalSync.settlements.map(s=>s.settlementKey).sort();
 const repeatFinal = product.syncProviderGroup('admin','BEST-ACTOR');
 assert.strictEqual(repeatFinal.completed,true);
@@ -144,7 +133,6 @@ assert.deepStrictEqual(repeatFinal.settlements,[]);
 assert.strictEqual(product.getGroup('BEST-ACTOR').status,'RESOLVED');
 assert(settlementBefore.length>=1);
 
-// 12. Ambiguous final result -> REVIEW_REQUIRED and no settlement.
 const ambiguous = groupImport('AMBIG',['One','Two','Three']);
 admin.open('admin',{logicalMarketId:'AMBIG'});
 ambiguous.outcomes.forEach((o,i)=>{providerState[o.externalMarketId]={status:'finalized',result:i<2?'yes':'no'};});
@@ -154,7 +142,6 @@ assert.strictEqual(ambiguousSync.providerLifecycle,'REVIEW_REQUIRED');
 assert.strictEqual(ambiguousSync.group.status,'LOCKED');
 assert.deepStrictEqual(ambiguousSync.settlements,[]);
 
-// 13. DRAFT provider source refresh detects and can safely apply an added option.
 const refreshGroup = groupImport('REFRESH',['Red','Blue','Green']);
 detailByEvent.REFRESH = eventDetail('REFRESH',['Red','Blue','Green','Gold']);
 const refreshReview = product.refreshGroupSource('admin','REFRESH');
@@ -164,7 +151,6 @@ assert.strictEqual(refreshReview.reviewRequired,false);
 const appliedSource = draftEditing.applyProviderSource('admin','REFRESH');
 assert.strictEqual(appliedSource.group.length,4);
 
-// 14. OPEN source change never silently mutates group structure.
 admin.open('admin',{logicalMarketId:'REFRESH'});
 const beforeOpenIds = product.getGroup('REFRESH').outcomes.map(o=>o.externalMarketId);
 detailByEvent.REFRESH = eventDetail('REFRESH',['Red','Blue','Green','Gold','Silver']);
@@ -174,38 +160,32 @@ assert.strictEqual(openReview.reviewReason,'OPEN_EXTERNAL_SOURCE_CHANGED');
 assert.deepStrictEqual(product.getGroup('REFRESH').outcomes.map(o=>o.externalMarketId),beforeOpenIds);
 assert.throws(()=>draftEditing.applyProviderSource('admin','REFRESH'),/Only DRAFT/);
 
-// 15. Player grouped presentation exposes one logical group with per-outcome reference prices.
 const playerState = player.state('alice');
 const playerGroup = playerState.marketGroups.find(g=>g.logicalMarketId==='BEST-ACTOR');
 assert(playerGroup);
 assert.strictEqual(playerGroup.outcomes.length,3);
 assert(playerGroup.outcomes.every(o=>typeof o.referenceProbability==='number'));
 
-// 16. Grouped portfolio keeps child positions under one logical market.
 const groupedPortfolio = playerState.groupedPortfolio.find(g=>g.logicalMarketId==='BEST-ACTOR');
 assert(groupedPortfolio);
 assert(groupedPortfolio.outcomes.some(o=>o.outcomeLabel==='Actor C'&&Number(o.quantity)===10));
 
-// 17. Grouped PATTC Community aggregates positioning by logical outcome.
 const groupedCommunity = product.groupedCommunity('BEST-ACTOR');
 assert.strictEqual(groupedCommunity.participatingPlayers,1);
 assert(groupedCommunity.outcomes.find(o=>o.outcomeLabel==='Actor C').shareQuantity===10);
 assert(groupedCommunity.tradingVolumeCredits>0);
 
-// 18. PATTC activity remains separate from External Market Probability/reference price.
 assert.strictEqual(base.getMarket(winnerChild.marketId).referenceYesPrice,refBefore);
 const viewerSource = read('frontend/js/pages/predictionMarketsR4.js');
 assert(viewerSource.includes('External Market Probability'));
 assert(viewerSource.includes('PATTC Community'));
 assert(viewerSource.includes('PATTC trades never populate this reference history'));
 
-// 19. Server-authoritative fee authority remains preserved for grouped child trades.
 assert(committed.feeCredits>0);
 assert.strictEqual(committed.netCredits,committed.grossCredits+committed.feeCredits);
 assert.strictEqual(playerGroup.outcomes[2].tradingFeeBps,100);
 assert(!viewerSource.includes('predictionMarketR4FeeEstimate_'));
 
-// 20. VOID fee refund still uses accepted settlement authority.
 engine.createMarket(adminCtx,{marketId:'void-fee',title:'Void fee',referenceYesPrice:0.5,referenceNoPrice:0.5,referencePriceAsOf:NOW,referencePriceTrusted:true,providerKind:'MANUAL',lockTime:LOCK});
 engine.openMarket(adminCtx,'void-fee');
 const walletBeforeVoidTrade=base.getWallet('alice');
@@ -215,25 +195,17 @@ engine.voidMarket(adminCtx,'void-fee');
 engine.settlePlayerMarket(adminCtx,'void-fee','alice');
 assert.strictEqual(base.getSettlement('void-fee:alice').committedResult.returnedTradingFeeCredits,chargedVoidFee);
 
-// 21. Exactly five stores remain.
 assert.deepStrictEqual(Object.keys(engineApi.PREDICTION_MARKET_R2_SHEETS).sort(),['markets','positions','settlements','transactions','wallets']);
 assert.strictEqual(Object.keys(engineApi.PREDICTION_MARKET_R2_SHEETS).length,5);
-
-// 22. Store schemas are unchanged.
 assert.deepStrictEqual(Object.fromEntries(Object.entries(engineApi.PREDICTION_MARKET_R2_HEADERS).map(([k,v])=>[k,v.length])),{markets:25,wallets:8,transactions:15,positions:12,settlements:13});
 assert.deepStrictEqual(engineApi.PREDICTION_MARKET_R2_HEADERS.markets.slice(0,5),['MarketId','Title','Description','Category','Status']);
 assert.strictEqual(engineApi.PREDICTION_MARKET_R2_HEADERS.settlements[0],'SettlementKey');
 assert.strictEqual(engineApi.PREDICTION_MARKET_R2_HEADERS.settlements.at(-1),'CommittedResultJson');
 
-// 23. Integration/product code never invokes PM setup.
 ['backend/engines/PredictionMarketProductIntegrationR2.js','backend/engines/PredictionMarketDraftGroupEditingR2.js','backend/admin/AdminPredictionMarketsR3.js','backend/player/PredictionMarketPlayerR4.js'].forEach(file=>assert(!/\bsetup\s*\(/.test(read(file)),file+' must not invoke setup'));
-
-// 24. Frontend performs no direct Sheet/store writes.
 const adminFrontend = read('frontend/js/pages/adminPredictionMarketsR3.js');
 assert(!/SpreadsheetApp|PredictionMarketMarkets|PredictionMarketWallets|PredictionMarketTransactions|PredictionMarketPositions|PredictionMarketSettlements/.test(adminFrontend));
 assert(!/SpreadsheetApp|PredictionMarketMarkets|PredictionMarketWallets|PredictionMarketTransactions|PredictionMarketPositions|PredictionMarketSettlements/.test(viewerSource));
-
-// 25. No second provider transport/client was introduced.
 const providerSource = read('backend/providers/PredictionMarketProviderResolutionR2.js');
 const productSource = read('backend/engines/PredictionMarketProductIntegrationR2.js');
 const editSource = read('backend/engines/PredictionMarketDraftGroupEditingR2.js');
