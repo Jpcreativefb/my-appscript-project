@@ -90,8 +90,10 @@ const trade = engine.executeTrade(ctxPlayer,{
   referencePrice:0.01,expectedWalletVersion:0,requestedAt:NOW
 });
 assert.strictEqual(trade.grossCredits,6);
-assert.strictEqual(trade.feeCredits,0.06);
-assert.strictEqual(trade.netCredits,6.06);
+const committedTrade = base.getTransaction('combo-buy').committedResult;
+assert.strictEqual(committedTrade.grossCredits,6);
+assert.strictEqual(committedTrade.feeCredits,0.06);
+assert.strictEqual(committedTrade.netCredits,6.06);
 const referenceAfter = engine.getMarkets().find(m=>m.marketId==='combo').referenceYesPrice;
 assert.strictEqual(referenceAfter,referenceBefore,'PATTC trades must not move external/reference price');
 const community = communityApi.predictionMarketCommunityR1CreateService({repository,now:()=>new Date(nowMs)}).market('combo');
@@ -103,8 +105,9 @@ assert.strictEqual(community.yesShareQuantity,10);
 // VOID still refunds the trading fee after the community/repository integration.
 const voided = base.getMarket('combo');
 voided.status='VOID'; voided.voided=true; voided.resolutionStatus='VOID'; base.saveMarket(voided);
-const settlement = engine.settlePlayerMarket(ctxAdmin,'combo','alice');
-assert.strictEqual(settlement.returnedTradingFeeCredits,0.06,'VOID must refund trading fees after integration');
+engine.settlePlayerMarket(ctxAdmin,'combo','alice');
+const savedSettlement = base.getSettlement('combo:alice');
+assert.strictEqual(savedSettlement.committedResult.returnedTradingFeeCredits,0.06,'VOID must refund trading fees after integration');
 assert.strictEqual(base.getWallet('alice').availableCredits,1000);
 
 // Viewer keeps authoritative fee fields and presents external probability separately from PATTC Community.
