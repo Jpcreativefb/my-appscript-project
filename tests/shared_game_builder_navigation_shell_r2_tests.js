@@ -81,7 +81,12 @@ function makeHost() {
     innerHTML: '',
     getAttribute(name) { return attrs[name] || null; },
     setAttribute(name, value) { attrs[name] = String(value); },
-    querySelector() { return null; },
+    querySelector(selector) {
+      if (selector === '[data-shared-game-builder-navigation-shell-r2="1"]' && this.innerHTML.includes('data-shared-game-builder-navigation-shell-r2="1"')) {
+        return { nodeType: 1 };
+      }
+      return null;
+    },
     querySelectorAll() { return []; }
   };
 }
