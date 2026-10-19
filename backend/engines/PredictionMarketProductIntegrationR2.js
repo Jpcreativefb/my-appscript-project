@@ -342,15 +342,32 @@ function predictionMarketProductR2CreateCoordinator(options) {
     };
   }
 
+  function transactionNetShares_(transactions, playerId, marketId, outcome) {
+    var net = 0;
+    (transactions || []).forEach(function(tx) {
+      if (predictionMarketProductR2Upper_(tx.status) !== "COMMITTED") return;
+      if (predictionMarketProductR2String_(tx.playerId) !== predictionMarketProductR2String_(playerId)) return;
+      if (predictionMarketProductR2String_(tx.marketId) !== predictionMarketProductR2String_(marketId)) return;
+      if (predictionMarketProductR2Upper_(tx.outcome) !== predictionMarketProductR2Upper_(outcome)) return;
+      var quantity = Number(tx.quantity || 0);
+      if (!isFinite(quantity)) return;
+      net += predictionMarketProductR2Upper_(tx.side) === "SELL" ? -quantity : quantity;
+    });
+    return Math.max(0, Math.round(net * 1000000) / 1000000);
+  }
+
   function groupedPortfolio(portfolio) {
     portfolio = portfolio || {};
     var map = marketMap_(), grouped = {}, order = [];
+    var transactions = repository && typeof repository.listTransactions === "function" ? repository.listTransactions() : [];
     (portfolio.positions || []).forEach(function(position) {
       var market = map[position.marketId], metadata = market && predictionMarketProductR2Metadata_(market);
       if (!metadata) return;
       var id = metadata.logicalMarketId || metadata.groupMarketId;
       if (!grouped[id]) { grouped[id] = { logicalMarketId:id, logicalTitle:metadata.logicalTitle, logicalQuestion:metadata.logicalQuestion, outcomes:[] }; order.push(id); }
-      grouped[id].outcomes.push({ outcomeId:metadata.outcomeId, outcomeLabel:metadata.outcomeLabel, marketId:position.marketId, side:position.outcome, quantity:position.quantity, markedValueCredits:position.markedValueCredits, unrealizedCredits:position.unrealizedCredits, realizedCredits:position.realizedCredits, settled:position.settled, settledCredits:position.settledCredits });
+      var quantity = Number(position.quantity || 0);
+      if (position.settled && quantity <= 0 && transactions.length) quantity = transactionNetShares_(transactions, portfolio.playerId, position.marketId, position.outcome);
+      grouped[id].outcomes.push({ outcomeId:metadata.outcomeId, outcomeLabel:metadata.outcomeLabel, marketId:position.marketId, side:position.outcome, quantity:quantity, activeQuantity:Number(position.quantity || 0), markedValueCredits:position.markedValueCredits, unrealizedCredits:position.unrealizedCredits, realizedCredits:position.realizedCredits, settled:position.settled, settledCredits:position.settledCredits });
     });
     return order.map(function(id){return grouped[id];});
   }
@@ -358,21 +375,31 @@ function predictionMarketProductR2CreateCoordinator(options) {
   function groupedCommunity(groupId) {
     var group = getGroup(groupId);
     if (!group || !repository) return null;
-    var childIds = {}, labels = {};
-    group.outcomes.forEach(function(outcome) { childIds[outcome.marketId]=true; labels[outcome.marketId]=outcome; });
-    var positions = typeof repository.listPositions === "function" ? repository.listPositions() : [];
+    var childIds = {};
+    group.outcomes.forEach(function(outcome) { childIds[outcome.marketId]=true; });
     var transactions = typeof repository.listTransactions === "function" ? repository.listTransactions() : [];
-    var players = {}, outcomeStats = {}, totalYesShares = 0;
+    var players = {}, outcomeStats = {}, totalYesShares = 0, holdings = {};
     group.outcomes.forEach(function(outcome) { outcomeStats[outcome.marketId]={ outcomeId:outcome.outcomeId, outcomeLabel:outcome.outcomeLabel, marketId:outcome.marketId, usersPositioned:0, shareQuantity:0, positioningPercent:0, volumeCredits:0, tradeCount:0 }; });
-    positions.forEach(function(position) {
-      if (!childIds[position.marketId] || predictionMarketProductR2Upper_(position.outcome) !== "YES" || Number(position.quantity) <= 0) return;
-      var stat=outcomeStats[position.marketId]; stat.usersPositioned += 1; stat.shareQuantity += Number(position.quantity||0); totalYesShares += Number(position.quantity||0); players[predictionMarketProductR2String_(position.playerId)] = true;
-    });
-    var totalVolume=0, tradeCount=0;
     transactions.forEach(function(tx) {
       if (!childIds[tx.marketId] || predictionMarketProductR2Upper_(tx.status) !== "COMMITTED") return;
-      var gross=Number(tx.grossCredits||0), stat=outcomeStats[tx.marketId]; stat.volumeCredits += gross; stat.tradeCount += 1; totalVolume += gross; tradeCount += 1; players[predictionMarketProductR2String_(tx.playerId)] = true;
+      var gross=Number(tx.grossCredits||0), stat=outcomeStats[tx.marketId];
+      stat.volumeCredits += gross; stat.tradeCount += 1;
+      players[predictionMarketProductR2String_(tx.playerId)] = true;
+      if (predictionMarketProductR2Upper_(tx.outcome) !== "YES") return;
+      var key=[predictionMarketProductR2String_(tx.playerId),predictionMarketProductR2String_(tx.marketId)].join("|");
+      var quantity=Number(tx.quantity||0);
+      if (!isFinite(quantity)) quantity=0;
+      holdings[key]=(holdings[key]||0)+(predictionMarketProductR2Upper_(tx.side)==="SELL"?-quantity:quantity);
     });
+    Object.keys(holdings).forEach(function(key) {
+      var parts=key.split("|"), marketId=parts.slice(1).join("|"), quantity=Math.max(0,Math.round(Number(holdings[key]||0)*1000000)/1000000);
+      if (!quantity || !outcomeStats[marketId]) return;
+      outcomeStats[marketId].usersPositioned += 1;
+      outcomeStats[marketId].shareQuantity += quantity;
+      totalYesShares += quantity;
+    });
+    var totalVolume=0, tradeCount=0;
+    group.outcomes.forEach(function(outcome){totalVolume+=Number(outcomeStats[outcome.marketId].volumeCredits||0);tradeCount+=Number(outcomeStats[outcome.marketId].tradeCount||0);});
     var outcomes=group.outcomes.map(function(outcome){var stat=outcomeStats[outcome.marketId];stat.positioningPercent=totalYesShares?Math.round((stat.shareQuantity/totalYesShares)*10000)/100:0;return stat;});
     return { logicalMarketId:group.logicalMarketId, participatingPlayers:Object.keys(players).filter(Boolean).length, tradingVolumeCredits:totalVolume, tradeCount:tradeCount, outcomes:outcomes, note:"Aggregate PATTC activity only; external/reference probabilities remain independent." };
   }
@@ -391,7 +418,7 @@ function predictionMarketProductR2CreateCoordinator(options) {
   };
 }
 
-if (typeof module !== "undefined" && module.exports) {
+if (typeof module !== "undefined"&&module.exports) {
   module.exports = {
     PREDICTION_MARKET_PRODUCT_INTEGRATION_R2:PREDICTION_MARKET_PRODUCT_INTEGRATION_R2,
     predictionMarketProductR2Metadata_:predictionMarketProductR2Metadata_,
