@@ -11,19 +11,22 @@ const managerSource = fs.readFileSync(managerPath, 'utf8');
 
 assert.doesNotThrow(() => new Function(shellSource), 'Competition Builder R5 shell must parse');
 
-// 1. Competitions remains one of five lifecycle groups.
+// 1. Competitions remains one of the Sports lifecycle destinations under League → NFL → 2026.
 for (const heading of [
-  '1. Game Builder',
-  '2. Manage Existing Games',
-  '3. Competitions',
-  '4. League / Season Data',
-  '5. Operations'
+  'Game Builder',
+  'Manage Existing Games',
+  'Competitions',
+  'League / Season Data',
+  'Operations'
 ]) {
-  assert(shellSource.includes(heading), 'missing lifecycle group: ' + heading);
+  assert(shellSource.includes(heading), 'missing Sports lifecycle destination: ' + heading);
+}
+for (const level of ['>League<', '>NFL<', '>2026<']) {
+  assert(shellSource.includes(level), 'missing Sports hierarchy level: ' + level);
 }
 
 // 2-5. Compact competition selector, full-width workspace, authoritative Cup route, no duplicated Cup controls.
-assert(/Competition Type[\s\S]*value="cup"[\s\S]*>Cup<\/option>[\s\S]*value="series"[\s\S]*>Series<\/option>[\s\S]*value="tournament"[\s\S]*>Tournament<\/option>/.test(shellSource), 'Competition selector must include Cup, Series, Tournament');
+assert(/Competition Type[\s\S]*value="cup"[\s\S]*>Cups<\/option>[\s\S]*value="series"[\s\S]*>Series<\/option>[\s\S]*value="tournament"[\s\S]*>Tournaments<\/option>/.test(shellSource), 'Competition selector must include Cups, Series, Tournaments');
 assert(shellSource.includes('data-admin-r5-competition-host'), 'full-width Competition workspace host missing');
 assert(shellSource.includes("navigate('admin-nfl-cup')"), 'Cup must retain admin-nfl-cup route');
 assert(shellSource.includes('Open NFL Cup Control Center'), 'Cup workspace must expose one authoritative manager action');
@@ -84,17 +87,17 @@ function runtime() {
   const state = runtime();
   assert.strictEqual(state.context.pattcAdminGameBuilderNavigationShellR2Mount(), true, 'shell must mount');
   const html = state.mountHost.innerHTML;
-  assert(html.indexOf('data-admin-r5-competition-host') > html.indexOf('5. Operations'), 'Competition workspace must render below lifecycle cards');
+  assert(html.indexOf('data-admin-r5-competition-host') > html.indexOf('<h3>Operations</h3>'), 'Competition workspace must render below Sports lifecycle cards');
 
   // 11-16. R3/R4 routing and builder boundaries remain intact.
   for (const label of ['Confidence', 'Survivor', 'Team Fantasy', 'Playoff / Forecast', 'Other Game']) {
     assert(html.includes(label), 'Game Builder behavior missing: ' + label);
   }
   assert(html.includes("navigate('admin-games')"), 'Manage Existing Games must remain admin-games');
-  assert(html.includes("navigate('admin-nfl-season-setup')"), 'NFL Sports Pack must remain dedicated');
+  assert(html.includes("navigate('admin-nfl-season-setup')"), 'NFL Season Setup must remain dedicated');
   assert(html.includes("navigate('admin-sports-engine')"), 'Sports Engine Controls must remain dedicated');
   assert(shellSource.includes("navigate('admin-team-fantasy')"), 'Team Fantasy must remain dedicated after exact type handoff');
-  assert(shellSource.includes("navigate(\"admin-playoff-race\")"), 'Playoff Race must remain dedicated');
+  assert(shellSource.includes('admin-playoff-race'), 'Playoff Race must remain dedicated');
 
   state.context.pattcAdminGameBuilderR2Select_('series', 'competition');
   assert(state.competitionHost.innerHTML.includes('Selected Competition — Series'), 'Series selection must open selected workspace');
