@@ -252,7 +252,7 @@ function predictionMarketProductR2CreateCoordinator(options) {
     repository.listPositions().forEach(function(position) { if (childIds[position.marketId]) players[predictionMarketProductR2String_(position.playerId)] = true; });
     var settlements = [];
     Object.keys(players).filter(Boolean).forEach(function(playerId) {
-      children.forEach(function(child) { settlements.push(engine.settlePlayerMarket(ctx,playerId,child.marketId)); });
+      children.forEach(function(child) { settlements.push(engine.settlePlayerMarket(ctx,child.marketId,playerId)); });
     });
     return settlements;
   }
@@ -268,6 +268,9 @@ function predictionMarketProductR2CreateCoordinator(options) {
       catch (err) { return { child:child, result:{ lifecycle:"REVIEW_REQUIRED", reviewRequired:true, reviewReason:"PROVIDER_API_UNAVAILABLE", providerStatus:"PROVIDER_ERROR", evidence:{message:err&&err.message?err.message:String(err)} } }; }
     });
     var currentStatus = predictionMarketProductR2Upper_(group.status);
+    if (currentStatus === "RESOLVED" || currentStatus === "VOID") {
+      return { success:true, completed:true, noOverride:true, providerLifecycle:"FINAL", reviewRequired:false, group:group, childResults:results, settlements:[] };
+    }
     if (currentStatus === "DRAFT") {
       results.forEach(function(entry) { if (typeof providerResolution.sync === "function") providerResolution.sync(username,entry.child.marketId); });
       var draftNeedsReview = results.some(function(entry) { return entry.result.final === true || entry.result.tradingClosed === true || entry.result.reviewRequired === true; });
