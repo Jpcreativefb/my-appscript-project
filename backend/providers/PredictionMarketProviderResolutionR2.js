@@ -251,7 +251,7 @@ function predictionMarketProviderResolutionR2CreateService(options) {
       }
     });
     return Object.keys(players).filter(Boolean).map(function(playerId) {
-      return engine.settlePlayerMarket(ctx, playerId, marketId);
+      return engine.settlePlayerMarket(ctx, marketId, playerId);
     });
   }
   function fetchResult(market) {
