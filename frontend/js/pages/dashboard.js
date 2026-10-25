@@ -1175,6 +1175,8 @@ async function renderDashboardHubPage_(category) {
         <p>${escapeHtml(dashboardHubDescription_(category))}</p>
       </header>
 
+      ${category === "sports" ? `<a class="card" href="./digit-clock.html" style="display:block;padding:20px;margin:16px 0;text-decoration:none"><strong>Digit Clock · 0–9 →</strong><p>Multi-sport score digits, time and outs, weekly leagues and season standings.</p></a>` : ""}
+
       ${category === "sports" && window.PATTCSportsLaunchCore && typeof PATTCSportsLaunchCore.renderSportsHub === "function"
         ? PATTCSportsLaunchCore.renderSportsHub(active, past)
         : ""}

@@ -1,0 +1,508 @@
+{
+  "header": {
+    "season": {
+      "year": 2023,
+      "current": false,
+      "type": 2
+    },
+    "competitions": [
+      {
+        "id": "401547417",
+        "status": {
+          "type": {
+            "id": "3",
+            "name": "STATUS_FINAL",
+            "state": "post",
+            "completed": true,
+            "description": "Final",
+            "detail": "Final",
+            "shortDetail": "Final"
+          },
+          "isTBDFlex": false
+        },
+        "competitors": [
+          {
+            "homeAway": "home",
+            "score": "25",
+            "team": {
+              "displayName": "Atlanta Falcons"
+            }
+          },
+          {
+            "homeAway": "away",
+            "score": "24",
+            "team": {
+              "displayName": "Green Bay Packers"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "scoringPlays": [
+    {
+      "id": "401547417805",
+      "period": {
+        "number": 1
+      },
+      "clock": {
+        "value": 230.0,
+        "displayValue": "3:50"
+      },
+      "homeScore": 3,
+      "awayScore": 0,
+      "text": "Younghoe Koo 24 Yd Field Goal  ",
+      "type": {
+        "id": "59",
+        "text": "Field Goal Good",
+        "abbreviation": "FG"
+      }
+    },
+    {
+      "id": "4015474171123",
+      "period": {
+        "number": 2
+      },
+      "clock": {
+        "value": 813.0,
+        "displayValue": "13:33"
+      },
+      "homeScore": 3,
+      "awayScore": 7,
+      "text": "Jayden Reed 9 Yd pass from Jordan Love (Anders Carlson Kick)",
+      "type": {
+        "id": "67",
+        "text": "Passing Touchdown",
+        "abbreviation": "TD"
+      }
+    },
+    {
+      "id": "4015474171685",
+      "period": {
+        "number": 2
+      },
+      "clock": {
+        "value": 186.0,
+        "displayValue": "3:06"
+      },
+      "homeScore": 3,
+      "awayScore": 10,
+      "text": "Anders Carlson 33 Yd Field Goal  ",
+      "type": {
+        "id": "59",
+        "text": "Field Goal Good",
+        "abbreviation": "FG"
+      }
+    },
+    {
+      "id": "4015474171984",
+      "period": {
+        "number": 2
+      },
+      "clock": {
+        "value": 12.0,
+        "displayValue": "0:12"
+      },
+      "homeScore": 9,
+      "awayScore": 10,
+      "text": "Drake London 3 Yd pass from Desmond Ridder (Younghoe Koo PAT failed)",
+      "type": {
+        "id": "67",
+        "text": "Passing Touchdown",
+        "abbreviation": "TD"
+      }
+    },
+    {
+      "id": "4015474172395",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "value": 631.0,
+        "displayValue": "10:31"
+      },
+      "homeScore": 9,
+      "awayScore": 17,
+      "text": "Dontayvion Wicks 32 Yd pass from Jordan Love (Anders Carlson Kick)",
+      "type": {
+        "id": "67",
+        "text": "Passing Touchdown",
+        "abbreviation": "TD"
+      }
+    },
+    {
+      "id": "4015474172764",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "value": 187.0,
+        "displayValue": "3:07"
+      },
+      "homeScore": 12,
+      "awayScore": 17,
+      "text": "Younghoe Koo 33 Yd Field Goal  ",
+      "type": {
+        "id": "59",
+        "text": "Field Goal Good",
+        "abbreviation": "FG"
+      }
+    },
+    {
+      "id": "4015474172941",
+      "period": {
+        "number": 3
+      },
+      "clock": {
+        "value": 56.0,
+        "displayValue": "0:56"
+      },
+      "homeScore": 12,
+      "awayScore": 24,
+      "text": "Jayden Reed 10 Yd pass from Jordan Love (Anders Carlson Kick)",
+      "type": {
+        "id": "67",
+        "text": "Passing Touchdown",
+        "abbreviation": "TD"
+      }
+    },
+    {
+      "id": "4015474173262",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "value": 708.0,
+        "displayValue": "11:48"
+      },
+      "homeScore": 19,
+      "awayScore": 24,
+      "text": "Desmond Ridder 6 Yd Run (Younghoe Koo Kick)",
+      "type": {
+        "id": "68",
+        "text": "Rushing Touchdown",
+        "abbreviation": "TD"
+      }
+    },
+    {
+      "id": "4015474173620",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "value": 490.0,
+        "displayValue": "8:10"
+      },
+      "homeScore": 22,
+      "awayScore": 24,
+      "text": "Younghoe Koo 39 Yd Field Goal  ",
+      "type": {
+        "id": "59",
+        "text": "Field Goal Good",
+        "abbreviation": "FG"
+      }
+    },
+    {
+      "id": "4015474174100",
+      "period": {
+        "number": 4
+      },
+      "clock": {
+        "value": 57.0,
+        "displayValue": "0:57"
+      },
+      "homeScore": 25,
+      "awayScore": 24,
+      "text": "Younghoe Koo 25 Yd Field Goal  ",
+      "type": {
+        "id": "59",
+        "text": "Field Goal Good",
+        "abbreviation": "FG"
+      }
+    }
+  ],
+  "drives": {
+    "previous": [
+      {
+        "plays": []
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": [
+          {
+            "id": "401547417805",
+            "sequenceNumber": "80500",
+            "period": {
+              "number": 1
+            },
+            "clock": {
+              "displayValue": "3:50"
+            },
+            "homeScore": 3,
+            "awayScore": 0,
+            "text": "Y.Koo 24 yard field goal is GOOD, Center-L.McCullough, Holder-B.Pinion.",
+            "scoringPlay": true,
+            "type": {
+              "id": "59",
+              "text": "Field Goal Good",
+              "abbreviation": "FG"
+            }
+          }
+        ]
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474171123",
+            "sequenceNumber": "112300",
+            "period": {
+              "number": 2
+            },
+            "clock": {
+              "displayValue": "13:33"
+            },
+            "homeScore": 3,
+            "awayScore": 7,
+            "text": "(Shotgun) J.Love pass short middle to J.Reed for 9 yards, TOUCHDOWN.A.Carlson extra point is GOOD, Center-M.Orzech, Holder-D.Whelan.",
+            "scoringPlay": true,
+            "type": {
+              "id": "67",
+              "text": "Passing Touchdown",
+              "abbreviation": "TD"
+            }
+          }
+        ]
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474171685",
+            "sequenceNumber": "168500",
+            "period": {
+              "number": 2
+            },
+            "clock": {
+              "displayValue": "3:06"
+            },
+            "homeScore": 3,
+            "awayScore": 10,
+            "text": "A.Carlson 33 yard field goal is GOOD, Center-M.Orzech, Holder-D.Whelan.",
+            "scoringPlay": true,
+            "type": {
+              "id": "59",
+              "text": "Field Goal Good",
+              "abbreviation": "FG"
+            }
+          }
+        ]
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474171984",
+            "sequenceNumber": "198400",
+            "period": {
+              "number": 2
+            },
+            "clock": {
+              "displayValue": "0:12"
+            },
+            "homeScore": 9,
+            "awayScore": 10,
+            "text": "Drake London 3 Yd pass from Desmond Ridder (Younghoe Koo PAT failed)",
+            "scoringPlay": true,
+            "type": {
+              "id": "67",
+              "text": "Passing Touchdown",
+              "abbreviation": "TD"
+            }
+          }
+        ]
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474172395",
+            "sequenceNumber": "239500",
+            "period": {
+              "number": 3
+            },
+            "clock": {
+              "displayValue": "10:31"
+            },
+            "homeScore": 9,
+            "awayScore": 17,
+            "text": "(Shotgun) J.Love pass short middle to D.Wicks for 32 yards, TOUCHDOWN.A.Carlson extra point is GOOD, Center-M.Orzech, Holder-D.Whelan.",
+            "scoringPlay": true,
+            "type": {
+              "id": "67",
+              "text": "Passing Touchdown",
+              "abbreviation": "TD"
+            }
+          }
+        ]
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474172764",
+            "sequenceNumber": "276400",
+            "period": {
+              "number": 3
+            },
+            "clock": {
+              "displayValue": "3:07"
+            },
+            "homeScore": 12,
+            "awayScore": 17,
+            "text": "Y.Koo 33 yard field goal is GOOD, Center-L.McCullough, Holder-B.Pinion. Penalty on GB-K.Enagbare, Defensive Offside, declined.",
+            "scoringPlay": true,
+            "type": {
+              "id": "59",
+              "text": "Field Goal Good",
+              "abbreviation": "FG"
+            }
+          }
+        ]
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474172941",
+            "sequenceNumber": "294100",
+            "period": {
+              "number": 3
+            },
+            "clock": {
+              "displayValue": "0:56"
+            },
+            "homeScore": 12,
+            "awayScore": 24,
+            "text": "R.Walker reported in as eligible.  J.Love pass short right to J.Reed for 10 yards, TOUCHDOWN.A.Carlson extra point is GOOD, Center-M.Orzech, Holder-D.Whelan.",
+            "scoringPlay": true,
+            "type": {
+              "id": "67",
+              "text": "Passing Touchdown",
+              "abbreviation": "TD"
+            }
+          }
+        ]
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474173262",
+            "sequenceNumber": "326200",
+            "period": {
+              "number": 4
+            },
+            "clock": {
+              "displayValue": "11:48"
+            },
+            "homeScore": 19,
+            "awayScore": 24,
+            "text": "(Shotgun) D.Ridder left end for 6 yards, TOUCHDOWN.Y.Koo extra point is GOOD, Center-L.McCullough, Holder-B.Pinion.",
+            "scoringPlay": true,
+            "type": {
+              "id": "68",
+              "text": "Rushing Touchdown",
+              "abbreviation": "TD"
+            }
+          }
+        ]
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474173620",
+            "sequenceNumber": "362000",
+            "period": {
+              "number": 4
+            },
+            "clock": {
+              "displayValue": "8:10"
+            },
+            "homeScore": 22,
+            "awayScore": 24,
+            "text": "Y.Koo 39 yard field goal is GOOD, Center-L.McCullough, Holder-B.Pinion.",
+            "scoringPlay": true,
+            "type": {
+              "id": "59",
+              "text": "Field Goal Good",
+              "abbreviation": "FG"
+            }
+          }
+        ]
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474174100",
+            "sequenceNumber": "410000",
+            "period": {
+              "number": 4
+            },
+            "clock": {
+              "displayValue": "0:57"
+            },
+            "homeScore": 25,
+            "awayScore": 24,
+            "text": "Y.Koo 25 yard field goal is GOOD, Center-L.McCullough, Holder-B.Pinion.",
+            "scoringPlay": true,
+            "type": {
+              "id": "59",
+              "text": "Field Goal Good",
+              "abbreviation": "FG"
+            }
+          }
+        ]
+      },
+      {
+        "plays": []
+      },
+      {
+        "plays": [
+          {
+            "id": "4015474174321",
+            "sequenceNumber": "432100",
+            "period": {
+              "number": 4
+            },
+            "clock": {
+              "displayValue": "0:00"
+            },
+            "homeScore": 25,
+            "awayScore": 24,
+            "text": "END GAME",
+            "scoringPlay": false,
+            "type": {
+              "id": "66",
+              "text": "End of Game",
+              "abbreviation": "EG"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
