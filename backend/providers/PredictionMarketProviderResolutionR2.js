@@ -289,8 +289,32 @@ function predictionMarketProviderResolutionR2CreateService(options) {
 
     var currentStatus = predictionMarketProviderResolutionR2Upper_(market.status);
     if (currentStatus === "RESOLVED" || currentStatus === "VOID") {
+      // Compare with canonical completion even when a prior metadata write failed
+      // or the group coordinator performed the original resolution.
+      var matchesCompletion = result.final === true && result.reviewRequired !== true &&
+        (currentStatus === "VOID" ? result.voided === true || result.lifecycle === "VOID" :
+          result.lifecycle === "RESOLVED" && predictionMarketProviderResolutionR2Upper_(result.mappedWinningOutcome) === predictionMarketProviderResolutionR2Upper_(market.winningOutcome));
+      if (!matchesCompletion && result.reviewRequired !== true) {
+        result = predictionMarketProviderResolutionR2Review_(provider, result.providerStatus, "PROVIDER_COMPLETED_RESULT_CHANGED", { current:result, completedStatus:currentStatus, winningOutcome:market.winningOutcome });
+      }
       persistMetadata(market, result, username);
-      return { success: true, completed: true, noOverride: true, providerResolution: result, market: getMarket(marketId), settlements: [] };
+      // Resolution and player settlements are separate durable operations. Resume
+      // unfinished players through the idempotent engine after an interrupted sync.
+      var pendingPlayers = {};
+      if (matchesCompletion && typeof repository.listPositions === "function") {
+        repository.listPositions().forEach(function(position) {
+          if (predictionMarketProviderResolutionR2String_(position.marketId) !== predictionMarketProviderResolutionR2String_(marketId)) return;
+          var playerId = predictionMarketProviderResolutionR2String_(position.playerId);
+          var settlement = typeof repository.getSettlement === "function" ? repository.getSettlement(marketId + ":" + playerId) : null;
+          if (position.settled !== true || settlement && predictionMarketProviderResolutionR2Upper_(settlement.status) === "PENDING") {
+            pendingPlayers[playerId] = true;
+          }
+        });
+      }
+      var resumed = Object.keys(pendingPlayers).filter(Boolean).map(function(playerId) {
+        return engine.settlePlayerMarket(systemContext(username), marketId, playerId);
+      });
+      return { success: true, completed: true, noOverride: true, providerResolution: result, market: getMarket(marketId), settlements: resumed };
     }
 
     var ctx = systemContext(username);

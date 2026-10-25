@@ -85,6 +85,11 @@ function predictionMarketProductR2CreateCoordinator(options) {
     if (!children.length) return null;
     var first = children[0], metadata = predictionMarketProductR2Metadata_(first), providerMetadata = first.providerMetadata || {};
     var resolution = providerMetadata.providerResolutionR2 || {};
+    children.some(function(child) {
+      var childResolution = (child.providerMetadata || {}).providerResolutionR2 || {};
+      if (childResolution.reviewRequired === true) { resolution = childResolution; return true; }
+      return false;
+    });
     return {
       marketType:PREDICTION_MARKET_PRODUCT_INTEGRATION_R2.MARKET_TYPE_MULTI,
       logicalMarketId:metadata.logicalMarketId,
@@ -269,7 +274,11 @@ function predictionMarketProductR2CreateCoordinator(options) {
     });
     var currentStatus = predictionMarketProductR2Upper_(group.status);
     if (currentStatus === "RESOLVED" || currentStatus === "VOID") {
-      return { success:true, completed:true, noOverride:true, providerLifecycle:"FINAL", reviewRequired:false, group:group, childResults:results, settlements:[] };
+      var completedResults = children.map(function(child) { return providerResolution.sync(username,child.marketId); });
+      var needsReview = completedResults.some(function(entry) { return entry.providerResolution && entry.providerResolution.reviewRequired === true; });
+      var resumedSettlements = [];
+      completedResults.forEach(function(entry) { resumedSettlements = resumedSettlements.concat(entry.settlements || []); });
+      return { success:true, completed:true, noOverride:true, providerLifecycle:needsReview?"REVIEW_REQUIRED":"FINAL", reviewRequired:needsReview, reviewReason:needsReview?"PROVIDER_COMPLETED_RESULT_CHANGED":"", group:getGroup(groupId), childResults:completedResults, settlements:resumedSettlements };
     }
     if (currentStatus === "DRAFT") {
       results.forEach(function(entry) { if (typeof providerResolution.sync === "function") providerResolution.sync(username,entry.child.marketId); });

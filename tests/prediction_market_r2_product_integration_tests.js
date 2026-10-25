@@ -232,4 +232,45 @@ assert(!/UrlFetchApp/.test(productSource+editSource+adminSource));
 assert(!/UrlFetchApp/.test(providerSource));
 assert(providerSource.includes('awardsManagerFetchJson_'));
 
+// Completed groups must surface provider corrections without rewriting payouts.
+const completedWallet = base.getWallet('alice');
+const completedSettlements = JSON.stringify(extGroup.outcomes.map(o=>base.getSettlement(o.marketId+':alice')));
+extGroup.outcomes.forEach((o,i)=>{providerState[o.externalMarketId]={status:'finalized',result:i===0?'yes':'no'};});
+const corrected = product.syncProviderGroup('admin','BEST-ACTOR');
+assert.strictEqual(corrected.reviewRequired,true);
+assert.strictEqual(corrected.providerLifecycle,'REVIEW_REQUIRED');
+assert.strictEqual(corrected.group.providerResolutionR2.reviewRequired,true);
+assert.strictEqual(base.getMarket(winnerChild.marketId).winningOutcome,'YES');
+assert.deepStrictEqual(base.getWallet('alice'),completedWallet);
+assert.strictEqual(JSON.stringify(extGroup.outcomes.map(o=>base.getSettlement(o.marketId+':alice'))),completedSettlements);
+assert.deepStrictEqual(corrected.settlements,[]);
+// A reversal to non-final must also require review.
+providerState[extGroup.outcomes[1].externalMarketId]={status:'active',result:''};
+assert.strictEqual(product.syncProviderGroup('admin','BEST-ACTOR').reviewRequired,true);
+
+// Resume a failed payout after group resolution using the existing settlement authority.
+const retryGroup = groupImport('RETRY',['First','Second','Third']);
+admin.open('admin',{logicalMarketId:'RETRY'});
+const retryWinner = retryGroup.outcomes[2];
+engine.executeTrade(playerCtx,{transactionId:'retry-buy',playerId:'alice',marketId:retryWinner.marketId,side:'BUY',outcome:'YES',quantity:7,expectedWalletVersion:base.getWallet('alice').version,requestedAt:NOW});
+retryGroup.outcomes.forEach((o,i)=>{providerState[o.externalMarketId]={status:'finalized',result:i===2?'yes':'no'};});
+const settleAuthority = engine.settlePlayerMarket;
+engine.settlePlayerMarket = function(ctx,marketId,playerId) {
+  if (marketId === retryWinner.marketId) throw new Error('injected payout interruption');
+  return settleAuthority(ctx,marketId,playerId);
+};
+assert.throws(()=>product.syncProviderGroup('admin','RETRY'),/injected payout interruption/);
+assert.strictEqual(product.getGroup('RETRY').status,'RESOLVED');
+assert.strictEqual(base.getPosition('alice',retryWinner.marketId,'YES').settled,false);
+engine.settlePlayerMarket = settleAuthority;
+const beforeRetry = base.getWallet('alice').availableCredits;
+const resumed = product.syncProviderGroup('admin','RETRY');
+assert.strictEqual(resumed.reviewRequired,false);
+assert.strictEqual(resumed.settlements.length,1);
+assert.strictEqual(base.getWallet('alice').availableCredits,beforeRetry+7);
+assert.strictEqual(base.getPosition('alice',retryWinner.marketId,'YES').quantity,0);
+const afterRetry = base.getWallet('alice');
+assert.deepStrictEqual(product.syncProviderGroup('admin','RETRY').settlements,[]);
+assert.deepStrictEqual(base.getWallet('alice'),afterRetry);
+
 console.log('PASS prediction_market_r2_product_integration_tests');
