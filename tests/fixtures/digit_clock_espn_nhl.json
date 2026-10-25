@@ -1,0 +1,888 @@
+{
+  "league": "nhl",
+  "summary": {
+    "header": {
+      "season": {
+        "year": 2026,
+        "current": false,
+        "type": 2
+      },
+      "competitions": [
+        {
+          "id": "401802478",
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "STATUS_FINAL",
+              "state": "post",
+              "completed": true,
+              "description": "Final",
+              "detail": "Final/SO",
+              "shortDetail": "Final/SO",
+              "altDetail": "SO"
+            }
+          },
+          "date": "2025-10-25T16:30Z",
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "4",
+              "team": {
+                "displayName": "Philadelphia Flyers"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "3",
+              "team": {
+                "displayName": "New York Islanders"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "plays": [
+      {
+        "id": "401802478000000520",
+        "sequenceNumber": "2",
+        "period": {
+          "number": 1,
+          "displayValue": "1st"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 0,
+        "awayScore": 0,
+        "text": "Start of 1st Period",
+        "scoringPlay": false,
+        "type": {
+          "id": "518",
+          "text": "Period Start",
+          "abbreviation": "period-start"
+        },
+        "wallclock": "2025-10-25T16:38:51Z"
+      },
+      {
+        "id": "401802478000002460",
+        "sequenceNumber": "52",
+        "period": {
+          "number": 1,
+          "displayValue": "1st"
+        },
+        "clock": {
+          "displayValue": "9:51"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Simon Holmstrom Goal (2) Snap Shot, assists: Jean-Gabriel Pageau (3)",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T16:55:21Z"
+      },
+      {
+        "id": "401802478000000310",
+        "sequenceNumber": "111",
+        "period": {
+          "number": 1,
+          "displayValue": "1st"
+        },
+        "clock": {
+          "displayValue": "20:00"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "End of 1st Period",
+        "scoringPlay": false,
+        "type": {
+          "id": "519",
+          "text": "Period End",
+          "abbreviation": "period-end"
+        },
+        "wallclock": "2025-10-25T17:17:52Z"
+      },
+      {
+        "id": "401802478000004830",
+        "sequenceNumber": "114",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Start of 2nd Period",
+        "scoringPlay": false,
+        "type": {
+          "id": "518",
+          "text": "Period Start",
+          "abbreviation": "period-start"
+        },
+        "wallclock": "2025-10-25T17:36:39Z"
+      },
+      {
+        "id": "401802478000002540",
+        "sequenceNumber": "137",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd"
+        },
+        "clock": {
+          "displayValue": "6:15"
+        },
+        "homeScore": 0,
+        "awayScore": 2,
+        "text": "Anthony Duclair Goal (2) Snap Shot, assists: Marshall Warren (1), Anders Lee (6)",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T17:44:17Z"
+      },
+      {
+        "id": "401802478000006540",
+        "sequenceNumber": "151",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd"
+        },
+        "clock": {
+          "displayValue": "10:29"
+        },
+        "homeScore": 1,
+        "awayScore": 2,
+        "text": "Christian Dvorak Goal (2) Backhand, assists: Trevor Zegras (6), Matvei Michkov (2)",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T17:49:49Z"
+      },
+      {
+        "id": "401802478000000440",
+        "sequenceNumber": "198",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd"
+        },
+        "clock": {
+          "displayValue": "20:00"
+        },
+        "homeScore": 1,
+        "awayScore": 2,
+        "text": "End of 2nd Period",
+        "scoringPlay": false,
+        "type": {
+          "id": "519",
+          "text": "Period End",
+          "abbreviation": "period-end"
+        },
+        "wallclock": "2025-10-25T18:07:22Z"
+      },
+      {
+        "id": "401802478000007960",
+        "sequenceNumber": "201",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 1,
+        "awayScore": 2,
+        "text": "Start of 3rd Period",
+        "scoringPlay": false,
+        "type": {
+          "id": "518",
+          "text": "Period Start",
+          "abbreviation": "period-start"
+        },
+        "wallclock": "2025-10-25T18:26:44Z"
+      },
+      {
+        "id": "401802478000008160",
+        "sequenceNumber": "216",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd"
+        },
+        "clock": {
+          "displayValue": "1:54"
+        },
+        "homeScore": 2,
+        "awayScore": 2,
+        "text": "Trevor Zegras Goal (1) Wrist Shot, assists: Christian Dvorak (2), Jamie Drysdale (3)",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T18:30:06Z"
+      },
+      {
+        "id": "401802478000008750",
+        "sequenceNumber": "239",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd"
+        },
+        "clock": {
+          "displayValue": "4:21"
+        },
+        "homeScore": 2,
+        "awayScore": 3,
+        "text": "Maxim Tsyplakov Goal (1) Tip-In, assists: Marshall Warren (2), Tony DeAngelo (3)",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T18:39:25Z"
+      },
+      {
+        "id": "401802478000001120",
+        "sequenceNumber": "251",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd"
+        },
+        "clock": {
+          "displayValue": "7:32"
+        },
+        "homeScore": 3,
+        "awayScore": 3,
+        "text": "Trevor Zegras Goal (2) Wrist Shot, assists: Bobby Brink (3), Cam York (4)",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T18:45:50Z"
+      },
+      {
+        "id": "401802478000005170",
+        "sequenceNumber": "303",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd"
+        },
+        "clock": {
+          "displayValue": "20:00"
+        },
+        "homeScore": 3,
+        "awayScore": 3,
+        "text": "End of 3rd Period",
+        "scoringPlay": false,
+        "type": {
+          "id": "519",
+          "text": "Period End",
+          "abbreviation": "period-end"
+        },
+        "wallclock": "2025-10-25T19:09:04Z"
+      },
+      {
+        "id": "401802478000010970",
+        "sequenceNumber": "306",
+        "period": {
+          "number": 4,
+          "displayValue": "OT"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 3,
+        "awayScore": 3,
+        "text": "Start of Overtime",
+        "scoringPlay": false,
+        "type": {
+          "id": "518",
+          "text": "Period Start",
+          "abbreviation": "period-start"
+        },
+        "wallclock": "2025-10-25T19:11:36Z"
+      },
+      {
+        "id": "401802478000005240",
+        "sequenceNumber": "325",
+        "period": {
+          "number": 4,
+          "displayValue": "OT"
+        },
+        "clock": {
+          "displayValue": "5:00"
+        },
+        "homeScore": 3,
+        "awayScore": 3,
+        "text": "End of OT",
+        "scoringPlay": false,
+        "type": {
+          "id": "519",
+          "text": "Period End",
+          "abbreviation": "period-end"
+        },
+        "wallclock": "2025-10-25T19:18:10Z"
+      },
+      {
+        "id": "401802478000005290",
+        "sequenceNumber": "328",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "Start of Shootout",
+        "scoringPlay": false,
+        "type": {
+          "id": "518",
+          "text": "Period Start",
+          "abbreviation": "period-start"
+        },
+        "wallclock": "2025-10-25T19:18:59Z"
+      },
+      {
+        "id": "401802478000005320",
+        "sequenceNumber": "331",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "Trevor Zegras Goal Wrist Shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T19:21:20Z"
+      },
+      {
+        "id": "401802478000005330",
+        "sequenceNumber": "332",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "Simon Holmstrom Goal Wrist Shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T19:21:50Z"
+      },
+      {
+        "id": "401802478000005340",
+        "sequenceNumber": "333",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "Matvei Michkov Goal Snap Shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "505",
+          "text": "Goal",
+          "abbreviation": "goal"
+        },
+        "wallclock": "2025-10-25T19:22:18Z"
+      },
+      {
+        "id": "401802478000005360",
+        "sequenceNumber": "335",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "End of Shootout",
+        "scoringPlay": false,
+        "type": {
+          "id": "521",
+          "text": "Shootout End",
+          "abbreviation": "shootout-end"
+        },
+        "wallclock": "2025-10-25T19:22:46Z"
+      },
+      {
+        "id": "401802478000005370",
+        "sequenceNumber": "336",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "End of OT",
+        "scoringPlay": false,
+        "type": {
+          "id": "519",
+          "text": "Period End",
+          "abbreviation": "period-end"
+        },
+        "wallclock": "2025-10-25T19:22:46Z"
+      },
+      {
+        "id": "401802478000005410",
+        "sequenceNumber": "338",
+        "period": {
+          "number": 5,
+          "displayValue": "SO"
+        },
+        "clock": {
+          "displayValue": "0:00"
+        },
+        "homeScore": 2,
+        "awayScore": 1,
+        "text": "Game End",
+        "scoringPlay": false,
+        "type": {
+          "id": "522",
+          "text": "End of Game"
+        },
+        "wallclock": "2025-10-25T19:23:24Z"
+      }
+    ]
+  },
+  "scoreboardEvent": {
+    "id": "401802478",
+    "status": {
+      "clock": 0.0,
+      "displayClock": "0:00",
+      "period": 5,
+      "type": {
+        "id": "3",
+        "name": "STATUS_FINAL",
+        "state": "post",
+        "completed": true,
+        "description": "Final",
+        "detail": "Final/SO",
+        "shortDetail": "Final/SO",
+        "altDetail": "SO"
+      }
+    },
+    "competitions": [
+      {
+        "status": {
+          "clock": 0.0,
+          "displayClock": "0:00",
+          "period": 5,
+          "type": {
+            "id": "3",
+            "name": "STATUS_FINAL",
+            "state": "post",
+            "completed": true,
+            "description": "Final",
+            "detail": "Final/SO",
+            "shortDetail": "Final/SO",
+            "altDetail": "SO"
+          },
+          "featuredAthletes": [
+            {
+              "name": "winningGoalie",
+              "displayName": "Winning Goalie",
+              "shortDisplayName": "Winning Goalie",
+              "abbreviation": "W",
+              "playerId": 4587815,
+              "athlete": {
+                "id": "4587815",
+                "fullName": "Samuel Ersson",
+                "displayName": "Samuel Ersson",
+                "shortName": "S. Ersson",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/nhl/player/_/id/4587815"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/nhl/players/full/4587815.png",
+                "jersey": "30",
+                "position": "G",
+                "team": {
+                  "id": "15"
+                }
+              },
+              "team": {
+                "id": "15"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "23"
+                },
+                {
+                  "name": "savePct",
+                  "abbreviation": "SV%",
+                  "displayValue": ".885"
+                },
+                {
+                  "name": "plusMinus",
+                  "abbreviation": "+/-",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "goals",
+                  "abbreviation": "G",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "ytdGoals",
+                  "abbreviation": "YTDG",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "assists",
+                  "abbreviation": "A",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "points",
+                  "abbreviation": "PTS",
+                  "displayValue": "0"
+                }
+              ]
+            },
+            {
+              "name": "losingGoalie",
+              "displayName": "Losing Goalie",
+              "shortDisplayName": "Losing Goalie",
+              "abbreviation": "L",
+              "playerId": 3151981,
+              "athlete": {
+                "id": "3151981",
+                "fullName": "Ilya Sorokin",
+                "displayName": "Ilya Sorokin",
+                "shortName": "I. Sorokin",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/nhl/player/_/id/3151981"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/nhl/players/full/3151981.png",
+                "jersey": "30",
+                "position": "G",
+                "team": {
+                  "id": "12"
+                }
+              },
+              "team": {
+                "id": "12"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "23"
+                },
+                {
+                  "name": "savePct",
+                  "abbreviation": "SV%",
+                  "displayValue": ".885"
+                },
+                {
+                  "name": "plusMinus",
+                  "abbreviation": "+/-",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "goals",
+                  "abbreviation": "G",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "ytdGoals",
+                  "abbreviation": "YTDG",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "assists",
+                  "abbreviation": "A",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "points",
+                  "abbreviation": "PTS",
+                  "displayValue": "0"
+                }
+              ]
+            },
+            {
+              "name": "firstStar",
+              "displayName": "First Star",
+              "shortDisplayName": "First Star",
+              "abbreviation": "FS",
+              "playerId": 4565230,
+              "athlete": {
+                "id": "4565230",
+                "fullName": "Trevor Zegras",
+                "displayName": "Trevor Zegras",
+                "shortName": "T. Zegras",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/nhl/player/_/id/4565230"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/nhl/players/full/4565230.png",
+                "jersey": "46",
+                "position": "C",
+                "team": {
+                  "id": "15"
+                }
+              },
+              "team": {
+                "id": "15"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "savePct",
+                  "abbreviation": "SV%",
+                  "displayValue": ".000"
+                },
+                {
+                  "name": "plusMinus",
+                  "abbreviation": "+/-",
+                  "displayValue": "2"
+                },
+                {
+                  "name": "goals",
+                  "abbreviation": "G",
+                  "displayValue": "2"
+                },
+                {
+                  "name": "ytdGoals",
+                  "abbreviation": "YTDG",
+                  "displayValue": "2"
+                },
+                {
+                  "name": "assists",
+                  "abbreviation": "A",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "points",
+                  "abbreviation": "PTS",
+                  "displayValue": "3"
+                }
+              ]
+            },
+            {
+              "name": "secondStar",
+              "displayName": "Second Star",
+              "shortDisplayName": "Second Star",
+              "abbreviation": "SS",
+              "playerId": 5149170,
+              "athlete": {
+                "id": "5149170",
+                "fullName": "Matvei Michkov",
+                "displayName": "Matvei Michkov",
+                "shortName": "M. Michkov",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/nhl/player/_/id/5149170"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/nhl/players/full/5149170.png",
+                "jersey": "39",
+                "position": "RW",
+                "team": {
+                  "id": "15"
+                }
+              },
+              "team": {
+                "id": "15"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "savePct",
+                  "abbreviation": "SV%",
+                  "displayValue": ".000"
+                },
+                {
+                  "name": "plusMinus",
+                  "abbreviation": "+/-",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "goals",
+                  "abbreviation": "G",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "ytdGoals",
+                  "abbreviation": "YTDG",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "assists",
+                  "abbreviation": "A",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "points",
+                  "abbreviation": "PTS",
+                  "displayValue": "1"
+                }
+              ]
+            },
+            {
+              "name": "thirdStar",
+              "displayName": "Third Star",
+              "shortDisplayName": "Third Star",
+              "abbreviation": "TS",
+              "playerId": 5212753,
+              "athlete": {
+                "id": "5212753",
+                "fullName": "Maxim Tsyplakov",
+                "displayName": "Maxim Tsyplakov",
+                "shortName": "M. Tsyplakov",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/nhl/player/_/id/5212753"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/nhl/players/full/5212753.png",
+                "jersey": "72",
+                "position": "RW",
+                "team": {
+                  "id": "11"
+                }
+              },
+              "team": {
+                "id": "12"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "savePct",
+                  "abbreviation": "SV%",
+                  "displayValue": ".000"
+                },
+                {
+                  "name": "plusMinus",
+                  "abbreviation": "+/-",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "goals",
+                  "abbreviation": "G",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "ytdGoals",
+                  "abbreviation": "YTDG",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "assists",
+                  "abbreviation": "A",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "points",
+                  "abbreviation": "PTS",
+                  "displayValue": "1"
+                }
+              ]
+            }
+          ]
+        },
+        "competitors": [
+          {
+            "homeAway": "home",
+            "score": "4",
+            "team": {
+              "displayName": "Philadelphia Flyers"
+            }
+          },
+          {
+            "homeAway": "away",
+            "score": "3",
+            "team": {
+              "displayName": "New York Islanders"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

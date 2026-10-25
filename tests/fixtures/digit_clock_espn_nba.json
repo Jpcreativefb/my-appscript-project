@@ -1,0 +1,2658 @@
+{
+  "league": "nba",
+  "summary": {
+    "header": {
+      "season": {
+        "year": 2026,
+        "current": false,
+        "type": 2
+      },
+      "competitions": [
+        {
+          "id": "401809955",
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "STATUS_FINAL",
+              "state": "post",
+              "completed": true,
+              "description": "Final",
+              "detail": "Final",
+              "shortDetail": "Final"
+            }
+          },
+          "date": "2025-10-25T23:00Z",
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "98",
+              "team": {
+                "displayName": "Orlando Magic"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "110",
+              "team": {
+                "displayName": "Chicago Bulls"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "plays": [
+      {
+        "id": "4018099559",
+        "sequenceNumber": "9",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "11:35"
+        },
+        "homeScore": 0,
+        "awayScore": 2,
+        "text": "Josh Giddey makes two point shot (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "109",
+          "text": "Running Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:11:29Z"
+      },
+      {
+        "id": "40180995518",
+        "sequenceNumber": "18",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "10:37"
+        },
+        "homeScore": 2,
+        "awayScore": 2,
+        "text": "Desmond Bane makes two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "125",
+          "text": "Layup Shot Putback"
+        },
+        "wallclock": "2025-10-25T23:12:40Z"
+      },
+      {
+        "id": "40180995525",
+        "sequenceNumber": "25",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "9:59"
+        },
+        "homeScore": 4,
+        "awayScore": 2,
+        "text": "Paolo Banchero makes driving layup (Tyus Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:13:22Z"
+      },
+      {
+        "id": "40180995529",
+        "sequenceNumber": "29",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "9:59"
+        },
+        "homeScore": 5,
+        "awayScore": 2,
+        "text": "Paolo Banchero makes free throw 1 of 1",
+        "scoringPlay": true,
+        "type": {
+          "id": "97",
+          "text": "Free Throw - 1 of 1"
+        },
+        "wallclock": "2025-10-25T23:13:48Z"
+      },
+      {
+        "id": "40180995536",
+        "sequenceNumber": "36",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "9:17"
+        },
+        "homeScore": 7,
+        "awayScore": 2,
+        "text": "Franz Wagner makes two point shot (Desmond Bane assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "129",
+          "text": "Running Finger Roll Layup"
+        },
+        "wallclock": "2025-10-25T23:14:30Z"
+      },
+      {
+        "id": "40180995538",
+        "sequenceNumber": "38",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "9:03"
+        },
+        "homeScore": 7,
+        "awayScore": 5,
+        "text": "Tre Jones makes 25-foot three point jumper (Nikola Vucevic assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:14:45Z"
+      },
+      {
+        "id": "40180995546",
+        "sequenceNumber": "46",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "8:28"
+        },
+        "homeScore": 7,
+        "awayScore": 6,
+        "text": "Josh Giddey makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-25T23:16:12Z"
+      },
+      {
+        "id": "40180995551",
+        "sequenceNumber": "51",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "8:28"
+        },
+        "homeScore": 7,
+        "awayScore": 7,
+        "text": "Josh Giddey makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-25T23:16:36Z"
+      },
+      {
+        "id": "40180995556",
+        "sequenceNumber": "56",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "7:59"
+        },
+        "homeScore": 9,
+        "awayScore": 7,
+        "text": "Paolo Banchero makes 6-foot driving floating jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "144",
+          "text": "Driving Floating Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:17:07Z"
+      },
+      {
+        "id": "40180995569",
+        "sequenceNumber": "69",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "7:11"
+        },
+        "homeScore": 11,
+        "awayScore": 7,
+        "text": "Franz Wagner makes 3-foot dunk (Desmond Bane assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "149",
+          "text": "Running Alley Oop Dunk Shot"
+        },
+        "wallclock": "2025-10-25T23:17:55Z"
+      },
+      {
+        "id": "40180995578",
+        "sequenceNumber": "78",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "6:54"
+        },
+        "homeScore": 11,
+        "awayScore": 8,
+        "text": "Matas Buzelis makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-25T23:21:51Z"
+      },
+      {
+        "id": "40180995581",
+        "sequenceNumber": "81",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "6:35"
+        },
+        "homeScore": 13,
+        "awayScore": 8,
+        "text": "Desmond Bane makes 8-foot two point shot (Wendell Carter Jr. assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "145",
+          "text": "Driving Floating Bank Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:22:10Z"
+      },
+      {
+        "id": "40180995589",
+        "sequenceNumber": "89",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "5:48"
+        },
+        "homeScore": 13,
+        "awayScore": 11,
+        "text": "Josh Giddey makes 25-foot three pointer (Kevin Huerter assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:22:56Z"
+      },
+      {
+        "id": "40180995599",
+        "sequenceNumber": "99",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "5:21"
+        },
+        "homeScore": 16,
+        "awayScore": 11,
+        "text": "Paolo Banchero makes 26-foot three point jumper (Wendell Carter Jr. assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:23:48Z"
+      },
+      {
+        "id": "401809955103",
+        "sequenceNumber": "103",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "4:53"
+        },
+        "homeScore": 18,
+        "awayScore": 11,
+        "text": "Anthony Black makes two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "129",
+          "text": "Running Finger Roll Layup"
+        },
+        "wallclock": "2025-10-25T23:24:15Z"
+      },
+      {
+        "id": "401809955104",
+        "sequenceNumber": "104",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "4:34"
+        },
+        "homeScore": 18,
+        "awayScore": 13,
+        "text": "Nikola Vucevic makes 9-foot two point shot (Josh Giddey assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "114",
+          "text": "Turnaround Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:24:35Z"
+      },
+      {
+        "id": "401809955106",
+        "sequenceNumber": "106",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "4:24"
+        },
+        "homeScore": 20,
+        "awayScore": 13,
+        "text": "Paolo Banchero makes 22-foot pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:24:44Z"
+      },
+      {
+        "id": "401809955115",
+        "sequenceNumber": "115",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "3:55"
+        },
+        "homeScore": 20,
+        "awayScore": 15,
+        "text": "Ayo Dosunmu makes 2-foot layup (Kevin Huerter assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "141",
+          "text": "Cutting Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:25:45Z"
+      },
+      {
+        "id": "401809955119",
+        "sequenceNumber": "119",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "3:33"
+        },
+        "homeScore": 20,
+        "awayScore": 17,
+        "text": "Ayo Dosunmu makes 1-foot dunk (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "116",
+          "text": "Running Dunk Shot"
+        },
+        "wallclock": "2025-10-25T23:26:06Z"
+      },
+      {
+        "id": "401809955123",
+        "sequenceNumber": "123",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "3:12"
+        },
+        "homeScore": 20,
+        "awayScore": 20,
+        "text": "Patrick Williams makes 26-foot running pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "146",
+          "text": "Running Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:26:27Z"
+      },
+      {
+        "id": "401809955126",
+        "sequenceNumber": "126",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "2:40"
+        },
+        "homeScore": 20,
+        "awayScore": 22,
+        "text": "Kevin Huerter makes 1-foot layup (Patrick Williams assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "141",
+          "text": "Cutting Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:26:59Z"
+      },
+      {
+        "id": "401809955133",
+        "sequenceNumber": "133",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "2:16"
+        },
+        "homeScore": 22,
+        "awayScore": 22,
+        "text": "Franz Wagner makes 2-foot two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "128",
+          "text": "Driving Finger Roll Layup"
+        },
+        "wallclock": "2025-10-25T23:30:27Z"
+      },
+      {
+        "id": "401809955136",
+        "sequenceNumber": "136",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "2:06"
+        },
+        "homeScore": 24,
+        "awayScore": 22,
+        "text": "Tristan da Silva makes layup (Jett Howard assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "95",
+          "text": "Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:30:38Z"
+      },
+      {
+        "id": "401809955140",
+        "sequenceNumber": "140",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "1:44"
+        },
+        "homeScore": 26,
+        "awayScore": 22,
+        "text": "Anthony Black makes driving layup",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:31:00Z"
+      },
+      {
+        "id": "401809955145",
+        "sequenceNumber": "145",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "1:30"
+        },
+        "homeScore": 26,
+        "awayScore": 24,
+        "text": "Kevin Huerter makes two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "121",
+          "text": "Fade Away Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:31:20Z"
+      },
+      {
+        "id": "401809955150",
+        "sequenceNumber": "150",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "1:30"
+        },
+        "homeScore": 26,
+        "awayScore": 25,
+        "text": "Kevin Huerter makes free throw 1 of 1",
+        "scoringPlay": true,
+        "type": {
+          "id": "97",
+          "text": "Free Throw - 1 of 1"
+        },
+        "wallclock": "2025-10-25T23:31:53Z"
+      },
+      {
+        "id": "401809955156",
+        "sequenceNumber": "156",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "1:02"
+        },
+        "homeScore": 26,
+        "awayScore": 27,
+        "text": "Tre Jones makes 3-foot two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "145",
+          "text": "Driving Floating Bank Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:32:36Z"
+      },
+      {
+        "id": "401809955157",
+        "sequenceNumber": "157",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "54.0"
+        },
+        "homeScore": 28,
+        "awayScore": 27,
+        "text": "Tristan da Silva makes 2-foot layup (Goga Bitadze assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "141",
+          "text": "Cutting Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:32:46Z"
+      },
+      {
+        "id": "401809955159",
+        "sequenceNumber": "159",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "40.5"
+        },
+        "homeScore": 28,
+        "awayScore": 29,
+        "text": "Jalen Smith makes 1-foot two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "114",
+          "text": "Turnaround Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:33:01Z"
+      },
+      {
+        "id": "401809955164",
+        "sequenceNumber": "164",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "31.4"
+        },
+        "homeScore": 30,
+        "awayScore": 29,
+        "text": "Franz Wagner makes 6-foot driving floating jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "144",
+          "text": "Driving Floating Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:33:39Z"
+      },
+      {
+        "id": "401809955172",
+        "sequenceNumber": "172",
+        "period": {
+          "number": 1,
+          "displayValue": "1st Quarter"
+        },
+        "clock": {
+          "displayValue": "0.0"
+        },
+        "homeScore": 30,
+        "awayScore": 29,
+        "text": "End of the 1st Quarter",
+        "scoringPlay": false,
+        "type": {
+          "id": "412",
+          "text": "End Period"
+        },
+        "wallclock": "2025-10-25T23:34:22Z"
+      },
+      {
+        "id": "401809955180",
+        "sequenceNumber": "180",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "11:23"
+        },
+        "homeScore": 32,
+        "awayScore": 29,
+        "text": "Desmond Bane makes 2-foot layup (Goga Bitadze assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "141",
+          "text": "Cutting Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:37:28Z"
+      },
+      {
+        "id": "401809955182",
+        "sequenceNumber": "182",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "11:12"
+        },
+        "homeScore": 32,
+        "awayScore": 31,
+        "text": "Julian Phillips makes dunk (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "151",
+          "text": "Cutting Dunk Shot"
+        },
+        "wallclock": "2025-10-25T23:37:39Z"
+      },
+      {
+        "id": "401809955186",
+        "sequenceNumber": "186",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:54"
+        },
+        "homeScore": 34,
+        "awayScore": 31,
+        "text": "Goga Bitadze makes two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "125",
+          "text": "Layup Shot Putback"
+        },
+        "wallclock": "2025-10-25T23:37:57Z"
+      },
+      {
+        "id": "401809955187",
+        "sequenceNumber": "187",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:44"
+        },
+        "homeScore": 34,
+        "awayScore": 34,
+        "text": "Jalen Smith makes 25-foot three point jumper (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:38:06Z"
+      },
+      {
+        "id": "401809955191",
+        "sequenceNumber": "191",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:19"
+        },
+        "homeScore": 34,
+        "awayScore": 36,
+        "text": "Jalen Smith makes two point shot (Ayo Dosunmu assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "109",
+          "text": "Running Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:38:36Z"
+      },
+      {
+        "id": "401809955219",
+        "sequenceNumber": "219",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "9:00"
+        },
+        "homeScore": 34,
+        "awayScore": 38,
+        "text": "Jalen Smith makes 1-foot two point shot (Kevin Huerter assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "128",
+          "text": "Driving Finger Roll Layup"
+        },
+        "wallclock": "2025-10-25T23:40:55Z"
+      },
+      {
+        "id": "401809955223",
+        "sequenceNumber": "223",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "8:43"
+        },
+        "homeScore": 36,
+        "awayScore": 38,
+        "text": "Jonathan Isaac makes dunk",
+        "scoringPlay": true,
+        "type": {
+          "id": "150",
+          "text": "Tip Dunk Shot"
+        },
+        "wallclock": "2025-10-25T23:41:12Z"
+      },
+      {
+        "id": "401809955240",
+        "sequenceNumber": "240",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "7:55"
+        },
+        "homeScore": 36,
+        "awayScore": 40,
+        "text": "Josh Giddey makes two point shot (Patrick Williams assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "129",
+          "text": "Running Finger Roll Layup"
+        },
+        "wallclock": "2025-10-25T23:42:51Z"
+      },
+      {
+        "id": "401809955266",
+        "sequenceNumber": "266",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "6:18"
+        },
+        "homeScore": 36,
+        "awayScore": 42,
+        "text": "Kevin Huerter makes 4-foot two point shot (Josh Giddey assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "145",
+          "text": "Driving Floating Bank Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:48:35Z"
+      },
+      {
+        "id": "401809955271",
+        "sequenceNumber": "271",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "6:09"
+        },
+        "homeScore": 37,
+        "awayScore": 42,
+        "text": "Paolo Banchero makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-25T23:49:13Z"
+      },
+      {
+        "id": "401809955272",
+        "sequenceNumber": "272",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "6:09"
+        },
+        "homeScore": 38,
+        "awayScore": 42,
+        "text": "Paolo Banchero makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-25T23:49:30Z"
+      },
+      {
+        "id": "401809955284",
+        "sequenceNumber": "284",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "5:09"
+        },
+        "homeScore": 40,
+        "awayScore": 42,
+        "text": "Paolo Banchero makes 15-foot two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "137",
+          "text": "Turnaround Fade Away Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:51:05Z"
+      },
+      {
+        "id": "401809955285",
+        "sequenceNumber": "285",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "4:55"
+        },
+        "homeScore": 40,
+        "awayScore": 44,
+        "text": "Patrick Williams makes 6-foot pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:51:18Z"
+      },
+      {
+        "id": "401809955293",
+        "sequenceNumber": "293",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "4:04"
+        },
+        "homeScore": 40,
+        "awayScore": 46,
+        "text": "Patrick Williams makes 1-foot dunk (Kevin Huerter assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "151",
+          "text": "Cutting Dunk Shot"
+        },
+        "wallclock": "2025-10-25T23:52:24Z"
+      },
+      {
+        "id": "401809955297",
+        "sequenceNumber": "297",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:34"
+        },
+        "homeScore": 40,
+        "awayScore": 48,
+        "text": "Ayo Dosunmu makes driving layup",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:52:54Z"
+      },
+      {
+        "id": "401809955307",
+        "sequenceNumber": "307",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:13"
+        },
+        "homeScore": 42,
+        "awayScore": 48,
+        "text": "Franz Wagner makes driving layup",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-25T23:56:15Z"
+      },
+      {
+        "id": "401809955308",
+        "sequenceNumber": "308",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "2:50"
+        },
+        "homeScore": 42,
+        "awayScore": 50,
+        "text": "Nikola Vucevic makes 14-foot two point shot (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "121",
+          "text": "Fade Away Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:56:39Z"
+      },
+      {
+        "id": "401809955314",
+        "sequenceNumber": "314",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "1:47"
+        },
+        "homeScore": 44,
+        "awayScore": 50,
+        "text": "Anthony Black makes 7-foot pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:57:41Z"
+      },
+      {
+        "id": "401809955316",
+        "sequenceNumber": "316",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "1:34"
+        },
+        "homeScore": 47,
+        "awayScore": 50,
+        "text": "Anthony Black makes 27-foot three pointer",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-25T23:58:00Z"
+      },
+      {
+        "id": "401809955329",
+        "sequenceNumber": "329",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "50.5"
+        },
+        "homeScore": 48,
+        "awayScore": 50,
+        "text": "Franz Wagner makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-25T23:59:13Z"
+      },
+      {
+        "id": "401809955332",
+        "sequenceNumber": "332",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "50.5"
+        },
+        "homeScore": 49,
+        "awayScore": 50,
+        "text": "Franz Wagner makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-25T23:59:35Z"
+      },
+      {
+        "id": "401809955335",
+        "sequenceNumber": "335",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "30.8"
+        },
+        "homeScore": 49,
+        "awayScore": 52,
+        "text": "Nikola Vucevic makes tip shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "94",
+          "text": "Tip Shot"
+        },
+        "wallclock": "2025-10-26T00:00:00Z"
+      },
+      {
+        "id": "401809955341",
+        "sequenceNumber": "341",
+        "period": {
+          "number": 2,
+          "displayValue": "2nd Quarter"
+        },
+        "clock": {
+          "displayValue": "0.0"
+        },
+        "homeScore": 49,
+        "awayScore": 52,
+        "text": "End of the 2nd Quarter",
+        "scoringPlay": false,
+        "type": {
+          "id": "412",
+          "text": "End Period"
+        },
+        "wallclock": "2025-10-26T00:00:58Z"
+      },
+      {
+        "id": "401809955360",
+        "sequenceNumber": "360",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "11:10"
+        },
+        "homeScore": 49,
+        "awayScore": 54,
+        "text": "Tre Jones makes 8-foot driving floating jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "144",
+          "text": "Driving Floating Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:16:52Z"
+      },
+      {
+        "id": "401809955367",
+        "sequenceNumber": "367",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:58"
+        },
+        "homeScore": 50,
+        "awayScore": 54,
+        "text": "Paolo Banchero makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:18:19Z"
+      },
+      {
+        "id": "401809955372",
+        "sequenceNumber": "372",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:31"
+        },
+        "homeScore": 50,
+        "awayScore": 57,
+        "text": "Josh Giddey makes 26-foot three point shot (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "113",
+          "text": "Running Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:18:48Z"
+      },
+      {
+        "id": "401809955380",
+        "sequenceNumber": "380",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:15"
+        },
+        "homeScore": 51,
+        "awayScore": 57,
+        "text": "Franz Wagner makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:20:02Z"
+      },
+      {
+        "id": "401809955381",
+        "sequenceNumber": "381",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "10:08"
+        },
+        "homeScore": 51,
+        "awayScore": 60,
+        "text": "Nikola Vucevic makes 27-foot three point jumper (Josh Giddey assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:20:10Z"
+      },
+      {
+        "id": "401809955387",
+        "sequenceNumber": "387",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "9:46"
+        },
+        "homeScore": 53,
+        "awayScore": 60,
+        "text": "Desmond Bane makes 13-foot pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:20:57Z"
+      },
+      {
+        "id": "401809955394",
+        "sequenceNumber": "394",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "9:27"
+        },
+        "homeScore": 54,
+        "awayScore": 60,
+        "text": "Paolo Banchero makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:21:46Z"
+      },
+      {
+        "id": "401809955395",
+        "sequenceNumber": "395",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "9:10"
+        },
+        "homeScore": 54,
+        "awayScore": 62,
+        "text": "Josh Giddey makes 7-foot pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:22:21Z"
+      },
+      {
+        "id": "401809955402",
+        "sequenceNumber": "402",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "8:58"
+        },
+        "homeScore": 55,
+        "awayScore": 62,
+        "text": "Wendell Carter Jr. makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:23:07Z"
+      },
+      {
+        "id": "401809955403",
+        "sequenceNumber": "403",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "8:58"
+        },
+        "homeScore": 56,
+        "awayScore": 62,
+        "text": "Wendell Carter Jr. makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:23:27Z"
+      },
+      {
+        "id": "401809955411",
+        "sequenceNumber": "411",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "8:28"
+        },
+        "homeScore": 56,
+        "awayScore": 63,
+        "text": "Tre Jones makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:24:58Z"
+      },
+      {
+        "id": "401809955414",
+        "sequenceNumber": "414",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "8:28"
+        },
+        "homeScore": 56,
+        "awayScore": 64,
+        "text": "Tre Jones makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:25:24Z"
+      },
+      {
+        "id": "401809955417",
+        "sequenceNumber": "417",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "8:11"
+        },
+        "homeScore": 56,
+        "awayScore": 66,
+        "text": "Patrick Williams makes 2-foot dunk",
+        "scoringPlay": true,
+        "type": {
+          "id": "116",
+          "text": "Running Dunk Shot"
+        },
+        "wallclock": "2025-10-26T00:25:46Z"
+      },
+      {
+        "id": "401809955423",
+        "sequenceNumber": "423",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "7:55"
+        },
+        "homeScore": 57,
+        "awayScore": 66,
+        "text": "Anthony Black makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:29:26Z"
+      },
+      {
+        "id": "401809955424",
+        "sequenceNumber": "424",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "7:55"
+        },
+        "homeScore": 58,
+        "awayScore": 66,
+        "text": "Anthony Black makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:29:40Z"
+      },
+      {
+        "id": "401809955425",
+        "sequenceNumber": "425",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "7:36"
+        },
+        "homeScore": 58,
+        "awayScore": 68,
+        "text": "Nikola Vucevic makes 6-foot two point shot (Patrick Williams assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "140",
+          "text": "Hook Turnaround Bank"
+        },
+        "wallclock": "2025-10-26T00:30:00Z"
+      },
+      {
+        "id": "401809955427",
+        "sequenceNumber": "427",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "7:16"
+        },
+        "homeScore": 60,
+        "awayScore": 68,
+        "text": "Franz Wagner makes 8-foot driving floating jump shot (Desmond Bane assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "144",
+          "text": "Driving Floating Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:30:20Z"
+      },
+      {
+        "id": "401809955439",
+        "sequenceNumber": "439",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "6:52"
+        },
+        "homeScore": 60,
+        "awayScore": 69,
+        "text": "Nikola Vucevic makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:31:44Z"
+      },
+      {
+        "id": "401809955444",
+        "sequenceNumber": "444",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "6:52"
+        },
+        "homeScore": 60,
+        "awayScore": 70,
+        "text": "Nikola Vucevic makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:32:03Z"
+      },
+      {
+        "id": "401809955445",
+        "sequenceNumber": "445",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "6:30"
+        },
+        "homeScore": 62,
+        "awayScore": 70,
+        "text": "Desmond Bane makes 2-foot two point shot (Anthony Black assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "128",
+          "text": "Driving Finger Roll Layup"
+        },
+        "wallclock": "2025-10-26T00:32:27Z"
+      },
+      {
+        "id": "401809955452",
+        "sequenceNumber": "452",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "5:49"
+        },
+        "homeScore": 62,
+        "awayScore": 72,
+        "text": "Josh Giddey makes two point shot (Kevin Huerter assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "129",
+          "text": "Running Finger Roll Layup"
+        },
+        "wallclock": "2025-10-26T00:33:34Z"
+      },
+      {
+        "id": "401809955456",
+        "sequenceNumber": "456",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "5:45"
+        },
+        "homeScore": 63,
+        "awayScore": 72,
+        "text": "Anthony Black makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:34:03Z"
+      },
+      {
+        "id": "401809955457",
+        "sequenceNumber": "457",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "5:45"
+        },
+        "homeScore": 64,
+        "awayScore": 72,
+        "text": "Anthony Black makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:34:18Z"
+      },
+      {
+        "id": "401809955464",
+        "sequenceNumber": "464",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "5:26"
+        },
+        "homeScore": 64,
+        "awayScore": 73,
+        "text": "Patrick Williams makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:35:23Z"
+      },
+      {
+        "id": "401809955470",
+        "sequenceNumber": "470",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "4:54"
+        },
+        "homeScore": 67,
+        "awayScore": 73,
+        "text": "Wendell Carter Jr. makes 25-foot three point jumper (Paolo Banchero assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-26T00:36:26Z"
+      },
+      {
+        "id": "401809955476",
+        "sequenceNumber": "476",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "4:24"
+        },
+        "homeScore": 69,
+        "awayScore": 73,
+        "text": "Tristan da Silva makes tip shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "94",
+          "text": "Tip Shot"
+        },
+        "wallclock": "2025-10-26T00:36:56Z"
+      },
+      {
+        "id": "401809955482",
+        "sequenceNumber": "482",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "4:10"
+        },
+        "homeScore": 70,
+        "awayScore": 73,
+        "text": "Paolo Banchero makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:38:02Z"
+      },
+      {
+        "id": "401809955487",
+        "sequenceNumber": "487",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "4:10"
+        },
+        "homeScore": 71,
+        "awayScore": 73,
+        "text": "Paolo Banchero makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:38:28Z"
+      },
+      {
+        "id": "401809955490",
+        "sequenceNumber": "490",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:56"
+        },
+        "homeScore": 71,
+        "awayScore": 74,
+        "text": "Kevin Huerter makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:39:12Z"
+      },
+      {
+        "id": "401809955491",
+        "sequenceNumber": "491",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:56"
+        },
+        "homeScore": 71,
+        "awayScore": 75,
+        "text": "Kevin Huerter makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:39:31Z"
+      },
+      {
+        "id": "401809955492",
+        "sequenceNumber": "492",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:36"
+        },
+        "homeScore": 73,
+        "awayScore": 75,
+        "text": "Paolo Banchero makes driving layup",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-26T00:39:53Z"
+      },
+      {
+        "id": "401809955502",
+        "sequenceNumber": "502",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:07"
+        },
+        "homeScore": 74,
+        "awayScore": 75,
+        "text": "Paolo Banchero makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:41:33Z"
+      },
+      {
+        "id": "401809955505",
+        "sequenceNumber": "505",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "3:07"
+        },
+        "homeScore": 75,
+        "awayScore": 75,
+        "text": "Paolo Banchero makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:41:57Z"
+      },
+      {
+        "id": "401809955510",
+        "sequenceNumber": "510",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "2:53"
+        },
+        "homeScore": 75,
+        "awayScore": 76,
+        "text": "Tre Jones makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:45:22Z"
+      },
+      {
+        "id": "401809955511",
+        "sequenceNumber": "511",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "2:53"
+        },
+        "homeScore": 75,
+        "awayScore": 77,
+        "text": "Tre Jones makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:45:36Z"
+      },
+      {
+        "id": "401809955514",
+        "sequenceNumber": "514",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "2:34"
+        },
+        "homeScore": 76,
+        "awayScore": 77,
+        "text": "Jase Richardson makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:46:28Z"
+      },
+      {
+        "id": "401809955517",
+        "sequenceNumber": "517",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "2:14"
+        },
+        "homeScore": 76,
+        "awayScore": 79,
+        "text": "Jalen Smith makes 2-foot layup (Patrick Williams assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "141",
+          "text": "Cutting Layup Shot"
+        },
+        "wallclock": "2025-10-26T00:47:05Z"
+      },
+      {
+        "id": "401809955536",
+        "sequenceNumber": "536",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "1:18"
+        },
+        "homeScore": 77,
+        "awayScore": 79,
+        "text": "Anthony Black makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:50:20Z"
+      },
+      {
+        "id": "401809955537",
+        "sequenceNumber": "537",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "1:18"
+        },
+        "homeScore": 78,
+        "awayScore": 79,
+        "text": "Anthony Black makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:50:34Z"
+      },
+      {
+        "id": "401809955538",
+        "sequenceNumber": "538",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "1:03"
+        },
+        "homeScore": 78,
+        "awayScore": 81,
+        "text": "Matas Buzelis makes 3-foot two point shot (Jalen Smith assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "128",
+          "text": "Driving Finger Roll Layup"
+        },
+        "wallclock": "2025-10-26T00:50:50Z"
+      },
+      {
+        "id": "401809955546",
+        "sequenceNumber": "546",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "48.3"
+        },
+        "homeScore": 78,
+        "awayScore": 82,
+        "text": "Jalen Smith makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:51:37Z"
+      },
+      {
+        "id": "401809955547",
+        "sequenceNumber": "547",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "48.3"
+        },
+        "homeScore": 78,
+        "awayScore": 83,
+        "text": "Jalen Smith makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T00:51:54Z"
+      },
+      {
+        "id": "401809955548",
+        "sequenceNumber": "548",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "27.5"
+        },
+        "homeScore": 80,
+        "awayScore": 83,
+        "text": "Jase Richardson makes driving layup (Tristan da Silva assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-26T00:52:18Z"
+      },
+      {
+        "id": "401809955555",
+        "sequenceNumber": "555",
+        "period": {
+          "number": 3,
+          "displayValue": "3rd Quarter"
+        },
+        "clock": {
+          "displayValue": "0.0"
+        },
+        "homeScore": 80,
+        "awayScore": 83,
+        "text": "End of the 3rd Quarter",
+        "scoringPlay": false,
+        "type": {
+          "id": "412",
+          "text": "End Period"
+        },
+        "wallclock": "2025-10-26T00:53:16Z"
+      },
+      {
+        "id": "401809955567",
+        "sequenceNumber": "567",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "11:22"
+        },
+        "homeScore": 80,
+        "awayScore": 84,
+        "text": "Tre Jones makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:57:21Z"
+      },
+      {
+        "id": "401809955579",
+        "sequenceNumber": "579",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "10:38"
+        },
+        "homeScore": 80,
+        "awayScore": 86,
+        "text": "Julian Phillips makes two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "125",
+          "text": "Layup Shot Putback"
+        },
+        "wallclock": "2025-10-26T00:58:46Z"
+      },
+      {
+        "id": "401809955582",
+        "sequenceNumber": "582",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "10:23"
+        },
+        "homeScore": 81,
+        "awayScore": 86,
+        "text": "Goga Bitadze makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T00:59:34Z"
+      },
+      {
+        "id": "401809955587",
+        "sequenceNumber": "587",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "10:16"
+        },
+        "homeScore": 83,
+        "awayScore": 86,
+        "text": "Desmond Bane makes tip shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "94",
+          "text": "Tip Shot"
+        },
+        "wallclock": "2025-10-26T01:00:01Z"
+      },
+      {
+        "id": "401809955596",
+        "sequenceNumber": "596",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "9:27"
+        },
+        "homeScore": 83,
+        "awayScore": 88,
+        "text": "Josh Giddey makes two point shot (Kevin Huerter assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "127",
+          "text": "Layup Running Reverse"
+        },
+        "wallclock": "2025-10-26T01:00:51Z"
+      },
+      {
+        "id": "401809955607",
+        "sequenceNumber": "607",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "9:14"
+        },
+        "homeScore": 85,
+        "awayScore": 88,
+        "text": "Franz Wagner makes two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "125",
+          "text": "Layup Shot Putback"
+        },
+        "wallclock": "2025-10-26T01:02:17Z"
+      },
+      {
+        "id": "401809955608",
+        "sequenceNumber": "608",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "8:53"
+        },
+        "homeScore": 85,
+        "awayScore": 91,
+        "text": "Ayo Dosunmu makes 23-foot three point jumper (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:02:32Z"
+      },
+      {
+        "id": "401809955616",
+        "sequenceNumber": "616",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "8:11"
+        },
+        "homeScore": 85,
+        "awayScore": 94,
+        "text": "Jalen Smith makes 25-foot three point jumper (Ayo Dosunmu assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:03:15Z"
+      },
+      {
+        "id": "401809955632",
+        "sequenceNumber": "632",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "7:48"
+        },
+        "homeScore": 86,
+        "awayScore": 94,
+        "text": "Wendell Carter Jr. makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T01:07:55Z"
+      },
+      {
+        "id": "401809955635",
+        "sequenceNumber": "635",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "7:48"
+        },
+        "homeScore": 87,
+        "awayScore": 94,
+        "text": "Wendell Carter Jr. makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T01:08:16Z"
+      },
+      {
+        "id": "401809955643",
+        "sequenceNumber": "643",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "6:54"
+        },
+        "homeScore": 87,
+        "awayScore": 95,
+        "text": "Josh Giddey makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T01:10:11Z"
+      },
+      {
+        "id": "401809955646",
+        "sequenceNumber": "646",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "6:54"
+        },
+        "homeScore": 87,
+        "awayScore": 96,
+        "text": "Josh Giddey makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T01:10:29Z"
+      },
+      {
+        "id": "401809955655",
+        "sequenceNumber": "655",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "5:50"
+        },
+        "homeScore": 87,
+        "awayScore": 98,
+        "text": "Patrick Williams makes 8-foot two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "114",
+          "text": "Turnaround Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:11:51Z"
+      },
+      {
+        "id": "401809955656",
+        "sequenceNumber": "656",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "5:37"
+        },
+        "homeScore": 89,
+        "awayScore": 98,
+        "text": "Anthony Black makes driving layup",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-26T01:12:06Z"
+      },
+      {
+        "id": "401809955665",
+        "sequenceNumber": "665",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "5:24"
+        },
+        "homeScore": 89,
+        "awayScore": 99,
+        "text": "Josh Giddey makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T01:13:11Z"
+      },
+      {
+        "id": "401809955670",
+        "sequenceNumber": "670",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "5:10"
+        },
+        "homeScore": 90,
+        "awayScore": 99,
+        "text": "Tristan da Silva makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T01:14:21Z"
+      },
+      {
+        "id": "401809955671",
+        "sequenceNumber": "671",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "5:10"
+        },
+        "homeScore": 91,
+        "awayScore": 99,
+        "text": "Tristan da Silva makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T01:14:40Z"
+      },
+      {
+        "id": "401809955684",
+        "sequenceNumber": "684",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "4:27"
+        },
+        "homeScore": 92,
+        "awayScore": 99,
+        "text": "Wendell Carter Jr. makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T01:16:35Z"
+      },
+      {
+        "id": "401809955692",
+        "sequenceNumber": "692",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "4:12"
+        },
+        "homeScore": 92,
+        "awayScore": 102,
+        "text": "Ayo Dosunmu makes 25-foot three point jumper (Tre Jones assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:19:27Z"
+      },
+      {
+        "id": "401809955699",
+        "sequenceNumber": "699",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "3:19"
+        },
+        "homeScore": 94,
+        "awayScore": 102,
+        "text": "Anthony Black makes 8-foot two point shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "137",
+          "text": "Turnaround Fade Away Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:23:26Z"
+      },
+      {
+        "id": "401809955700",
+        "sequenceNumber": "700",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "2:57"
+        },
+        "homeScore": 94,
+        "awayScore": 105,
+        "text": "Ayo Dosunmu makes 23-foot three point jumper (Nikola Vucevic assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "92",
+          "text": "Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:23:48Z"
+      },
+      {
+        "id": "401809955708",
+        "sequenceNumber": "708",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "2:30"
+        },
+        "homeScore": 94,
+        "awayScore": 106,
+        "text": "Nikola Vucevic makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T01:25:20Z"
+      },
+      {
+        "id": "401809955709",
+        "sequenceNumber": "709",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "2:30"
+        },
+        "homeScore": 94,
+        "awayScore": 107,
+        "text": "Nikola Vucevic makes free throw 2 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "99",
+          "text": "Free Throw - 2 of 2"
+        },
+        "wallclock": "2025-10-26T01:25:40Z"
+      },
+      {
+        "id": "401809955710",
+        "sequenceNumber": "710",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "2:14"
+        },
+        "homeScore": 96,
+        "awayScore": 107,
+        "text": "Desmond Bane makes driving layup (Franz Wagner assists)",
+        "scoringPlay": true,
+        "type": {
+          "id": "110",
+          "text": "Driving Layup Shot"
+        },
+        "wallclock": "2025-10-26T01:25:56Z"
+      },
+      {
+        "id": "401809955712",
+        "sequenceNumber": "712",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "1:48"
+        },
+        "homeScore": 96,
+        "awayScore": 109,
+        "text": "Kevin Huerter makes 7-foot pullup jump shot",
+        "scoringPlay": true,
+        "type": {
+          "id": "131",
+          "text": "Pullup Jump Shot"
+        },
+        "wallclock": "2025-10-26T01:26:25Z"
+      },
+      {
+        "id": "401809955715",
+        "sequenceNumber": "715",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "1:28"
+        },
+        "homeScore": 98,
+        "awayScore": 109,
+        "text": "Paolo Banchero makes layup",
+        "scoringPlay": true,
+        "type": {
+          "id": "95",
+          "text": "Layup Shot"
+        },
+        "wallclock": "2025-10-26T01:26:48Z"
+      },
+      {
+        "id": "401809955722",
+        "sequenceNumber": "722",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "43.2"
+        },
+        "homeScore": 98,
+        "awayScore": 110,
+        "text": "Tre Jones makes free throw 1 of 2",
+        "scoringPlay": true,
+        "type": {
+          "id": "98",
+          "text": "Free Throw - 1 of 2"
+        },
+        "wallclock": "2025-10-26T01:28:04Z"
+      },
+      {
+        "id": "401809955727",
+        "sequenceNumber": "727",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "4.6"
+        },
+        "homeScore": 98,
+        "awayScore": 110,
+        "text": "shot clock turnover ",
+        "scoringPlay": false,
+        "type": {
+          "id": "70",
+          "text": "Shot Clock Turnover"
+        },
+        "wallclock": "2025-10-26T01:29:01Z"
+      },
+      {
+        "id": "401809955728",
+        "sequenceNumber": "728",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "0.0"
+        },
+        "homeScore": 98,
+        "awayScore": 110,
+        "text": "End of the 4th Quarter",
+        "scoringPlay": false,
+        "type": {
+          "id": "412",
+          "text": "End Period"
+        },
+        "wallclock": "2025-10-26T01:29:17Z"
+      },
+      {
+        "id": "401809955729",
+        "sequenceNumber": "729",
+        "period": {
+          "number": 4,
+          "displayValue": "4th Quarter"
+        },
+        "clock": {
+          "displayValue": "0.0"
+        },
+        "homeScore": 98,
+        "awayScore": 110,
+        "text": "End of Game",
+        "scoringPlay": false,
+        "type": {
+          "id": "402",
+          "text": "End Game"
+        },
+        "wallclock": "2025-10-26T01:29:21Z"
+      }
+    ]
+  },
+  "scoreboardEvent": {
+    "id": "401809955",
+    "status": {
+      "clock": 720.0,
+      "displayClock": "12:00",
+      "period": 4,
+      "type": {
+        "id": "3",
+        "name": "STATUS_FINAL",
+        "state": "post",
+        "completed": true,
+        "description": "Final",
+        "detail": "Final",
+        "shortDetail": "Final"
+      }
+    },
+    "competitions": [
+      {
+        "status": {
+          "clock": 720.0,
+          "displayClock": "12:00",
+          "period": 4,
+          "type": {
+            "id": "3",
+            "name": "STATUS_FINAL",
+            "state": "post",
+            "completed": true,
+            "description": "Final",
+            "detail": "Final",
+            "shortDetail": "Final"
+          }
+        },
+        "competitors": [
+          {
+            "homeAway": "home",
+            "score": "98",
+            "team": {
+              "displayName": "Orlando Magic"
+            }
+          },
+          {
+            "homeAway": "away",
+            "score": "110",
+            "team": {
+              "displayName": "Chicago Bulls"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

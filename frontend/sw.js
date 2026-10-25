@@ -24,6 +24,13 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./app.html",
+  "./digit-clock.html",
+  "./css/digit-clock.css",
+  "./js/digitClockEngine.js",
+  "./js/digitClockSports.js",
+  "./js/digitClockCompetition.js",
+  "./js/digitClockLeagues.js",
+  "./js/digitClock.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -102,6 +109,9 @@ self.addEventListener("fetch", event => {
 
   // Do not touch Apps Script/API calls or any outside requests.
   if (url.origin !== self.location.origin) return;
+
+  // Never serve an offline cached score snapshot as a fresh Digit Clock feed.
+  if (url.pathname === "/api/digit-clock") return;
 
   event.respondWith(networkFirst(request));
 });
