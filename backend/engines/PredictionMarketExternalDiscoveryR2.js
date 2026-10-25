@@ -414,7 +414,7 @@ function predictionMarketExternalDiscoveryR2Resolve(payload) {
     if (!match) throw new Error("No provider event matched that URL or ID.");
     eventId = predictionMarketExternalDiscoveryR2String_(match.externalEventId);
   }
-  var detail = predictionMarketExternalDiscoveryR2Detail({ username:payload.username, provider:parsed.provider, eventId:eventId, includeClosed:true, status:"all" });
+  var detail = predictionMarketExternalDiscoveryR2Detail(Object.assign({}, payload, { provider:parsed.provider, eventId:eventId, includeClosed:true, status:"all" }));
   return {
     success:true,
     contractVersion:PREDICTION_MARKET_EXTERNAL_DISCOVERY_R2_CONTRACT,
