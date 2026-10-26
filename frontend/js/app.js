@@ -1984,6 +1984,11 @@ async function enterGame(
       .trim()
       .toLowerCase();
 
+  if (gameType === "digit-clock" && gameId) {
+    window.location.href = "./digit-clock.html?gameId=" + encodeURIComponent(gameId);
+    return;
+  }
+
   if (!gameId) {
     return;
   }
@@ -2169,6 +2174,11 @@ async function viewGameLeaderboard(
     String(gameType || "")
       .trim()
       .toLowerCase();
+
+  if (gameType === "digit-clock" && gameId) {
+    window.location.href = "./digit-clock.html?gameId=" + encodeURIComponent(gameId);
+    return;
+  }
 
   if (!gameId) {
     return;

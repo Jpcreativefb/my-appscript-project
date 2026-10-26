@@ -73,6 +73,11 @@ function doPost(e) {
       body
     );
 
+    if (/^(getDigitClockWorkspace|admin(SaveDigitClockLeague|PublishDigitClockSeason|PrepareDigitClockImport|PreviewDigitClockImport|CommitDigitClockImport))$/.test(action)) {
+      return json(digitClockSharedDispatch_(action, body));
+    }
+
+
     // =========================
     // AUTHENTICATION WRITES
     // Sensitive credentials never belong in GET/query strings.

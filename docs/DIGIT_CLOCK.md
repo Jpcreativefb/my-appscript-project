@@ -90,3 +90,68 @@ Additional replay fixtures, fetched October 25, 2026, retain only the necessary 
 - NHL 401802478: Islanders 3–Flyers 4 after a shootout; 3,900 timed seconds; the final winning digit receives zero shootout seconds.
 
 Rule references: [NBA scoring and timing](https://official.nba.com/rule-no-5-scoring-and-timing), [NCAA football statistics manual](https://fs.ncaa.org/Docs/stats/Stats_Manuals/Football.pdf), [NCAA women’s rules](https://ncaaorg.s3.amazonaws.com/championships/sports/basketball/rules/women/PRWBB_RulesBook.pdf), [NHL official rulebook](https://media.nhl.com/site/asset/public/ext/2022-23/2022-23Rulebook.pdf).
+
+## Shared PATTC leagues and Sheets import (shared-r2)
+
+`/digit-clock` is the shared viewer and admin setup page. `/digit-clock-console.html`
+retains the device-local advanced calculator. Sign in to PATTC before opening shared leagues.
+Only server-validated administrators receive setup controls or may change league data.
+Published seasons create a regular `digit-clock` game in the Sports / Digit Clock hub;
+Enter Game and Leaderboard both open the shared viewer with that season selected.
+
+Admin workflow:
+1. Open Admin setup, create a league, then add a season. Save league.
+2. Add names and games manually, or create the Google Sheets templates.
+3. Assign digits manually or randomize a game; optionally copy its numbers across its saved week.
+4. Choose scoring values and the visible sections. Season defaults can be overridden per game.
+5. Save and publish the season. Members select a league, season, week, game or combination.
+
+The weekly scoreboard uses ESPN names/logos, current scores and the assigned current digit.
+Time/outs and period leaders appear when enabled. Beneath each scoreboard the admin can
+independently enable Time Bank, Quarter/Period/Inning Winners, Who Takes the Number,
+Your Path to the Score, Possibilities and Paper Trail. Sections are collapsible.
+Possibilities are illustrative ending-digit models, disabled by default, not ESPN odds.
+Combined stats are separate from individual scoreboards. Named combinations sum the
+selected games' individual awards; baseball outs and clock seconds are never added together.
+
+### Bulk entry in the PATTC Google workbook
+
+The admin button creates two dedicated tabs without overwriting existing tabs or cells:
+
+* `DigitClockGamesImport`: `LeagueID, SeasonID, Week, Sport, ESPNEventID, Group`
+* `DigitClockNumbersImport`: `LeagueID, SeasonID, Week, Sport, ESPNEventID, Digit, PlayerName, Username`
+
+Copy LeagueID and SeasonID from Admin setup. Sports are `nfl, cfb, nba, wnba, ncaam,
+ncaaw, mlb, nhl`. ESPNEventID is the numeric event ID; Group is an optional named
+combination. In number rows, Digit is 0–9. Blank Week (or `*`), Sport and ESPNEventID
+match all applicable games in that season. Username is optional; PlayerName is displayed.
+A number row applies after game rows, so games and assignments can be imported together.
+Two rows assigning different names to the same game's digit block the entire import.
+Repeated imports update matching games/assignments rather than duplicating events.
+
+Use Preview sheet import, fix row errors, then Import previewed rows. Any intervening
+sheet or league change requires another preview. Save pending admin edits first.
+Templates live in the existing PATTC workbook; no Drive upload or Sheets credential
+is required beyond the workbook's ordinary Google sharing permissions.
+
+Shared storage is the dedicated `DigitClockLeagueStore` sheet. Chunked append records
+with commit markers, optimistic revisions and a script lock protect concurrent saves.
+Reads never create sheets. Previous revisions are retained for recovery. The optional
+old JSON backup is a downloaded file that can be kept in Documents or Google Drive;
+Import leagues saved on this browser explicitly copies device-local leagues into shared storage.
+
+ESPN refreshes run every 30 seconds while the viewer is visible. Members calculate live
+standings locally without workbook writes. Admins save refreshed snapshots explicitly;
+scores are not continuously written to Sheets. Feed failures retain prior snapshots,
+mark the affected game stale, and withhold confirmed awards. Baseball uses actual outs
+(six per full inning), credits scoring-play outs to the previous digit, and does not
+invent unused outs for walk-offs. Existing OT and shootout rules remain in the sports engine.
+
+The dedicated POST `/api/digit-leagues` bridge forwards only these six actions, never
+puts session tokens in URLs, and rejects writes on preview deployments. It recognizes
+both canonical PATTC production Pages hosts and uses the stable production Apps Script
+URL. Preview uses the existing Preview backend and is read-only because it shares the workbook.
+
+Validation: `node tests/digit_clock_shared_tests.js`, the full production check script,
+and `tools/verify_digit_clock_shared_ui.js` with Playwright and an isolated fixture server.
+The browser fixture does not create real leagues, modify Google Sheets or submit other games' data.

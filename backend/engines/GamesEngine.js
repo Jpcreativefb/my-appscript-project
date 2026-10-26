@@ -22,6 +22,13 @@ function getSupportedGameTypes() {
 
   return [
     {
+      id: "digit-clock",
+      label: "Digit Clock",
+      description: "Follow assigned score digits, time, outs and period results.",
+      predictionEnabled: false, rankingEnabled: false, confidenceEnabled: false,
+      wagerEnabled: false, stakedPointsEnabled: false, fixedPointsEnabled: false
+    },
+    {
       id: "prediction",
       label: "Prediction Game",
       description: "Users pick one nominee or answer per category.",

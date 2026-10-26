@@ -2164,6 +2164,8 @@ function getDashboardGameActionLabel_(
       .trim()
       .toLowerCase();
 
+  if (type === "digit-clock") return "View games & results";
+
   const madeCount =
     Number(game.madeCount) ||
     getDashboardMadeCountFromStats_(game);

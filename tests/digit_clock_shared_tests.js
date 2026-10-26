@@ -1,0 +1,26 @@
+const assert=require('assert'),vm=require('vm'),fs=require('fs'),crypto=require('crypto');
+const C=require('../frontend/js/digitClockCompetition.js');
+const sheets=new Map();let sequence=0,locked=false;
+function makeSheet(){let rows=[];return {getLastRow:()=>rows.length,getDataRange:()=>({getValues:()=>structuredClone(rows)}),appendRow:r=>rows.push(r),setFrozenRows(){},deleteRow:n=>rows.splice(n-1,1),getRange:(start,col,n,width)=>({getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:width},(_,j)=>rows[start+i-1]?.[col+j-1]??'')),setValues:values=>values.forEach((r,i)=>{rows[start+i-1]=r;})})};}
+const ss={getSheetByName:n=>sheets.get(n),insertSheet:n=>{const s=makeSheet();sheets.set(n,s);return s;},getUrl:()=> 'https://docs.google.com/spreadsheets/d/fixture'};
+const ctx={console,SpreadsheetApp:{getActive:()=>ss,flush(){}},LockService:{getScriptLock:()=>({tryLock(){assert(!locked);locked=true;return true;},releaseLock(){locked=false;}})},Utilities:{getUuid:()=>`id-${++sequence}`,DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>crypto.createHash('sha256').update(s).digest(),base64EncodeWebSafe:b=>Buffer.from(b).toString('base64url')},validateSessionToken:t=>t==='admin'?{success:true,isAdmin:true,username:'owner'}:t==='member'?{success:true,isAdmin:false,username:'sam'}:{success:false},adminCreateGame:p=>{assert.equal(p.type,'digit-clock');assert(!locked);return{success:true};}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('backend/engines/DigitClockSharedEngine.js','utf8'),ctx);
+const call=(action,body={})=>ctx.digitClockSharedDispatch_(action,{token:'admin',...body});
+assert.equal(call('getDigitClockWorkspace').leagues.length,0);assert.equal(sheets.size,0,'reads never create sheets');
+assert.throws(()=>call('adminPrepareDigitClockImport',{token:'member'}),/Administrator/);assert.throws(()=>call('getDigitClockWorkspace',{token:''}),/Sign in/);
+let league={id:'league-1',name:'Family',members:[],seasons:[{id:'season-1',label:'2026',rules:{...C.defaults},entries:[]}]};
+league=call('adminSaveDigitClockLeague',{league,expectedRevision:0}).league;assert.equal(league.revision,1);
+assert.throws(()=>call('adminSaveDigitClockLeague',{league,expectedRevision:0}),/changed/);
+call('adminPrepareDigitClockImport');sheets.get('DigitClockGamesImport').appendRow(['league-1','season-1','1','nfl','401547417','Sunday']);sheets.get('DigitClockGamesImport').appendRow(['league-1','season-1','1','mlb','401999999','Sunday']);
+for(let digit=0;digit<10;digit++)sheets.get('DigitClockNumbersImport').appendRow(['league-1','season-1','1','','',digit,'Sam '+digit,'sam'+digit]);
+let plan=call('adminPreviewDigitClockImport');assert.equal(plan.errors.length,0);assert.equal(plan.summary.games,2);assert.equal(plan.summary.assignments,20);assert.equal(ctx.dcReadAll_()['league-1'].seasons[0].entries.length,0,'preview does not save');
+let committed=call('adminCommitDigitClockImport',{previewHash:plan.hash});assert.equal(committed.leagues[0].revision,2);assert.equal(ctx.dcReadAll_()['league-1'].members.length,10);
+assert.throws(()=>call('adminCommitDigitClockImport',{previewHash:plan.hash}),/changed/);
+sheets.get('DigitClockNumbersImport').appendRow(['league-1','season-1','1','','',0,'Different name','']);plan=call('adminPreviewDigitClockImport');assert(plan.errors.some(e=>e.includes('conflicting')));assert.throws(()=>call('adminCommitDigitClockImport',{previewHash:plan.hash}),/Fix all/);
+assert.equal(call('getDigitClockWorkspace',{token:'member'}).leagues.length,0);
+const published=call('adminPublishDigitClockSeason',{leagueId:'league-1',seasonId:'season-1',revision:2});assert(published.gameId.startsWith('digit-clock-'));assert.equal(published.league.revision,3);
+const publicView=call('getDigitClockWorkspace',{token:'member'});assert.equal(publicView.leagues.length,1);assert.equal(publicView.leagues[0].members[0].username,undefined);
+assert.throws(()=>ctx.dcValidateLeague_({...league,id:'__proto__'}),/valid league/);
+assert.throws(()=>ctx.dcValidateRules_({...C.defaults,q1:-1}),/award/);
+const rows=sheets.get('DigitClockLeagueStore').getDataRange().getValues();assert(rows.filter(r=>r[2]==='commit').length<=2,'retains current and preceding revision');
+console.log('Digit Clock shared: auth, read-only bootstrap, revision conflicts, sheet preview/commit, row conflicts, number scopes, publication and private roster fields passed.');
