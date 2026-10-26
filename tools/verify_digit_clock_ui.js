@@ -30,7 +30,7 @@ const server = http.createServer((req, res) => {
     const errors = [];
     page.on("pageerror", e => errors.push(e.message));
     await page.route("https://fonts.googleapis.com/**", route => route.abort());
-    const base = `http://127.0.0.1:${server.address().port}/digit-clock.html`;
+    const base = `http://127.0.0.1:${server.address().port}/digit-clock-console.html`;
     await page.goto(base);
     await page.getByRole("button", { name: "Try example" }).click();
     assert.equal(await page.locator(".digit-card").count(), 10);

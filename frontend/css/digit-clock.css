@@ -3,3 +3,14 @@
 /* League scheduling and season standings. */
 .league-selectors{margin:20px 0}.league-heading{margin-top:24px;flex-wrap:wrap}.league-heading h3{margin:0;flex:1;min-width:140px}.roster-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.roster-list input{width:100%}.saved-games{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.saved-game{padding:20px;border:1px solid var(--line);border-radius:8px;background:#0d1b1e;min-width:0}.saved-game.selected-game{border-color:var(--lime)}.saved-game h3{margin-bottom:10px;font-size:17px;overflow-wrap:anywhere}.saved-game p{margin-bottom:12px}.saved-game button{font-size:12px}.lineup-editor{border:1px solid var(--teal);border-radius:8px;padding:22px;margin-top:20px}.lineup-editor select{width:100%}.check-label{display:flex;flex-direction:row;align-items:center;gap:10px}.check-label input{min-height:0;accent-color:var(--lime)}.import-label{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px}.import-label input{font-size:12px;max-width:280px}#dc-manager-message{margin:18px 0}#dc-create>.controls{margin:16px 0}#dc-standings td:nth-child(3){color:var(--lime);font-weight:700}#dc-standings td:nth-child(5){color:var(--teal)}#dc-period-winners td{min-width:85px}#dc-period-winners td:nth-child(2),#dc-period-winners td:nth-child(5){min-width:130px}#dc-lineup .model-inputs select{width:100%}@media(max-width:800px){.roster-list{grid-template-columns:repeat(2,minmax(0,1fr))}.saved-games{grid-template-columns:1fr}}@media(max-width:520px){#league-heading{font-size:27px}.league-heading label{max-width:100%;width:100%}.lineup-editor{padding:15px}.lineup-editor .section-heading{flex-wrap:wrap}.league-selectors>*{width:100%}.league-selectors .grow{min-width:0}.import-label input{max-width:100%;width:100%}.panel .section-heading .pill{white-space:normal;text-align:center;max-width:105px}}
 .model-inputs>*{min-width:0}.model-inputs select{width:100%}.saved-game .eyebrow{line-height:1.6}.league-selectors label{min-width:0}#general-model-form input{width:100%}
+
+/* Shared league scoreboards */
+.dc-scorecard { border-bottom:1px solid var(--line, #34504c); padding:18px 0; }
+.dc-scoreline { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.dc-team { display:inline-flex; align-items:center; gap:8px; }
+.dc-team b { font-size:1.3rem; }
+#admin textarea { display:block; width:min(100%,540px); font:inherit; color:inherit; background:#102622; border:1px solid #49615b; border-radius:8px; padding:10px; }
+#admin details { margin:16px 0; padding:12px 0; border-top:1px solid #34504c; }
+#game-list details { margin-top:12px; }
+#game-list details details { padding:10px; }
+#visibility input[type=checkbox] { width:auto; }

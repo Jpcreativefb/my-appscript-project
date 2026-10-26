@@ -1961,6 +1961,7 @@ function getDashboardGameMode_(game) {
     plain Wager games and skipped the Game Sections chooser.
   */
   const explicitTypes = [
+    "digit-clock",
     "mixed",
     "hybrid",
     "combo",
@@ -2045,6 +2046,8 @@ function getDashboardHubPlacement_(game, mode, options) {
   }
 
   const sportsSurvivor = ["sports-survivor", "streak-survivor", "streak-points-strikes", "king-of-the-hill"].indexOf(survivorMode) !== -1;
+
+  if (mode === "digit-clock") return { category: "sports", group: "Digit Clock" };
 
   if (mode === "team-fantasy") {
     return { category: "sports", group: "NFL" };
@@ -2179,6 +2182,8 @@ function getDashboardGameTypeLabel_(
   game,
   mode
 ) {
+
+  if (mode === "digit-clock") return "Digit Clock";
 
   if (mode === "team-fantasy") {
     return "Team Fantasy Football";

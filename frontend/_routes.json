@@ -7,7 +7,8 @@
     "/api/push-public-key",
     "/api/push-send",
     "/api/push-subscription",
-    "/api/digit-clock"
+    "/api/digit-clock",
+    "/api/digit-leagues"
   ],
   "exclude": []
 }
