@@ -152,7 +152,14 @@ function dcPublishSeason_(params) {
 function digitClockSharedDispatch_(action,params) {
   var actor=dcActor_(params,/^admin/.test(action));
   if(action==="getDigitClockWorkspace") {
-    var all=dcReadAll_(); return {success:true,isAdmin:actor.isAdmin===true,username:actor.username,leagues:Object.keys(all).map(function(id) { return all[id]; }).filter(function(l) { return dcCanView_(l,actor); }).map(function(l) { if(actor.isAdmin!==true) { delete l.allowUsernames; l.seasons=l.seasons.filter(function(s) { return !!s.gameId; }); l.members.forEach(function(m) { delete m.username; }); } return l; })};
+    var all=dcReadAll_(), memberships=Object.create(null);
+    var visible=Object.keys(all).map(function(id) { return all[id]; }).filter(function(l) { return dcCanView_(l,actor); });
+    visible.forEach(function(l) {
+      var username=dcText_(actor.username).toLowerCase();
+      memberships[l.id]=l.members.filter(function(m) { return username && dcText_(m.username).toLowerCase()===username; }).map(function(m) { return m.id; });
+      if(actor.isAdmin!==true) { delete l.allowUsernames; l.seasons=l.seasons.filter(function(s) { return !!s.gameId; }); l.members.forEach(function(m) { delete m.username; }); }
+    });
+    return {success:true,isAdmin:actor.isAdmin===true,username:actor.username,myMemberIds:memberships,leagues:visible};
   }
   if(action==="adminSaveDigitClockLeague") { var expected={};expected[params.league.id]=params.expectedRevision||0; return {success:true,league:dcSaveBatch_([params.league],expected)[0]}; }
   if(action==="adminPublishDigitClockSeason") return Object.assign({success:true},dcPublishSeason_(params));

@@ -14,3 +14,5 @@
 #game-list details { margin-top:12px; }
 #game-list details details { padding:10px; }
 #visibility input[type=checkbox] { width:auto; }
+.dc-personal { border-left:3px solid var(--lime); padding:12px; margin:12px 0; background:#193338; border-radius:6px; }
+.dc-other-numbers { margin:10px 0; padding:10px; border:1px solid var(--line); border-radius:6px; }
