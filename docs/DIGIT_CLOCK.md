@@ -155,3 +155,19 @@ URL. Preview uses the existing Preview backend and is read-only because it share
 Validation: `node tests/digit_clock_shared_tests.js`, the full production check script,
 and `tools/verify_digit_clock_shared_ui.js` with Playwright and an isolated fixture server.
 The browser fixture does not create real leagues, modify Google Sheets or submit other games' data.
+
+### Personal member view
+
+The viewer prioritizes the signed-in member's digit(s) using the optional Username in
+`DigitClockNumbersImport`. The server returns only that actor's matching member IDs,
+not other players' usernames. A Viewing as selector supports manually entered rosters;
+its preference is saved per PATTC username and league on the device. It affects only
+presentation and grants no permission to change number assignments.
+
+Time Bank, paths, probabilities and next-score outcomes show the selected member's
+numbers first, followed by a closed See all other numbers / results section. Period
+wins and the scoring paper trail similarly prioritize their matching results. All
+numbers is available in Viewing as for the complete tables. Multiple digits assigned
+to the same member are grouped together, and games with no assigned number explain
+that state. The scoreboard also shows their assigned digit(s). Expanded section state
+survives refreshes without opening sibling sections that happen to have the same label.

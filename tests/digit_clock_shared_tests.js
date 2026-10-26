@@ -20,6 +20,7 @@ sheets.get('DigitClockNumbersImport').appendRow(['league-1','season-1','1','',''
 assert.equal(call('getDigitClockWorkspace',{token:'member'}).leagues.length,0);
 const published=call('adminPublishDigitClockSeason',{leagueId:'league-1',seasonId:'season-1',revision:2});assert(published.gameId.startsWith('digit-clock-'));assert.equal(published.league.revision,3);
 const publicView=call('getDigitClockWorkspace',{token:'member'});assert.equal(publicView.leagues.length,1);assert.equal(publicView.leagues[0].members[0].username,undefined);
+ctx.validateSessionToken=()=>({success:true,isAdmin:false,username:'sam0'});const ownView=call('getDigitClockWorkspace',{token:'member'});assert.equal(ownView.myMemberIds['league-1'].length,1);assert.equal(ownView.myMemberIds['league-1'][0],ownView.leagues[0].members[0].id);
 assert.throws(()=>ctx.dcValidateLeague_({...league,id:'__proto__'}),/valid league/);
 assert.throws(()=>ctx.dcValidateRules_({...C.defaults,q1:-1}),/award/);
 const rows=sheets.get('DigitClockLeagueStore').getDataRange().getValues();assert(rows.filter(r=>r[2]==='commit').length<=2,'retains current and preceding revision');
