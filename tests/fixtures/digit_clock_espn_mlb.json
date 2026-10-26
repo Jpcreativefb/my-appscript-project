@@ -1,0 +1,1119 @@
+{
+  "league": "mlb",
+  "summary": {
+    "header": {
+      "season": {
+        "year": 2025,
+        "current": false,
+        "type": 3
+      },
+      "competitions": [
+        {
+          "id": "401809298",
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "STATUS_FINAL",
+              "state": "post",
+              "completed": true,
+              "description": "Final",
+              "detail": "Final",
+              "shortDetail": "Final"
+            }
+          },
+          "date": "2025-10-26T00:00Z",
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "1",
+              "team": {
+                "displayName": "Toronto Blue Jays"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "5",
+              "team": {
+                "displayName": "Los Angeles Dodgers"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "plays": [
+      {
+        "id": "4018092980000000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 1,
+          "displayValue": "1st Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 0,
+        "text": "Top of the 1st inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:09:20Z"
+      },
+      {
+        "id": "4018092980004990057",
+        "sequenceNumber": "4",
+        "period": {
+          "type": "Top",
+          "number": 1,
+          "displayValue": "1st Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Smith singled to center, Freeman scored.",
+        "scoringPlay": true,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 2,
+        "wallclock": "2025-10-26T00:16:37Z"
+      },
+      {
+        "id": "4018092980099990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 1,
+          "displayValue": "1st Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Middle of the 1st inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:18:28Z"
+      },
+      {
+        "id": "4018092980100000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 1,
+          "displayValue": "1st Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Bottom of the 1st inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:21:44Z"
+      },
+      {
+        "id": "4018092980199990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 1,
+          "displayValue": "1st Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "End of the 1st inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:32:03Z"
+      },
+      {
+        "id": "4018092980200000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 2,
+          "displayValue": "2nd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Top of the 2nd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:35:16Z"
+      },
+      {
+        "id": "4018092980299990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 2,
+          "displayValue": "2nd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Middle of the 2nd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:40:31Z"
+      },
+      {
+        "id": "4018092980300000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 2,
+          "displayValue": "2nd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Bottom of the 2nd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:44:00Z"
+      },
+      {
+        "id": "4018092980399990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 2,
+          "displayValue": "2nd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "End of the 2nd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:47:34Z"
+      },
+      {
+        "id": "4018092980400000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 3,
+          "displayValue": "3rd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Top of the 3rd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:50:41Z"
+      },
+      {
+        "id": "4018092980499990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 3,
+          "displayValue": "3rd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Middle of the 3rd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:53:32Z"
+      },
+      {
+        "id": "4018092980500000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 3,
+          "displayValue": "3rd Inning"
+        },
+        "homeScore": 0,
+        "awayScore": 1,
+        "text": "Bottom of the 3rd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T00:56:42Z"
+      },
+      {
+        "id": "4018092980504990057",
+        "sequenceNumber": "4",
+        "period": {
+          "type": "Bottom",
+          "number": 3,
+          "displayValue": "3rd Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Kirk hit sacrifice fly to center, Springer scored.",
+        "scoringPlay": true,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 2,
+        "wallclock": "2025-10-26T01:02:07Z"
+      },
+      {
+        "id": "4018092980599990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 3,
+          "displayValue": "3rd Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "End of the 3rd inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:03:00Z"
+      },
+      {
+        "id": "4018092980600000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 4,
+          "displayValue": "4th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Top of the 4th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:06:20Z"
+      },
+      {
+        "id": "4018092980699990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 4,
+          "displayValue": "4th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Middle of the 4th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:08:55Z"
+      },
+      {
+        "id": "4018092980700000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 4,
+          "displayValue": "4th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Bottom of the 4th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:12:06Z"
+      },
+      {
+        "id": "4018092980799990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 4,
+          "displayValue": "4th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "End of the 4th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:14:15Z"
+      },
+      {
+        "id": "4018092980800000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 5,
+          "displayValue": "5th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Top of the 5th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:17:43Z"
+      },
+      {
+        "id": "4018092980899990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 5,
+          "displayValue": "5th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Middle of the 5th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:21:37Z"
+      },
+      {
+        "id": "4018092980900000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 5,
+          "displayValue": "5th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Bottom of the 5th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:24:45Z"
+      },
+      {
+        "id": "4018092980999990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 5,
+          "displayValue": "5th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "End of the 5th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:27:23Z"
+      },
+      {
+        "id": "4018092981000000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 6,
+          "displayValue": "6th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Top of the 6th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:35:00Z"
+      },
+      {
+        "id": "4018092981099990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 6,
+          "displayValue": "6th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Middle of the 6th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:37:28Z"
+      },
+      {
+        "id": "4018092981100000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 6,
+          "displayValue": "6th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Bottom of the 6th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:40:38Z"
+      },
+      {
+        "id": "4018092981199990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 6,
+          "displayValue": "6th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "End of the 6th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:44:07Z"
+      },
+      {
+        "id": "4018092981200000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 7,
+          "displayValue": "7th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 1,
+        "text": "Top of the 7th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:47:27Z"
+      },
+      {
+        "id": "4018092981202990057",
+        "sequenceNumber": "8",
+        "period": {
+          "type": "Top",
+          "number": 7,
+          "displayValue": "7th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 2,
+        "text": "Smith homered to left (404 feet).",
+        "scoringPlay": true,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 1,
+        "wallclock": "2025-10-26T01:50:06Z"
+      },
+      {
+        "id": "4018092981204990057",
+        "sequenceNumber": "7",
+        "period": {
+          "type": "Top",
+          "number": 7,
+          "displayValue": "7th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 3,
+        "text": "Muncy homered to left (351 feet).",
+        "scoringPlay": true,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 2,
+        "wallclock": "2025-10-26T01:54:48Z"
+      },
+      {
+        "id": "4018092981299990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 7,
+          "displayValue": "7th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 3,
+        "text": "Middle of the 7th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T01:58:06Z"
+      },
+      {
+        "id": "4018092981300000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 7,
+          "displayValue": "7th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 3,
+        "text": "Bottom of the 7th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:01:14Z"
+      },
+      {
+        "id": "4018092981399990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 7,
+          "displayValue": "7th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 3,
+        "text": "End of the 7th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:04:59Z"
+      },
+      {
+        "id": "4018092981400000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 3,
+        "text": "Top of the 8th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:08:09Z"
+      },
+      {
+        "id": "4018092981405020454",
+        "sequenceNumber": "4",
+        "period": {
+          "type": "Top",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 4,
+        "text": "Pages scored on Hoffman wild pitch, Betts to second on wild pitch by Hoffman, Ohtani to third on wild pitch by Hoffman.",
+        "scoringPlay": true,
+        "type": {
+          "id": "54",
+          "text": "Wild Pitch",
+          "abbreviation": "WP",
+          "alternativeText": "Wild Pitch",
+          "type": "wild-pitch"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:17:01Z"
+      },
+      {
+        "id": "4018092981405020498",
+        "sequenceNumber": "5",
+        "period": {
+          "type": "Top",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 4,
+        "text": "Pages scored on Hoffman wild pitch, Betts to second, Ohtani to third.",
+        "scoringPlay": true,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:17:01Z"
+      },
+      {
+        "id": "4018092981406990057",
+        "sequenceNumber": "5",
+        "period": {
+          "type": "Top",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Smith grounded into fielder's choice to shortstop, Ohtani scored, Freeman out at second, Betts to third.",
+        "scoringPlay": true,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 2,
+        "wallclock": "2025-10-26T02:19:15Z"
+      },
+      {
+        "id": "4018092981499990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Middle of the 8th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:20:51Z"
+      },
+      {
+        "id": "4018092981500000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Bottom of the 8th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:23:54Z"
+      },
+      {
+        "id": "4018092981599990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 8,
+          "displayValue": "8th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "End of the 8th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:28:12Z"
+      },
+      {
+        "id": "4018092981600000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Top",
+          "number": 9,
+          "displayValue": "9th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Top of the 9th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:31:22Z"
+      },
+      {
+        "id": "4018092981699990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "Mid",
+          "number": 9,
+          "displayValue": "9th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Middle of the 9th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:36:49Z"
+      },
+      {
+        "id": "4018092981700000059",
+        "sequenceNumber": "1",
+        "period": {
+          "type": "Bottom",
+          "number": 9,
+          "displayValue": "9th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Bottom of the 9th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "59",
+          "text": "Start Inning",
+          "type": "start-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:40:07Z"
+      },
+      {
+        "id": "4018092981703990057",
+        "sequenceNumber": "6",
+        "period": {
+          "type": "Bottom",
+          "number": 9,
+          "displayValue": "9th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "Varsho popped out to third.",
+        "scoringPlay": false,
+        "type": {
+          "id": "57",
+          "text": "Play Result",
+          "type": "play-result"
+        },
+        "outs": 3,
+        "wallclock": "2025-10-26T02:45:24Z"
+      },
+      {
+        "id": "4018092981703990099",
+        "sequenceNumber": "7",
+        "period": {
+          "type": "Bottom",
+          "number": 9,
+          "displayValue": "9th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "scoringPlay": false,
+        "type": {
+          "id": "99",
+          "text": "End Batter/Pitcher",
+          "type": "end-batterpitcher"
+        },
+        "outs": 3,
+        "wallclock": "2025-10-26T02:45:24Z"
+      },
+      {
+        "id": "4018092981799990058",
+        "sequenceNumber": "2",
+        "period": {
+          "type": "End",
+          "number": 9,
+          "displayValue": "9th Inning"
+        },
+        "homeScore": 1,
+        "awayScore": 5,
+        "text": "End of the 9th inning",
+        "scoringPlay": false,
+        "type": {
+          "id": "58",
+          "text": "End Inning",
+          "type": "end-inning"
+        },
+        "outs": 0,
+        "wallclock": "2025-10-26T02:45:24Z"
+      }
+    ]
+  },
+  "scoreboardEvent": {
+    "id": "401809298",
+    "status": {
+      "clock": 0.0,
+      "displayClock": "0:00",
+      "period": 9,
+      "type": {
+        "id": "3",
+        "name": "STATUS_FINAL",
+        "state": "post",
+        "completed": true,
+        "description": "Final",
+        "detail": "Final",
+        "shortDetail": "Final"
+      }
+    },
+    "competitions": [
+      {
+        "status": {
+          "clock": 0.0,
+          "displayClock": "0:00",
+          "period": 9,
+          "type": {
+            "id": "3",
+            "name": "STATUS_FINAL",
+            "state": "post",
+            "completed": true,
+            "description": "Final",
+            "detail": "Final",
+            "shortDetail": "Final"
+          },
+          "featuredAthletes": [
+            {
+              "name": "winningPitcher",
+              "displayName": "Winning Pitcher",
+              "shortDisplayName": "Win",
+              "abbreviation": "WP",
+              "playerId": 4872587,
+              "athlete": {
+                "id": "4872587",
+                "fullName": "Yoshinobu Yamamoto",
+                "displayName": "Yoshinobu Yamamoto",
+                "shortName": "Y. Yamamoto",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/mlb/player/_/id/4872587"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/mlb/players/full/4872587.png",
+                "jersey": "18",
+                "position": "SP",
+                "team": {
+                  "id": "19"
+                }
+              },
+              "team": {
+                "id": "19"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "losses",
+                  "abbreviation": "L",
+                  "displayValue": "1"
+                },
+                {
+                  "name": "wins",
+                  "abbreviation": "W",
+                  "displayValue": "3"
+                },
+                {
+                  "name": "ERA",
+                  "abbreviation": "ERA",
+                  "displayValue": "1.57"
+                },
+                {
+                  "name": "errors",
+                  "abbreviation": "E",
+                  "displayValue": "0"
+                }
+              ]
+            },
+            {
+              "name": "losingPitcher",
+              "displayName": "Losing Pitcher",
+              "shortDisplayName": "Loss",
+              "abbreviation": "LP",
+              "playerId": 32667,
+              "athlete": {
+                "id": "32667",
+                "fullName": "Kevin Gausman",
+                "displayName": "Kevin Gausman",
+                "shortName": "K. Gausman",
+                "links": [
+                  {
+                    "rel": [
+                      "playercard",
+                      "desktop",
+                      "athlete"
+                    ],
+                    "href": "https://www.espn.com/mlb/player/_/id/32667"
+                  }
+                ],
+                "headshot": "https://a.espncdn.com/i/headshots/mlb/players/full/32667.png",
+                "jersey": "12",
+                "position": "SP",
+                "team": {
+                  "id": "14"
+                }
+              },
+              "team": {
+                "id": "14"
+              },
+              "statistics": [
+                {
+                  "name": "saves",
+                  "abbreviation": "SV",
+                  "displayValue": "0"
+                },
+                {
+                  "name": "losses",
+                  "abbreviation": "L",
+                  "displayValue": "2"
+                },
+                {
+                  "name": "wins",
+                  "abbreviation": "W",
+                  "displayValue": "2"
+                },
+                {
+                  "name": "ERA",
+                  "abbreviation": "ERA",
+                  "displayValue": "2.55"
+                },
+                {
+                  "name": "errors",
+                  "abbreviation": "E",
+                  "displayValue": "0"
+                }
+              ]
+            }
+          ]
+        },
+        "competitors": [
+          {
+            "homeAway": "home",
+            "score": "1",
+            "team": {
+              "displayName": "Toronto Blue Jays"
+            }
+          },
+          {
+            "homeAway": "away",
+            "score": "5",
+            "team": {
+              "displayName": "Los Angeles Dodgers"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -76,6 +76,7 @@ async function renderAdminPage() {
                   <strong>Sports Operations</strong><div class="admin-sub">Existing sports tools stay on their current routes and APIs.</div>
                   <div class="admin-actions">
                     <button class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores &amp; Game Builder</button>
+                    <button class="button admin-button secondary" onclick="window.location.href='./digit-clock.html#digit-clock-admin'">Digit Clock · Leagues &amp; Game Formats</button>
                     <button class="button admin-button secondary" onclick="navigate('admin-sports-engine')">Sports Engine Controls</button>
                   </div>
                 </div>

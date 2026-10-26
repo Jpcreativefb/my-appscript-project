@@ -6,7 +6,8 @@
     "/api/team-fantasy",
     "/api/push-public-key",
     "/api/push-send",
-    "/api/push-subscription"
+    "/api/push-subscription",
+    "/api/digit-clock"
   ],
   "exclude": []
 }
