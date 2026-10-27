@@ -756,7 +756,7 @@ function appPageScriptUrl_(name, retryToken) {
   if (name === "picks" || name === "confidenceR2") url.searchParams.set("confidenceWeekly", "v1228-confidence-pool-r8");
   // NFL_SURVIVOR_PLAYER_R2_MODULE_CACHE: Survivor-only lazy-module refresh.
   if (name === "survivor" || name === "survivorR4") url.searchParams.set("survivorPlayer", "v1231-nfl-survivor-live-presentation-r2");
-  if (name === "adminPredictionMarketsR3") url.searchParams.set("discovery", "search-url-futures-batch-r2");
+  if (name === "adminPredictionMarketsR3") url.searchParams.set("discovery", "section-keyword-batch-r3");
   if (retryToken) url.searchParams.set("retry", retryToken);
   return url.href;
 }

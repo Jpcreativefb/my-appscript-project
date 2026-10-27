@@ -368,6 +368,7 @@ function predictionMarketExternalDiscoveryR2ParseReference_(value, providerHint)
       var ticker=query.match(/(?:^|&)op_market_ticker=([^&]+)/i);if(ticker)result.marketId=decodeURIComponent(ticker[1]);
     }else if(host==='polymarket.com'||host==='www.polymarket.com'){
       result.provider='polymarket';if(parts[0]==='sports'&&((parts[1]==='futures'&&parts[2])||(parts.length===2&&parts[1]!=='futures'))){result.collection='polymarket-sports';result.sport=parts[1]==='futures'?parts[2]:parts[1];result.futures=parts[1]==='futures';}
+      else if(parts.length===1&&['politics','culture','weather','climate-science','economics','finance','crypto','tech','geopolitics'].indexOf(parts[0])!==-1){result.collection='polymarket-section';result.section=parts[0];}
       else if(parts[0]==='event')result.slug=parts[1]||'';else if(parts[0]==='market')result.marketSlug=parts[1]||'';
       else throw new Error('That is a Polymarket listing/category page, not a single event. Open a specific question first, then copy its /event/ page address.');
     }else throw new Error('Only official kalshi.com or polymarket.com event/market page URLs are supported.');
@@ -384,21 +385,25 @@ function predictionMarketExternalDiscoveryR2ParseReference_(value, providerHint)
 // Browse official provider collections through their APIs, never scrape or auto-import a page.
 function predictionMarketExternalDiscoveryR2Browse_(parsed,payload) {
   var state=awardsManagerParseJson_(payload.searchStateJSON,{})||{},rows,data,next,hasMore,label;
-  if(parsed.collection==='polymarket-sports'){
+  if(parsed.collection==='polymarket-sports'||parsed.collection==='polymarket-section'){
+    var sport={name:parsed.section},tagSlug=parsed.section==='culture'?'pop-culture':parsed.section;
+    if(parsed.collection==='polymarket-sports'){
     var sports=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/sports');
-    var sport=(Array.isArray(sports)?sports:[]).find(function(row){return predictionMarketExternalDiscoveryR2Key_(row.sport)===parsed.sport.toLowerCase();});
+    sport=(Array.isArray(sports)?sports:[]).find(function(row){return predictionMarketExternalDiscoveryR2Key_(row.sport)===parsed.sport.toLowerCase();});
     if(!sport)throw new Error('That sports listing is not supported by the provider API. Choose a league-specific futures page.');
-    var tag=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/tags/slug/'+encodeURIComponent(parsed.sport));
+    tagSlug=parsed.sport;}
+    var tag=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/tags/slug/'+encodeURIComponent(tagSlug));
     if(!/^\d+$/.test(String(tag.id)))throw new Error('Provider did not return a valid league tag.');
     var offset=Math.max(0,Math.min(100000,Math.floor(Number(state.offset||0)))),limit=50,url=AWARDS_MANAGER_POLYMARKET_BASE+'/events?tag_id='+encodeURIComponent(tag.id);
     if(parsed.futures){var gamesTag=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/tags/slug/games');if(!/^\d+$/.test(String(gamesTag.id)))throw new Error('Provider did not return the Games tag for futures filtering.');url+='&exclude_tag_id='+encodeURIComponent(gamesTag.id);}
     url+='&closed=false&active=true&limit='+limit+'&offset='+offset+'&order=volume24hr&ascending=false';
-    data=awardsManagerFetchJson_(url);if(!Array.isArray(data))throw new Error('Provider returned an unsupported event listing.');rows=data;hasMore=rows.length===limit;next={offset:offset+limit};label=(sport.name||parsed.sport.toUpperCase())+(parsed.futures?' futures':' events');
+    data=awardsManagerFetchJson_(url);if(!Array.isArray(data))throw new Error('Provider returned an unsupported event listing.');rows=data;hasMore=rows.length===limit;next={offset:offset+limit};label=(tag.label||sport.name||parsed.sport.toUpperCase())+(parsed.futures?' futures':' events');
   }else{
     var url=AWARDS_MANAGER_KALSHI_BASE+'/events?series_ticker='+encodeURIComponent(parsed.seriesTicker)+'&status=open&limit=50&with_nested_markets=true'+(state.cursor?'&cursor='+encodeURIComponent(state.cursor):'');
     data=awardsManagerFetchJson_(url);rows=Array.isArray(data.events)?data.events:[];next={cursor:awardsManagerString_(data.cursor)};hasMore=!!next.cursor;label='Kalshi series '+parsed.seriesTicker;
   }
-  var events=rows.filter(function(e){return awardsManagerMarketIsLive_(null,e);}).map(function(e){return parsed.provider==='polymarket'?predictionMarketExternalDiscoveryR2PolymarketSummary_(e,''):predictionMarketExternalDiscoveryR2KalshiSummary_(e,'');});
+  var keyword=predictionMarketExternalDiscoveryR2String_(payload.sectionKeyword),options=predictionMarketExternalDiscoveryR2Options_({});
+  var events=rows.filter(function(e){return awardsManagerMarketIsLive_(null,e)&&(!keyword||predictionMarketExternalDiscoveryR2Matches_(e,keyword,options));}).map(function(e){return parsed.provider==='polymarket'?predictionMarketExternalDiscoveryR2PolymarketSummary_(e,''):predictionMarketExternalDiscoveryR2KalshiSummary_(e,'');});
   return {success:true,contractVersion:PREDICTION_MARKET_EXTERNAL_DISCOVERY_R2_CONTRACT,collection:true,collectionLabel:label,resolvedReference:parsed,events:events,searchState:next,hasMore:hasMore,scannedPages:1,errors:[],coverage:parsed.futures?'League-tagged active events excluding the provider Games tag; website curation and ordering may differ.':'Active events in the provider collection; website curation and ordering may differ.'};
 }
 

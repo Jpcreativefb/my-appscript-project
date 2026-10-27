@@ -58,3 +58,12 @@ handler=async()=>({success:true,collection:true,collectionLabel:'NFL futures',ev
 handler=async()=>{throw Error('Provider request failed (429).');};await window.predictionMarketAdminR3ExternalSearch_({currentTarget:form,preventDefault(){}});assert(node('adminPredictionMarketDiscoveryStatus').textContent.includes('429'));assert(buttons.every(b=>!b.disabled));assert.equal(timers.size,0);
 console.log('Prediction discovery repair: exact URL/ID lookup, listing/host validation, strict scope/type/date filters, bounded open/closed continuation, dedupe, pending/elapsed/errors and read-only UI passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+// Section membership comes from the provider tag; keywords narrow raw titles/children.
+const sectionContext=context();let sectionUrls=[];
+sectionContext.awardsManagerFetchJson_=url=>{sectionUrls.push(url);if(url.endsWith('/tags/slug/politics'))return {id:'2',label:'Politics'};if(url.includes('/events?tag_id=2'))return Array.from({length:50},(_,i)=>event('section-'+i,i===49?'Senate election':'Presidential election'));throw Error(url);};
+assert.equal(sectionContext.predictionMarketExternalDiscoveryR2ParseReference_('https://polymarket.com/culture').collection,'polymarket-section');
+let sectionResult=sectionContext.predictionMarketExternalDiscoveryR2Resolve({reference:'https://polymarket.com/politics',sectionKeyword:'Senate'});
+assert.equal(sectionResult.events.length,1);assert(sectionResult.hasMore,'continuation uses raw page count, not filtered matches');assert.equal(sectionResult.collectionLabel,'Politics events');
+sectionResult=sectionContext.predictionMarketExternalDiscoveryR2Resolve({reference:'https://polymarket.com/politics',sectionKeyword:'Weather',searchStateJSON:JSON.stringify(sectionResult.searchState)});
+assert.equal(sectionResult.events.length,0);assert(sectionResult.hasMore);assert(sectionUrls.some(u=>u.includes('offset=50')));
+assert.equal(sectionContext.predictionMarketExternalDiscoveryR2Resolve({reference:'https://polymarket.com/politics'}).events.length,50);
