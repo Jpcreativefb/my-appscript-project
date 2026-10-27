@@ -155,19 +155,18 @@ authenticated.awardsManagerRequireAdmin_ = payload => {
   if (payload.username !== 'admin' || payload.sessionToken !== 'test-session') throw new Error('Admin auth missing');
 };
 authenticated.predictionMarketExternalDiscoveryR2RawDetail_ = (provider,eventId) => ({
-  provider, externalEventId:eventId, eventName:'Best Actor', markets:[]
+  provider, externalEventId:eventId, eventName:'Best Actor', markets:[{externalMarketId:'M1'}]
 });
-authenticated.predictionMarketExternalDiscoveryR2Search = payload => {
-  authenticated.awardsManagerRequireAdmin_(payload);
-  return {events:[{externalEventId:'event-actor',sourceUrl:'https://polymarket.com/event/best-actor'}]};
-};
+authenticated.AWARDS_MANAGER_POLYMARKET_BASE='https://provider.fixture';
+authenticated.awardsManagerFetchJson_ = () => ({id:'event-actor',slug:'best-actor'});
+authenticated.awardsManagerString_ = value => String(value||'');
 for (const reference of ['https://kalshi.com/markets/foo/x/KXOSCARS','https://polymarket.com/event/best-actor']) {
   const result = authenticated.predictionMarketExternalDiscoveryR2Resolve({
     username:'admin', sessionToken:'test-session', reference, providerHint:'auto'
   });
   assert(result.event.externalEventId);
 }
-assert.strictEqual(authChecks,5,'both outer and nested checks must retain authentication');
+assert.strictEqual(authChecks,4,'both outer and nested checks must retain authentication');
 assert.throws(()=>authenticated.predictionMarketExternalDiscoveryR2Resolve({username:'admin',reference:'https://kalshi.com/markets/foo/x/KXOSCARS'}),/Admin auth missing/);
 
 console.log('PASS prediction_market_external_discovery_r2_tests');

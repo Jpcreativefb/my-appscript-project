@@ -810,6 +810,7 @@ function awardsManagerEventPassesCategory_(event, category) {
 function awardsManagerEventMatchesSearch_(event, query, options) {
   event = event || {};
   options = options || {};
+  if (typeof options.eventFilter === "function") return !!options.eventFilter(event);
 
   if (!awardsManagerEventPassesCategory_(
     event,
@@ -1228,7 +1229,7 @@ function awardsManagerKalshiEventSearchPage_(
   );
 
   let pagesScanned = 0;
-  const maxPagesPerRequest = 4;
+  const maxPagesPerRequest = Math.max(1, Math.min(4, Number(options.maxPagesPerRequest || 4)));
   const targetMatches = 20;
 
   while (
@@ -1320,7 +1321,7 @@ function awardsManagerPolymarketEventSearchPage_(
   let hasMore = true;
 
   const matches = [];
-  const maxPagesPerRequest = 3;
+  const maxPagesPerRequest = Math.max(1, Math.min(3, Number(options.maxPagesPerRequest || 3)));
   const targetMatches = 20;
 
   while (
@@ -1466,7 +1467,9 @@ function apiAdminAwardsSearchExternalMarkets(payload) {
     ),
     sort: awardsManagerKey_(
       payload.sort || "relevance"
-    )
+    ),
+    maxPagesPerRequest: payload.maxPagesPerRequest,
+    eventFilter: typeof payload.eventFilter === "function" ? payload.eventFilter : null
   };
 
   const searchState =

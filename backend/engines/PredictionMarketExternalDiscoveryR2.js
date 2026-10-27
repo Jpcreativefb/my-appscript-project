@@ -37,6 +37,7 @@ function predictionMarketExternalDiscoveryR2Options_(payload) {
   var closeBefore = predictionMarketExternalDiscoveryR2String_(payload.closeBefore || payload.closeTo);
   if (closeAfter && predictionMarketExternalDiscoveryR2DateMs_(closeAfter) === null) throw new Error("Close-after date is invalid.");
   if (closeBefore && predictionMarketExternalDiscoveryR2DateMs_(closeBefore) === null) throw new Error("Close-before date is invalid.");
+  if (closeAfter && closeBefore && Date.parse(closeAfter)>Date.parse(closeBefore)) throw new Error("Close on/after must be before Close on/before.");
   return {
     category: predictionMarketExternalDiscoveryR2String_(payload.category),
     marketType: predictionMarketExternalDiscoveryR2String_(payload.marketType),
@@ -48,6 +49,29 @@ function predictionMarketExternalDiscoveryR2Options_(payload) {
     exactPhrase: payload.exactPhrase === true || ["1", "true", "yes", "on"].indexOf(predictionMarketExternalDiscoveryR2Key_(payload.exactPhrase)) !== -1,
     sort: predictionMarketExternalDiscoveryR2Key_(payload.sort || "relevance")
   };
+}
+
+// Match a visible event title or one child at a time, never unrelated rule text or separate siblings.
+function predictionMarketExternalDiscoveryR2Matches_(event, query, options) {
+  function text(parts) { return parts.map(predictionMarketExternalDiscoveryR2Key_).join(' ').replace(/[^\p{L}\p{N}]+/gu,' ').trim(); }
+  function matches(parts) {
+    var hay=' '+text(parts)+' ', wanted=text([query]);
+    if(options.exactPhrase)return hay.indexOf(' '+wanted+' ')!==-1;
+    return wanted.split(' ').every(function(token){return hay.indexOf(' '+token+' ')!==-1;});
+  }
+  var category=predictionMarketExternalDiscoveryR2Key_(options.category);
+  if(category&&category!=='all'&&text([event.category,event.subcategory].concat((event.tags||[]).map(function(tag){return typeof tag==='string'?tag:tag.label||tag.slug;}))).indexOf(category)===-1)return false;
+  var parent=[event.title,event.sub_title,event.subtitle], children=Array.isArray(event.markets)?event.markets:[];
+  var eventMatch=matches(parent), childMatch=children.some(function(m){return matches((options.searchIn==='markets'?[]:parent).concat([m.title,m.subtitle,m.question,m.yes_sub_title,m.no_sub_title]));});
+  // A ticker is useful for a single short league/code search (NFL), but rules/descriptions are not search titles.
+  if(!options.exactPhrase&&/^[a-z0-9]{2,8}$/i.test(query))eventMatch=eventMatch||text([event.series_ticker,event.ticker]).indexOf(query.toLowerCase())!==-1||(query.toLowerCase()==='nfl'&&text(parent).indexOf('pro football')!==-1);
+  if(!(options.searchIn==='event'?eventMatch:options.searchIn==='markets'?childMatch:eventMatch||childMatch))return false;
+  if(!predictionMarketExternalDiscoveryR2PassesType_(event,options))return false;
+  var close=awardsManagerEventCloseTime_(event), ms=predictionMarketExternalDiscoveryR2DateMs_(close);
+  if((options.closeAfter||options.closeBefore||options.closeDays>0)&&ms===null)return false;
+  if(!predictionMarketExternalDiscoveryR2PassesDate_(close,options))return false;
+  if(options.closeDays>0&&(ms<Date.now()||ms>Date.now()+options.closeDays*86400000))return false;
+  return true;
 }
 
 function predictionMarketExternalDiscoveryR2EventStatus_(event) {
@@ -190,48 +214,21 @@ function predictionMarketExternalDiscoveryR2PolymarketSummary_(event, query) {
   };
 }
 
-function predictionMarketExternalDiscoveryR2RawSearchProvider_(provider, query, options) {
-  var matches = [];
-  var scannedPages = 0;
-  if (provider === "kalshi") {
-    var statuses = options.status === "all" ? ["closed", "settled"] : ["closed", "settled"];
-    statuses.forEach(function(providerStatus) {
-      var cursor = "";
-      for (var page = 0; page < 4; page += 1) {
-        var url = AWARDS_MANAGER_KALSHI_BASE + "/events?status=" + encodeURIComponent(providerStatus) + "&limit=50&with_nested_markets=true" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : "");
-        var data;
-        try { data = awardsManagerFetchJson_(url); } catch (err) { break; }
-        var rows = Array.isArray(data && data.events) ? data.events : [];
-        rows.forEach(function(event) {
-          if (!awardsManagerEventMatchesSearch_(event, query, options)) return;
-          if (!predictionMarketExternalDiscoveryR2PassesType_(event, options)) return;
-          var summary = predictionMarketExternalDiscoveryR2KalshiSummary_(event, query);
-          if (!predictionMarketExternalDiscoveryR2PassesDate_(summary.closeTime, options)) return;
-          matches.push(summary);
-        });
-        scannedPages += 1;
-        cursor = awardsManagerString_(data && data.cursor);
-        if (!cursor || !rows.length) break;
-      }
-    });
-  } else {
-    for (var polyPage = 1; polyPage <= 3; polyPage += 1) {
-      var polyUrl = AWARDS_MANAGER_POLYMARKET_BASE + "/public-search?q=" + encodeURIComponent(awardsManagerString_(query)) + "&limit_per_type=20&page=" + encodeURIComponent(polyPage) + "&search_profiles=false&keep_closed_markets=1";
-      var polyData = awardsManagerFetchJson_(polyUrl);
-      var polyRows = Array.isArray(polyData && polyData.events) ? polyData.events : [];
-      polyRows.forEach(function(event) {
-        if (predictionMarketExternalDiscoveryR2EventStatus_(event) !== "closed") return;
-        if (!awardsManagerEventMatchesSearch_(event, query, options)) return;
-        if (!predictionMarketExternalDiscoveryR2PassesType_(event, options)) return;
-        var summary = predictionMarketExternalDiscoveryR2PolymarketSummary_(event, query);
-        if (!predictionMarketExternalDiscoveryR2PassesDate_(summary.closeTime, options)) return;
-        matches.push(summary);
-      });
-      scannedPages += 1;
-      if (!polyRows.length || !(polyData.pagination && polyData.pagination.hasMore)) break;
-    }
+function predictionMarketExternalDiscoveryR2RawSearchProvider_(provider, query, options, state) {
+  state=state||{};if(state.done)return {events:[],scannedPages:0,state:state};
+  var url, rows, data, next;
+  if(provider==='kalshi'){
+    var phase=Math.max(0,Math.min(1,Number(state.phase||0))), statuses=['closed','settled'];
+    url=AWARDS_MANAGER_KALSHI_BASE+'/events?status='+statuses[phase]+'&limit=50&with_nested_markets=true'+(state.cursor?'&cursor='+encodeURIComponent(state.cursor):'');
+    data=awardsManagerFetchJson_(url);rows=Array.isArray(data.events)?data.events:[];
+    var cursor=awardsManagerString_(data.cursor);next={phase:cursor?phase:phase+1,cursor:cursor,done:!cursor&&phase===1};
+  }else{
+    var page=Math.max(1,Math.min(10000,Number(state.page||1)));
+    url=AWARDS_MANAGER_POLYMARKET_BASE+'/public-search?q='+encodeURIComponent(query)+'&limit_per_type=20&page='+page+'&search_profiles=false&keep_closed_markets=1';
+    data=awardsManagerFetchJson_(url);rows=Array.isArray(data.events)?data.events:[];next={page:page+1,done:!rows.length||!(data.pagination&&data.pagination.hasMore)};
   }
-  return { events: matches, scannedPages: scannedPages };
+  var events=rows.filter(function(event){return predictionMarketExternalDiscoveryR2EventStatus_(event)==='closed'&&predictionMarketExternalDiscoveryR2Matches_(event,query,options);}).map(function(event){return provider==='kalshi'?predictionMarketExternalDiscoveryR2KalshiSummary_(event,query):predictionMarketExternalDiscoveryR2PolymarketSummary_(event,query);});
+  return {events:events,scannedPages:1,state:next};
 }
 
 function predictionMarketExternalDiscoveryR2Dedupe_(events) {
@@ -256,16 +253,18 @@ function predictionMarketExternalDiscoveryR2Search(payload) {
   var events = [];
   var errors = [];
   var scannedPages = 0;
+  var prior=awardsManagerParseJson_(payload.searchStateJSON,{})||{}, next={open:prior.open||{},closed:Object.assign({},prior.closed||{})},hasMore=false;
 
   if (options.status === "open" || options.status === "all") {
-    var openPayload = Object.assign({}, payload, options, { provider:provider, status:"open" });
+    var openPayload = Object.assign({}, payload, options, { provider:provider, status:"open", searchStateJSON:JSON.stringify(prior.open||{}),maxPagesPerRequest:1,eventFilter:function(event){return predictionMarketExternalDiscoveryR2Matches_(event,query,options);} });
     try {
       var openResult = apiAdminAwardsSearchExternalMarkets(openPayload);
       (Array.isArray(openResult && openResult.events) ? openResult.events : []).forEach(function(event) {
         event = Object.assign({}, event, { status:event.status || "open", groupedEvent:true, logicalQuestion:event.eventName || event.externalEventId, childMarketCount:event.childMarketCount == null ? (event.liveMarketCount || 0) : event.childMarketCount });
         if (predictionMarketExternalDiscoveryR2PassesDate_(event.closeTime, options)) events.push(event);
       });
-      scannedPages += Number(openResult && openResult.scannedPages || 0);
+      var scans=openResult&&openResult.scannedPages||{};scannedPages+=typeof scans==="number"?scans:Object.keys(scans).reduce(function(n,k){return n+Number(scans[k]||0);},0);
+      next.open=openResult.searchState||{};hasMore=!!openResult.hasMore;
       if (Array.isArray(openResult && openResult.errors)) errors = errors.concat(openResult.errors);
     } catch (err) {
       if (options.status === "open") throw err;
@@ -277,10 +276,12 @@ function predictionMarketExternalDiscoveryR2Search(payload) {
     ["kalshi", "polymarket"].forEach(function(name) {
       if (provider !== "both" && provider !== name) return;
       try {
-        var closed = predictionMarketExternalDiscoveryR2RawSearchProvider_(name, query, options);
+        var closed = predictionMarketExternalDiscoveryR2RawSearchProvider_(name, query, options, prior.closed&&prior.closed[name]);
+        next.closed[name]=closed.state;hasMore=hasMore||!closed.state.done;
         events = events.concat(closed.events || []);
         scannedPages += Number(closed.scannedPages || 0);
       } catch (err) {
+        hasMore=true;
         errors.push(name + ": " + (err && err.message ? err.message : String(err)));
       }
     });
@@ -297,6 +298,9 @@ function predictionMarketExternalDiscoveryR2Search(payload) {
     results: [],
     options: options,
     scannedPages: scannedPages,
+    searchState:next,
+    hasMore:hasMore,
+    coverage:"Provider API results are paged; this is not a complete copy of either website.",
     errors: errors
   };
 }
@@ -306,7 +310,7 @@ function predictionMarketExternalDiscoveryR2RawDetail_(provider, eventId) {
   var rawMarkets;
   var markets;
   if (provider === "kalshi") {
-    var data = awardsManagerFetchJson_(AWARDS_MANAGER_KALSHI_BASE + "/events/" + encodeURIComponent(eventId));
+    var data = awardsManagerFetchJson_(AWARDS_MANAGER_KALSHI_BASE + "/events/" + encodeURIComponent(eventId) + "?with_nested_markets=true");
     event = data && data.event ? data.event : {};
     rawMarkets = Array.isArray(data && data.markets) ? data.markets : (Array.isArray(event.markets) ? event.markets : []);
     var eventName = awardsManagerString_(event.title || event.sub_title || event.event_ticker || eventId);
@@ -352,75 +356,70 @@ function predictionMarketExternalDiscoveryR2Detail(payload) {
 }
 
 function predictionMarketExternalDiscoveryR2ParseReference_(value, providerHint) {
-  var input = predictionMarketExternalDiscoveryR2String_(value);
-  var hint = predictionMarketExternalDiscoveryR2Key_(providerHint || "auto");
-  if (!input) throw new Error("Paste a Kalshi/Polymarket URL or provider event/market ID.");
-  var result = { input:input, provider:"", eventId:"", marketId:"", slug:"" };
-  var lower = input.toLowerCase();
-  if (/^https?:\/\//i.test(input)) {
-    if (lower.indexOf("kalshi.com/") !== -1) {
-      result.provider = "kalshi";
-      var kalshiEvent = input.match(/\/x\/([^/?#]+)/i);
-      if (kalshiEvent) result.eventId = decodeURIComponent(kalshiEvent[1]);
-      var kalshiMarket = input.match(/[?&]op_market_ticker=([^&#]+)/i);
-      if (kalshiMarket) result.marketId = decodeURIComponent(kalshiMarket[1]);
-    } else if (lower.indexOf("polymarket.com/") !== -1) {
-      result.provider = "polymarket";
-      var polyEvent = input.match(/\/event\/([^/?#]+)/i);
-      if (polyEvent) result.slug = decodeURIComponent(polyEvent[1]);
-    } else {
-      throw new Error("Only official Kalshi or Polymarket URLs are supported.");
-    }
-  } else {
-    if (hint === "kalshi" || hint === "polymarket") result.provider = hint;
-    else if (/^kx[a-z0-9-]+$/i.test(input) || /^[A-Z0-9]+-[A-Z0-9-]+$/.test(input)) result.provider = "kalshi";
-    else if (/^\d+$/.test(input)) result.provider = "polymarket";
-    if (result.provider === "kalshi") {
-      if (input.indexOf("-") !== -1) result.marketId = input;
-      else result.eventId = input;
-    } else if (result.provider === "polymarket") {
-      if (/^\d+$/.test(input)) result.eventId = input;
-      else result.slug = input;
-    }
+  var input=predictionMarketExternalDiscoveryR2String_(value),hint=predictionMarketExternalDiscoveryR2Key_(providerHint||'auto');
+  if(!input)throw new Error('Paste the specific event or market page URL.');
+  var result={input:input,provider:'',eventId:'',marketId:'',slug:''};
+  if(/^https?:\/\//i.test(input)){
+    var url=input.match(/^https?:\/\/([^/?#]+)([^?#]*)(?:\?([^#]*))?/i),host=url&&url[1].toLowerCase(),parts=(url&&url[2]||'').split('/').filter(Boolean).map(decodeURIComponent),query=url&&url[3]||'';
+    if(host==='kalshi.com'||host==='www.kalshi.com'){
+      result.provider='kalshi';var x=parts.indexOf('x');if(x!==-1)result.eventId=parts[x+1]||'';
+      else if(parts[0]==='markets'&&parts.length>=3&&parts[parts.length-1].toUpperCase().indexOf(parts[1].toUpperCase()+'-')===0)result.eventId=parts[parts.length-1].toUpperCase();
+      else if(parts[0]==='markets'&&parts[1]){result.collection='kalshi-series';result.seriesTicker=parts[1].toUpperCase();}
+      var ticker=query.match(/(?:^|&)op_market_ticker=([^&]+)/i);if(ticker)result.marketId=decodeURIComponent(ticker[1]);
+    }else if(host==='polymarket.com'||host==='www.polymarket.com'){
+      result.provider='polymarket';if(parts[0]==='sports'&&((parts[1]==='futures'&&parts[2])||(parts.length===2&&parts[1]!=='futures'))){result.collection='polymarket-sports';result.sport=parts[1]==='futures'?parts[2]:parts[1];result.futures=parts[1]==='futures';}
+      else if(parts[0]==='event')result.slug=parts[1]||'';else if(parts[0]==='market')result.marketSlug=parts[1]||'';
+      else throw new Error('That is a Polymarket listing/category page, not a single event. Open a specific question first, then copy its /event/ page address.');
+    }else throw new Error('Only official kalshi.com or polymarket.com event/market page URLs are supported.');
+  }else{
+    result.provider=hint==='kalshi'||hint==='polymarket'?hint:/^(?:market:)?\d+$/i.test(input)?'polymarket':/^[a-z0-9]+-[a-z0-9-]+$/i.test(input)?'kalshi':'';
+    if(result.provider==='kalshi')result.marketId=input.toUpperCase();
+    if(result.provider==='polymarket'){if(/^market:\d+$/i.test(input))result.marketId=input.slice(7);else if(/^\d+$/.test(input))result.eventId=input;else result.slug=input;}
   }
-  if (!result.provider) throw new Error("Choose Kalshi or Polymarket for an unrecognized provider ID.");
-  if (!result.eventId && !result.marketId && !result.slug) throw new Error("Could not recognize a provider event or market identifier.");
+  if(!result.provider)throw new Error('Choose a provider for an ID, or paste its specific event page URL.');
+  if(!result.eventId&&!result.marketId&&!result.slug&&!result.marketSlug&&!result.collection)throw new Error('Open a specific event on the provider site and copy its full address, not the homepage or category listing.');
   return result;
 }
 
-function predictionMarketExternalDiscoveryR2Resolve(payload) {
-  awardsManagerRequireAdmin_(payload);
-  payload = payload || {};
-  var parsed = predictionMarketExternalDiscoveryR2ParseReference_(payload.reference || payload.urlOrId || payload.providerReference, payload.providerHint || payload.provider);
-  var eventId = parsed.eventId;
-  if (!eventId) {
-    var searchText = parsed.marketId || parsed.slug;
-    var search = predictionMarketExternalDiscoveryR2Search(Object.assign({}, payload, {
-      provider:parsed.provider,
-      query:searchText.replace(/[-_]+/g, " "),
-      searchIn:parsed.marketId ? "markets" : "both",
-      status:"all",
-      exactPhrase:false
-    }));
-    var candidates = Array.isArray(search.events) ? search.events : [];
-    var wanted = predictionMarketExternalDiscoveryR2Key_(parsed.slug || parsed.marketId);
-    var match = candidates.filter(function(event) {
-      if (parsed.slug && predictionMarketExternalDiscoveryR2Key_(event.sourceUrl).indexOf("/event/" + wanted) !== -1) return true;
-      if (parsed.marketId && Array.isArray(event.markets)) {
-        return event.markets.some(function(market) { return predictionMarketExternalDiscoveryR2Key_(market.externalMarketId) === wanted; });
-      }
-      return predictionMarketExternalDiscoveryR2Key_(event.externalEventId) === wanted;
-    })[0] || candidates[0];
-    if (!match) throw new Error("No provider event matched that URL or ID.");
-    eventId = predictionMarketExternalDiscoveryR2String_(match.externalEventId);
+// Browse official provider collections through their APIs, never scrape or auto-import a page.
+function predictionMarketExternalDiscoveryR2Browse_(parsed,payload) {
+  var state=awardsManagerParseJson_(payload.searchStateJSON,{})||{},rows,data,next,hasMore,label;
+  if(parsed.collection==='polymarket-sports'){
+    var sports=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/sports');
+    var sport=(Array.isArray(sports)?sports:[]).find(function(row){return predictionMarketExternalDiscoveryR2Key_(row.sport)===parsed.sport.toLowerCase();});
+    if(!sport)throw new Error('That sports listing is not supported by the provider API. Choose a league-specific futures page.');
+    var tag=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/tags/slug/'+encodeURIComponent(parsed.sport));
+    if(!/^\d+$/.test(String(tag.id)))throw new Error('Provider did not return a valid league tag.');
+    var offset=Math.max(0,Math.min(100000,Math.floor(Number(state.offset||0)))),limit=50,url=AWARDS_MANAGER_POLYMARKET_BASE+'/events?tag_id='+encodeURIComponent(tag.id);
+    if(parsed.futures){var gamesTag=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/tags/slug/games');if(!/^\d+$/.test(String(gamesTag.id)))throw new Error('Provider did not return the Games tag for futures filtering.');url+='&exclude_tag_id='+encodeURIComponent(gamesTag.id);}
+    url+='&closed=false&active=true&limit='+limit+'&offset='+offset+'&order=volume24hr&ascending=false';
+    data=awardsManagerFetchJson_(url);if(!Array.isArray(data))throw new Error('Provider returned an unsupported event listing.');rows=data;hasMore=rows.length===limit;next={offset:offset+limit};label=(sport.name||parsed.sport.toUpperCase())+(parsed.futures?' futures':' events');
+  }else{
+    var url=AWARDS_MANAGER_KALSHI_BASE+'/events?series_ticker='+encodeURIComponent(parsed.seriesTicker)+'&status=open&limit=50&with_nested_markets=true'+(state.cursor?'&cursor='+encodeURIComponent(state.cursor):'');
+    data=awardsManagerFetchJson_(url);rows=Array.isArray(data.events)?data.events:[];next={cursor:awardsManagerString_(data.cursor)};hasMore=!!next.cursor;label='Kalshi series '+parsed.seriesTicker;
   }
-  var detail = predictionMarketExternalDiscoveryR2Detail(Object.assign({}, payload, { provider:parsed.provider, eventId:eventId, includeClosed:true, status:"all" }));
-  return {
-    success:true,
-    contractVersion:PREDICTION_MARKET_EXTERNAL_DISCOVERY_R2_CONTRACT,
-    resolvedReference:Object.assign({}, parsed, { eventId:eventId }),
-    event:detail
-  };
+  var events=rows.filter(function(e){return awardsManagerMarketIsLive_(null,e);}).map(function(e){return parsed.provider==='polymarket'?predictionMarketExternalDiscoveryR2PolymarketSummary_(e,''):predictionMarketExternalDiscoveryR2KalshiSummary_(e,'');});
+  return {success:true,contractVersion:PREDICTION_MARKET_EXTERNAL_DISCOVERY_R2_CONTRACT,collection:true,collectionLabel:label,resolvedReference:parsed,events:events,searchState:next,hasMore:hasMore,scannedPages:1,errors:[],coverage:parsed.futures?'League-tagged active events excluding the provider Games tag; website curation and ordering may differ.':'Active events in the provider collection; website curation and ordering may differ.'};
+}
+
+function predictionMarketExternalDiscoveryR2Resolve(payload) {
+  awardsManagerRequireAdmin_(payload);payload=payload||{};
+  var parsed=predictionMarketExternalDiscoveryR2ParseReference_(payload.reference||payload.urlOrId||payload.providerReference,payload.providerHint||payload.provider),eventId=parsed.eventId,raw;
+  if(parsed.collection)return predictionMarketExternalDiscoveryR2Browse_(parsed,payload);
+  if(parsed.provider==='polymarket'&&!eventId){
+    if(parsed.slug){raw=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+'/events/slug/'+encodeURIComponent(parsed.slug));if(predictionMarketExternalDiscoveryR2Key_(raw.slug)!==predictionMarketExternalDiscoveryR2Key_(parsed.slug))throw new Error('Provider did not return that exact event.');eventId=awardsManagerString_(raw.id);}
+    else{raw=awardsManagerFetchJson_(AWARDS_MANAGER_POLYMARKET_BASE+(parsed.marketSlug?'/markets/slug/'+encodeURIComponent(parsed.marketSlug):'/markets/'+encodeURIComponent(parsed.marketId)));eventId=awardsManagerString_(raw.events&&raw.events[0]&&raw.events[0].id);}
+  }else if(parsed.provider==='kalshi'&&!eventId){
+    // Event and market tickers both contain hyphens. Try an exact event first, then an exact market on 404 only.
+    try{raw=awardsManagerFetchJson_(AWARDS_MANAGER_KALSHI_BASE+'/events/'+encodeURIComponent(parsed.marketId));eventId=awardsManagerString_(raw.event&&raw.event.event_ticker);if(eventId)parsed.marketId='';}
+    catch(error){if(!/404/.test(error.message))throw error;}
+    if(!eventId){raw=awardsManagerFetchJson_(AWARDS_MANAGER_KALSHI_BASE+'/markets/'+encodeURIComponent(parsed.marketId));if(awardsManagerString_(raw.market&&raw.market.ticker).toUpperCase()!==parsed.marketId.toUpperCase())throw new Error('Provider did not return that exact market.');eventId=awardsManagerString_(raw.market.event_ticker);}
+  }
+  if(!eventId)throw new Error('The provider could not identify a parent event for that exact URL or ID.');
+  var detail=predictionMarketExternalDiscoveryR2Detail(Object.assign({},payload,{provider:parsed.provider,eventId:eventId,includeClosed:true,status:'all'}));
+  if(!detail.markets||!detail.markets.length)throw new Error('That event returned no supported markets. Check the specific event URL or ID.');
+  if(parsed.marketId&&!detail.markets.some(function(m){return predictionMarketExternalDiscoveryR2Key_(m.externalMarketId)===predictionMarketExternalDiscoveryR2Key_(parsed.marketId);}))throw new Error('That exact market was not found in the provider event.');
+  return {success:true,contractVersion:PREDICTION_MARKET_EXTERNAL_DISCOVERY_R2_CONTRACT,resolvedReference:Object.assign({},parsed,{eventId:eventId}),event:detail};
 }
 
 if (typeof module !== "undefined" && module.exports) {
