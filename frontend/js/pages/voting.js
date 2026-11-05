@@ -268,7 +268,7 @@ function votingPageCategoryEntries_(payload) {
   var entries = payload && Array.isArray(payload.entries) ? payload.entries : [];
   var categoryId = votingPageActiveCategoryId_(payload);
   return !categoryId ? entries.slice() : entries.filter(function(e) {
-    return !Array.isArray(e.categoryIds) || !e.categoryIds.length || e.categoryIds.includes(categoryId);
+    return !Array.isArray(e.categoryIds) || e.categoryIds.includes(categoryId);
   });
 }
 function votingPageCategorySelector_(payload) {
@@ -342,7 +342,7 @@ async function votingSaveEvaluationState_() {
   if (!VOTING_PAGE_STATE.payload || !VOTING_PAGE_STATE.payload.votingOpen) return;
   var message = document.getElementById('votingEvaluationMessage');
   try {
-    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, evaluationOnly: true, evaluatedEntryIds: VOTING_PAGE_STATE.evaluatedEntryIds.slice(), criteriaScoresByEntry: VOTING_PAGE_STATE.criteriaScoresByEntry });
+    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, categoryId: votingPageActiveCategoryId_(VOTING_PAGE_STATE.payload), evaluationOnly: true, evaluatedEntryIds: VOTING_PAGE_STATE.evaluatedEntryIds.slice(), criteriaScoresByEntry: VOTING_PAGE_STATE.criteriaScoresByEntry });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save evaluated entries.');
     if (message) { message.textContent = 'Evaluation state saved ✓'; message.classList.remove('error'); }
   } catch (err) {
