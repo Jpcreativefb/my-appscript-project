@@ -1276,6 +1276,17 @@ async function adminVotingSaveSettings_(gameId) {
       showIngredients: adminVotingChecked_("adminVotingShowIngredients"),
       numberAssignment: adminVotingValue_("adminVotingNumberAssignment"),
       colorAssignment: adminVotingValue_("adminVotingColorAssignment"),
+      entryIdentifierMode: adminVotingValue_("adminVotingEntryIdentifierMode"),
+      entryColorPalette: adminVotingValue_("adminVotingColorPalette").split(",").map(function(c){return c.trim();}).filter(Boolean),
+      allowMultipleEntries: adminVotingChecked_("adminVotingMultipleEntries"),
+      maxEntriesPerParticipant: Number(adminVotingValue_("adminVotingMaxEntries") || 0),
+      entryCategories: adminVotingValue_("adminVotingEntryCategories").split(/\r?\n/).map(function(line){
+        var parts=line.split("|");return {label:String(parts[0]||"").trim(),defaultSelected:String(parts[1]||"").trim().toLowerCase()!=="off"};
+      }).filter(function(c){return c.label;}),
+      entryRules: adminVotingValue_("adminVotingEntryRules"),
+      hostEntryInfo: adminVotingValue_("adminVotingHostInfo"),
+      pickupInstructions: adminVotingValue_("adminVotingPickupInstructions"),
+      registrationDeadline: adminVotingValue_("adminVotingRegistrationDeadline"),
       instructions: adminVotingValue_("adminVotingInstructions"),
       customFields: adminVotingCollectCustomFields_()
     });
@@ -1384,6 +1395,25 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
           <label class="admin-checkbox"><input id="adminVotingAllowEdits" type="checkbox" ${settings.allowParticipantEdits !== false ? "checked" : ""}><span>Participants may edit submitted entry</span></label>
           <label class="admin-checkbox"><input id="adminVotingRegistrationLocked" type="checkbox" ${settings.registrationLocked ? "checked" : ""}><span>Lock participant registration / changes</span></label>
         </div>
+
+        <h3>Cookoff Entry Options</h3>
+        <div class="admin-control-grid">
+          <label class="admin-field"><span>Entry Registration Deadline</span><input id="adminVotingRegistrationDeadline" type="datetime-local" value="${adminSetupEscapeHtml(adminSetupFormatDateTimeLocal(settings.registrationDeadline || ""))}"></label>
+          <label class="admin-checkbox"><input id="adminVotingMultipleEntries" type="checkbox" ${settings.allowMultipleEntries ? "checked" : ""}><span>Allow contestants to submit more than one dish</span></label>
+          <label class="admin-field"><span>Maximum Dishes Per Contestant (0 = unlimited)</span><input id="adminVotingMaxEntries" type="number" min="0" max="100" value="${adminSetupEscapeHtml(settings.maxEntriesPerParticipant == null ? 1 : settings.maxEntriesPerParticipant)}"></label>
+          <label class="admin-field"><span>Entry Identifier</span><select id="adminVotingEntryIdentifierMode">
+            <option value="legacy" ${!settings.entryIdentifierMode || settings.entryIdentifierMode === "legacy" ? "selected" : ""}>Legacy — preserve existing assignments</option>
+            <option value="color" ${settings.entryIdentifierMode === "color" ? "selected" : ""}>Colors Only — one unique color per dish</option>
+            <option value="number" ${settings.entryIdentifierMode === "number" ? "selected" : ""}>Numbers Only — one unique number per dish</option>
+            <option value="combo" ${settings.entryIdentifierMode === "combo" ? "selected" : ""}>Color + Number — unique combination</option>
+          </select></label>
+          <label class="admin-field"><span>Available Colors (comma separated)</span><input id="adminVotingColorPalette" value="${adminSetupEscapeHtml((settings.entryColorPalette || ["Red","Blue","Green","Orange","Yellow","Purple","Pink","Teal","Black","White","Silver","Gold"]).join(", "))}"></label>
+          <label class="admin-field"><span>Award Categories — one per line, optional |off to uncheck by default</span><textarea id="adminVotingEntryCategories" rows="4" placeholder="Best Overall&#10;Most Creative&#10;Bring the HEAT!">${adminSetupEscapeHtml((settings.entryCategories || []).map(function(c){return c.label + (c.defaultSelected === false ? "|off" : "");}).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Entry Rules</span><textarea id="adminVotingEntryRules" rows="3">${adminSetupEscapeHtml(settings.entryRules || "")}</textarea></label>
+          <label class="admin-field"><span>Host Information</span><textarea id="adminVotingHostInfo" rows="3">${adminSetupEscapeHtml(settings.hostEntryInfo || "")}</textarea></label>
+          <label class="admin-field"><span>Where to Pick Up Display Color / Number</span><textarea id="adminVotingPickupInstructions" rows="2">${adminSetupEscapeHtml(settings.pickupInstructions || "")}</textarea></label>
+        </div>
+        <p class="admin-field-note">Colors are reserved under a server lock. Colors-only mode stops accepting dishes when the palette is exhausted. Entries keep their identifier when edited.</p>
 
         <h3>Assigned Display Card</h3>
         <div class="admin-control-grid">
