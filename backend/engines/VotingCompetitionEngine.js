@@ -396,6 +396,7 @@ function votingCompetitionDeadlinePassed_(settings, nowMs) {
 }
 
 function votingCompetitionVotingOpen_(settings, game, nowMs) {
+  if (settings && settings.entryIdentifierMode !== "legacy" && votingCompetitionRegistrationOpen_(settings,nowMs)) return false;
   if (settings && settings.votingLocked === true) return false;
   if (game && (game.votingLocked === true || game.lockAllPicks === true)) return false;
   return !votingCompetitionDeadlinePassed_(settings, nowMs);
@@ -674,6 +675,7 @@ function votingCompetitionSaveSettings_(gameId, payload) {
     showVotingCountdown: votingCompetitionBool_(payload.showVotingCountdown,false)
   };
   if (settings.registrationDeadline && !Number.isFinite(Date.parse(settings.registrationDeadline))) throw new Error("Registration deadline must be a valid date/time.");
+  if (settings.registrationDeadline && settings.votingDeadline && Date.parse(settings.registrationDeadline)>=Date.parse(settings.votingDeadline)) throw new Error("Registration must close before the voting deadline.");
   if ((settings.entryIdentifierMode === "color" || settings.entryIdentifierMode === "combo") && !settings.entryColorPalette.length) throw new Error("Select at least one Cookoff color.");
   if (!settings.pointValues.length) settings.pointValues = [10, 7, 5, 3, 1];
   if (settings.votingMethod === "favorite") settings.rankLimit = 1;
