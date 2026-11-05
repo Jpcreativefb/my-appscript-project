@@ -93,6 +93,7 @@ async function apiGetVotingCompetitionState(){return demoPayload();}
 async function apiSaveVotingCompetitionBallot(payload){
  demo.evaluated=(payload.evaluatedEntryIds||[]).slice();
  if(payload.evaluationOnly) return {success:true,evaluationSaved:true};
+ if(payload.draftOnly) return {success:true,draftSaved:true};
  demo.rankingsByCategory[payload.categoryId||"overall"]=(payload.rankings||[]).map(function(r){return r.entryId;});
  demo.ballots=1;
  feedback("Demo ballot saved in memory — no server request.");
