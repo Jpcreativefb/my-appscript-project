@@ -255,9 +255,51 @@ function votingPageIsEvaluated_(entryId) {
   return VOTING_PAGE_STATE.evaluatedEntryIds.indexOf(String(entryId || "")) !== -1;
 }
 
+
+function votingPageActiveCategoryId_(payload) {
+  var cats = payload && payload.settings && payload.settings.entryCategories || [];
+  if (!cats.length) return '';
+  var current = VOTING_PAGE_STATE.activeCategoryId;
+  if (!cats.some(function(c){return c.id === current;})) current=cats[0].id;
+  VOTING_PAGE_STATE.activeCategoryId = current;
+  return current;
+}
+function votingPageCategoryEntries_(payload) {
+  var entries = payload && Array.isArray(payload.entries) ? payload.entries : [];
+  var categoryId = votingPageActiveCategoryId_(payload);
+  return !categoryId ? entries.slice() : entries.filter(function(e) {
+    return !Array.isArray(e.categoryIds) || !e.categoryIds.length || e.categoryIds.includes(categoryId);
+  });
+}
+function votingPageCategorySelector_(payload) {
+  var cats = payload && payload.settings && payload.settings.entryCategories || [];
+  if (!cats.length) return '';
+  var active = votingPageActiveCategoryId_(payload);
+  return '<label class="cookoff-r9-category-select"><span>Award Category</span><select onchange="votingPageChangeCategory_(this.value)">' +
+    cats.map(function(c) {return '<option value="' + votingPageEscape_(c.id) + '"' +
+      (active===c.id?' selected':'') + '>' + votingPageEscape_(c.label) + '</option>';}).join('') +
+    '</select></label>';
+}
+function votingPageChangeCategory_(categoryId) {
+  var payload = VOTING_PAGE_STATE.payload;
+  if (!payload) return;
+  VOTING_PAGE_STATE.localRankingsByCategory = VOTING_PAGE_STATE.localRankingsByCategory || {};
+  var current = votingPageActiveCategoryId_(payload);
+  VOTING_PAGE_STATE.localRankingsByCategory[current] = VOTING_PAGE_STATE.selectedEntryIds.slice();
+  VOTING_PAGE_STATE.activeCategoryId = categoryId;
+  var saved = payload.ballotsByCategory && payload.ballotsByCategory[categoryId] || [];
+  var next = VOTING_PAGE_STATE.localRankingsByCategory[categoryId] ||
+    saved.filter(function(r){return Number(r.rank||0)>0;}).sort(function(a,b){return a.rank-b.rank;}).map(function(r){return r.entryId;});
+  VOTING_PAGE_STATE.selectedEntryIds = next.slice();
+  var vote = document.querySelector('[data-cookoff-panel="vote"]');
+  if (vote) vote.innerHTML = votingPageVotingCard_(payload);
+  var results = document.querySelector('[data-cookoff-panel="results"]');
+  if (results) results.innerHTML = votingPageResultsCard_(payload);
+}
+
 function votingPageEligibleEntries_(payload) {
   payload = payload || VOTING_PAGE_STATE.payload || {};
-  var entries = Array.isArray(payload.entries) ? payload.entries : [];
+  var entries = votingPageCategoryEntries_(payload);
   var settings = payload.settings || {};
   if (!settings.evaluatedOnly) return entries.slice();
   return entries.filter(function(entry) { return votingPageIsEvaluated_(entry.entryId); });
@@ -363,8 +405,8 @@ function votingPageCompactRow_(entry, position, settings) {
   var tastingRequired = settings.evaluatedOnly === true;
   var showTasting = tastingRequired || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === 'combined';
   var ranked = position > 0;
-  var identifier = settings.colorAssignment !== 'none' && entry.displayColor ? entry.displayColor :
-    (entry.displayNumber ? '#' + entry.displayNumber : 'Dish');
+  var showNumber = settings.entryIdentifierMode === "number" || (!settings.entryIdentifierMode && settings.colorAssignment === "none");
+  var identifier = showNumber && entry.displayNumber ? "#" + entry.displayNumber + " " : "";
   var swatch = votingPageColorHex_(entry.displayColor);
   var photo = entry.imageUrl ? platformImgHtml(entry.imageUrl, {
     className:'cookoff-r9-photo-image',variant:'thumb',alt:entry.entryName || 'Dish'
@@ -383,11 +425,11 @@ function votingPageCompactRow_(entry, position, settings) {
       '<div class="cookoff-r9-main">' +
         '<div class="cookoff-r9-photo">' + photo + '</div>' +
         '<div class="cookoff-r9-shade"></div>' +
-        '<div class="cookoff-r9-title"><small>' + votingPageEscape_(identifier) + '</small><strong>' + votingPageEscape_(entry.entryName) + '</strong></div>' +
+        '<div class="cookoff-r9-title"><strong>' + votingPageEscape_(identifier + entry.entryName) + '</strong></div>' +
       '</div>' + actions +
     '</div>' +
     '<div class="cookoff-r9-quick">' +
-      (showTasting ? '<label><input type="checkbox" ' + (ate ? 'checked' : '') + ' onchange="votingEvaluationChanged_(\'' + id + '\',this.checked)"> Ate / Tasted</label>' : '') +
+      (showTasting ? '<label><input type="checkbox" ' + (ate ? 'checked' : '') + ' onchange="votingEvaluationChanged_(\'' + id + '\',this.checked)"> Tasted</label>' : '') +
       '<details><summary>Info / Ingredients</summary>' +
         (entry.description ? '<p>' + votingPageEscape_(entry.description) + '</p>' : '') +
         (entry.ingredients ? '<p><strong>Ingredients:</strong> ' + votingPageEscape_(entry.ingredients) + '</p>' : '') +
@@ -432,7 +474,7 @@ function votingPageTouchEnd_(event) {
 function votingPageCompactWorkspace_(payload) {
   var settings = payload.settings || {};
   var limit = votingPageBallotLimit_(payload);
-  var entries = Array.isArray(payload.entries) ? payload.entries : [];
+  var entries = votingPageCategoryEntries_(payload);
   var byId = {};
   entries.forEach(function(e) { byId[e.entryId] = e; });
   VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) {
@@ -445,7 +487,7 @@ function votingPageCompactWorkspace_(payload) {
     '<p class="cookoff-r9-intro">' + (settings.evaluatedOnly ? 'Mark the dishes you ate, then drag or use ▲ ▼ to rank them. Untasted dishes earn no points.' : 'Add the dishes you want to rank, then drag or use ▲ ▼ to arrange them.') + '</p>' +
     '<div class="cookoff-r9-meter">' + selected.length + ' ranked' + (settings.evaluatedOnly || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === 'combined' ? ' · ' + VOTING_PAGE_STATE.evaluatedEntryIds.length + ' tasted' : '') + '</div>' +
     '<h3>Your Ranking</h3>' +
-    (selected.length ? selected.map(function(id,i) { return votingPageCompactRow_(byId[id],i+1,settings); }).join('') : '<p class="voting-empty-state">Mark a dish Ate to start ranking.</p>') +
+    (selected.length ? selected.map(function(id,i) { return votingPageCompactRow_(byId[id],i+1,settings); }).join('') : '<p class="voting-empty-state">Mark a dish Tasted to start ranking.</p>') +
     '<h3>Other Dishes</h3>' +
     entries.filter(function(e) { return !selectedSet[e.entryId]; }).map(function(e) { return votingPageCompactRow_(e,0,settings); }).join('') +
     '<div id="votingEvaluationMessage" class="voting-inline-message"></div>' +
@@ -502,22 +544,23 @@ function votingRenderBallotWorkspace_() {
 
 function votingPageVotingCard_(payload) {
   var settings = payload.settings || {};
-  var entries = Array.isArray(payload.entries) ? payload.entries : [];
+  var entries = votingPageCategoryEntries_(payload);
   if (!entries.length) return '<section class="card voting-ballot-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Voting</span><h2>No published entries yet</h2></div></div><p>Approved participant entries will appear here automatically.</p></section>';
   var limit = votingPageBallotLimit_(payload);
   var judgingMode = settings.judgingMode || 'rank';
   var title = judgingMode === 'criteria' ? 'Score the Entries You Evaluated' : (judgingMode === 'combined' ? 'Rank + Score Your Evaluated Entries' : (settings.votingMethod === "favorite" ? "Choose Your Favorite" : (settings.votingMethod === "rank-all" ? "Rank Every Eligible Entry" : "Rank Your Top " + limit)));
   var status = payload.votingOpen ? "Voting Open" : (payload.votingDeadlinePassed ? "Deadline Passed" : "Voting Closed");
   var rankingWorkspace = judgingMode === 'criteria' ? '' : '<div class="voting-method-note">Ranking style: <strong>' + votingPageEscape_(VOTING_PAGE_STATE.effectiveUi === 'drag' ? 'Drag & Drop' : (VOTING_PAGE_STATE.effectiveUi === 'numbered' ? 'Numbered' : 'Up / Down Arrows')) + '</strong></div><div id="votingBallotWorkspace">' + (VOTING_PAGE_STATE.effectiveUi === "numbered" ? votingPageNumberedWorkspace_(payload) : votingPageOrderWorkspaceHtml_()) + '</div>';
-  return '<section class="card voting-ballot-card">' + '<div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
+  return '<section class="card voting-ballot-card">' + votingPageCategorySelector_(payload) + '<div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
 }
 
 function votingPageResultsCard_(payload) {
   if (!payload.resultsVisible) {
     return '<section class="card voting-results-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Results</span><h2>Results are hidden</h2></div></div><p>Results will appear when the administrator releases them.</p><div class="voting-ballot-count">' + votingPageEscape_(payload.ballotCount || 0) + ' ballots submitted</div></section>';
   }
-  var results = Array.isArray(payload.results) ? payload.results : [];
-  return '<section class="card voting-results-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Results</span><h2>Competition Standings</h2></div><span class="voting-ballot-count">' + votingPageEscape_(payload.ballotCount || 0) + ' ballots</span></div>' +
+  var categoryId = votingPageActiveCategoryId_(payload);
+  var results = payload.resultsByCategory && payload.resultsByCategory[categoryId] || (Array.isArray(payload.results) ? payload.results : []);
+  return '<section class="card voting-results-card">' + votingPageCategorySelector_(payload) + '<div class="voting-section-heading"><div><span class="voting-eyebrow">Results</span><h2>Competition Standings</h2></div><span class="voting-ballot-count">' + votingPageEscape_(payload.ballotCount || 0) + ' ballots</span></div>' +
     (results.length ? '<div class="voting-results-list">' + results.map(function(row) {
       return '<div class="voting-result-row"><div class="voting-result-position">#' + votingPageEscape_(row.position) + '</div>' +
         (row.imageUrl ? platformImgHtml(row.imageUrl, { className: 'voting-result-image', variant: 'thumb', alt: row.entryName || 'Competition entry' }) : '') +
@@ -728,9 +771,12 @@ async function votingSaveBallot_() {
   }
   if (message) { message.textContent = 'Saving ballot…'; message.classList.remove('error'); }
   try {
-    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, rankings: rankings, evaluatedEntryIds: VOTING_PAGE_STATE.evaluatedEntryIds.slice(), criteriaScoresByEntry: VOTING_PAGE_STATE.criteriaScoresByEntry });
+    var res = await apiSaveVotingCompetitionBallot({ gameId: VOTING_PAGE_STATE.gameId, categoryId: votingPageActiveCategoryId_(VOTING_PAGE_STATE.payload), rankings: rankings, evaluatedEntryIds: VOTING_PAGE_STATE.evaluatedEntryIds.slice(), criteriaScoresByEntry: VOTING_PAGE_STATE.criteriaScoresByEntry });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save ballot.');
     if (message) message.textContent = 'Ballot saved ✓';
+    if (VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.ballotsByCategory) {
+      VOTING_PAGE_STATE.payload.ballotsByCategory[votingPageActiveCategoryId_(VOTING_PAGE_STATE.payload)] = rankings.slice();
+    }
     window.setTimeout(function() { navigate('voting', { skipUnsavedCheck: true }); }, 400);
   } catch (err) {
     if (message) { message.textContent = err && err.message ? err.message : 'Could not save ballot.'; message.classList.add('error'); }
@@ -782,7 +828,7 @@ async function renderVotingPage() {
   var payload = await apiGetVotingCompetitionState(gameId);
   if (!payload || payload.success === false) return '<div class="page"><div class="card error-card">' + votingPageEscape_(payload && (payload.error || payload.message) || 'Could not load Voting / Competition game.') + '</div></div>';
   VOTING_PAGE_STATE.gameId = gameId; VOTING_PAGE_STATE.payload = payload; VOTING_PAGE_STATE.effectiveUi = votingPageResolveUi_(payload.settings && payload.settings.rankingUi);
-  VOTING_PAGE_STATE.selectedEntryIds = (payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
+  VOTING_PAGE_STATE.selectedEntryIds = ((payload.ballotsByCategory && payload.ballotsByCategory[votingPageActiveCategoryId_(payload)]) || payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
   VOTING_PAGE_STATE.evaluatedEntryIds = []; VOTING_PAGE_STATE.criteriaScoresByEntry = {};
   (payload.evaluations || []).forEach(function(row) { if (row.evaluated) VOTING_PAGE_STATE.evaluatedEntryIds.push(row.entryId); VOTING_PAGE_STATE.criteriaScoresByEntry[row.entryId] = Object.assign({}, row.criteriaScores || {}); });
   return '<div class="page voting-page">' + '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div><button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' + votingPageSections_(payload) + '</div>';
