@@ -399,6 +399,34 @@ function votingPageColorHex_(color) {
     black:'#292d35',white:'#e2e5e9',silver:'#a7adb8',gold:'#c69e24'};
   return colors[String(color || '').trim().toLowerCase()] || '#65748b';
 }
+
+function votingPageSetRankEntryMode_(mode) {
+  VOTING_PAGE_STATE.rankEntryMode = mode === 'number' ? 'number' : 'drag';
+  votingRenderBallotWorkspace_();
+}
+function votingPageDirectRank_(entryId, rank) {
+  rank = Number(rank);
+  if (!Number.isInteger(rank) || rank < 1) return;
+  var payload = VOTING_PAGE_STATE.payload || {};
+  var eligible = votingPageEligibleEntries_(payload).some(function(e){return e.entryId === entryId;});
+  if (!eligible) return;
+  var rows = VOTING_PAGE_STATE.selectedEntryIds;
+  var old = rows.indexOf(entryId);
+  var limit = votingPageBallotLimit_(payload);
+  if (old < 0 && rows.length >= limit) return;
+  if (old >= 0) rows.splice(old,1);
+  rows.splice(Math.min(rank-1,rows.length),0,entryId);
+  votingRenderBallotWorkspace_();
+}
+function votingPageDirectRankOptions_(id, ranked) {
+  var rows = VOTING_PAGE_STATE.selectedEntryIds;
+  var allowed = Math.min(votingPageBallotLimit_(VOTING_PAGE_STATE.payload),rows.length+(ranked?0:1));
+  var values = [];
+  for (var n=1;n<=allowed;n++) values.push('<option value="'+n+'"'+(ranked && rows.indexOf(id)+1===n?' selected':'')+'>'+n+'</option>');
+  return '<label class="cookoff-r9-direct-rank">Rank <select aria-label="Rank dish" onchange="votingPageDirectRank_(\'' +
+    votingPageEscape_(id) + '\',this.value)">' + (ranked?'':'<option value="" selected>Choose…</option>') + values.join('') + '</select></label>';
+}
+
 function votingPageCompactRow_(entry, position, settings) {
   var id = votingPageEscape_(entry.entryId);
   var ate = votingPageIsEvaluated_(entry.entryId);
@@ -411,12 +439,16 @@ function votingPageCompactRow_(entry, position, settings) {
   var photo = entry.imageUrl ? platformImgHtml(entry.imageUrl, {
     className:'cookoff-r9-photo-image',variant:'thumb',alt:entry.entryName || 'Dish'
   }) : '';
-  var actions = ranked ?
-    '<div class="cookoff-r9-reorder">' +
-      '<button type="button" aria-label="Move dish up" onclick="votingBallotMove_(\'' + id + '\',-1)">▲</button>' +
-      '<span class="cookoff-r9-grip" role="img" aria-label="Touch and drag to rank" ontouchstart="votingPageTouchStart_(event)" ontouchmove="event.preventDefault()" ontouchend="votingPageTouchEnd_(event)" ontouchcancel="votingPageTouchCancel_()">⠿</span>' +
-      '<button type="button" aria-label="Move dish down" onclick="votingBallotMove_(\'' + id + '\',1)">▼</button>' +
-    '</div>' : (!tastingRequired || ate ? '<button class="cookoff-r9-add" type="button" onclick="votingBallotAdd_(\'' + id + '\')">+ Rank</button>' : '');
+  var numberMode = VOTING_PAGE_STATE.rankEntryMode === 'number';
+  var actions = ranked
+    ? numberMode ? votingPageDirectRankOptions_(entry.entryId,true) :
+      '<div class="cookoff-r9-reorder">' +
+        '<button type="button" aria-label="Move dish up" onclick="votingBallotMove_(\'' + id + '\',-1)">▲</button>' +
+        '<span class="cookoff-r9-grip" role="img" aria-label="Touch and drag to rank" ontouchstart="votingPageTouchStart_(event)" ontouchmove="event.preventDefault()" ontouchend="votingPageTouchEnd_(event)" ontouchcancel="votingPageTouchCancel_()">⠿</span>' +
+        '<button type="button" aria-label="Move dish down" onclick="votingBallotMove_(\'' + id + '\',1)">▼</button>' +
+      '</div>'
+    : (!tastingRequired || ate ? (numberMode ? votingPageDirectRankOptions_(entry.entryId,false) :
+        '<button class="cookoff-r9-add" type="button" onclick="votingBallotAdd_(\'' + id + '\')">+ Rank</button>') : '');
   return '<article class="cookoff-r9-dish' + (tastingRequired && !ate ? ' is-untasted' : '') + '" data-ballot-entry-id="' + id + '"' +
     (ranked ? ' draggable="true" ondragstart="votingBallotDragStart_(event)" ondragover="votingBallotDragOver_(event)" ondrop="votingBallotDrop_(event)"' : '') +
     ' style="--cookoff-dish-color:' + swatch + '">' +
@@ -484,6 +516,7 @@ function votingPageCompactWorkspace_(payload) {
   var selectedSet = {};
   selected.forEach(function(id) { selectedSet[id] = true; });
   return '<div class="cookoff-r9-workspace">' +
+    '<div class="cookoff-r9-mode"><span>Rank using</span><button type="button" class="' + (VOTING_PAGE_STATE.rankEntryMode === 'number' ? '' : 'active') + '" onclick="votingPageSetRankEntryMode_(\'drag\')">Drag / Arrows</button><button type="button" class="' + (VOTING_PAGE_STATE.rankEntryMode === 'number' ? 'active' : '') + '" onclick="votingPageSetRankEntryMode_(\'number\')">Enter Rank</button></div>' +
     '<p class="cookoff-r9-intro">' + (settings.evaluatedOnly ? 'Mark the dishes you ate, then drag or use ▲ ▼ to rank them. Untasted dishes earn no points.' : 'Add the dishes you want to rank, then drag or use ▲ ▼ to arrange them.') + '</p>' +
     '<div class="cookoff-r9-meter">' + selected.length + ' ranked' + (settings.evaluatedOnly || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === 'combined' ? ' · ' + VOTING_PAGE_STATE.evaluatedEntryIds.length + ' tasted' : '') + '</div>' +
     '<h3>Your Ranking</h3>' +
