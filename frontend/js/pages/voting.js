@@ -271,6 +271,28 @@ function votingPageCategoryEntries_(payload) {
     return !Array.isArray(e.categoryIds) || e.categoryIds.includes(categoryId);
   });
 }
+
+function votingPageCountdownHtml_(payload) {
+  if (!payload || !(payload.settings || {}).showVotingCountdown || !payload.votingDeadlineEpoch) return '';
+  return '<div class="cookoff-r9-countdown">Voting closes in <strong id="cookoffVotingCountdown">…</strong></div>';
+}
+function votingPageCountdownTick_() {
+  var payload=VOTING_PAGE_STATE.payload||{};
+  var el=document.getElementById('cookoffVotingCountdown');
+  if (!el || !payload.votingDeadlineEpoch) return;
+  var offset=Number(payload.serverNow||Date.now())-Number(VOTING_PAGE_STATE.receivedAt||Date.now());
+  var seconds=Math.max(0,Math.ceil((payload.votingDeadlineEpoch-Date.now()-offset)/1000));
+  var h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),sec=seconds%60;
+  el.textContent=seconds===0?'Voting Closed':(h?String(h)+':':'')+String(m).padStart(h?2:1,'0')+':'+String(sec).padStart(2,'0');
+}
+function votingPageNextCategory_() {
+  var payload=VOTING_PAGE_STATE.payload||{};
+  var cats=(payload.settings||{}).entryCategories||[];
+  if (!cats.length) return;
+  var at=cats.findIndex(function(c){return c.id===votingPageActiveCategoryId_(payload);});
+  votingPageChangeCategory_(cats[(at+1)%cats.length].id);
+}
+
 function votingPageCategorySelector_(payload) {
   var cats = payload && payload.settings && payload.settings.entryCategories || [];
   if (!cats.length) return '';
@@ -623,7 +645,7 @@ function votingPageVotingCard_(payload) {
   var title = judgingMode === 'criteria' ? 'Score the Entries You Evaluated' : (judgingMode === 'combined' ? 'Rank + Score Your Evaluated Entries' : (settings.votingMethod === "favorite" ? "Choose Your Favorite" : (settings.votingMethod === "rank-all" ? "Rank Every Eligible Entry" : "Rank Your Top " + limit)));
   var status = payload.votingOpen ? "Voting Open" : (payload.votingDeadlinePassed ? "Deadline Passed" : "Voting Closed");
   var rankingWorkspace = judgingMode === 'criteria' ? '' : '<div class="voting-method-note">Ranking style: <strong>' + votingPageEscape_(VOTING_PAGE_STATE.effectiveUi === 'drag' ? 'Drag & Drop' : (VOTING_PAGE_STATE.effectiveUi === 'numbered' ? 'Numbered' : 'Up / Down Arrows')) + '</strong></div><div id="votingBallotWorkspace">' + (VOTING_PAGE_STATE.effectiveUi === "numbered" ? votingPageNumberedWorkspace_(payload) : votingPageOrderWorkspaceHtml_()) + '</div>';
-  return '<section class="card voting-ballot-card">' + votingPageCategorySelector_(payload) + '<div id="votingDraftStatus" class="cookoff-r9-draft-hint">Changes save automatically while voting is open.</div><div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
+  return '<section class="card voting-ballot-card">' + votingPageCategorySelector_(payload) + votingPageCountdownHtml_(payload) + '<div id="votingDraftStatus" class="cookoff-r9-draft-hint">Changes save automatically while voting is open.</div><div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button>' + ((settings.entryCategories || []).length ? '<button class="button secondary" type="button" onclick="votingPageNextCategory_()">Next Category →</button>' : '') + '<span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
 }
 
 function votingPageResultsCard_(payload) {
@@ -903,9 +925,11 @@ async function renderVotingPage() {
   setPageLoadStep(55, 'Loading competition entries and your ballot…');
   var payload = await apiGetVotingCompetitionState(gameId);
   if (!payload || payload.success === false) return '<div class="page"><div class="card error-card">' + votingPageEscape_(payload && (payload.error || payload.message) || 'Could not load Voting / Competition game.') + '</div></div>';
-  VOTING_PAGE_STATE.gameId = gameId; VOTING_PAGE_STATE.payload = payload; VOTING_PAGE_STATE.effectiveUi = votingPageResolveUi_(payload.settings && payload.settings.rankingUi);
+  VOTING_PAGE_STATE.gameId = gameId; VOTING_PAGE_STATE.payload = payload; VOTING_PAGE_STATE.receivedAt = Date.now(); VOTING_PAGE_STATE.effectiveUi = votingPageResolveUi_(payload.settings && payload.settings.rankingUi);
   VOTING_PAGE_STATE.selectedEntryIds = ((payload.draftsByCategory && payload.draftsByCategory[votingPageActiveCategoryId_(payload)]) || (payload.ballotsByCategory && payload.ballotsByCategory[votingPageActiveCategoryId_(payload)]) || payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
   VOTING_PAGE_STATE.evaluatedEntryIds = []; VOTING_PAGE_STATE.criteriaScoresByEntry = {};
   (payload.evaluations || []).forEach(function(row) { if (row.evaluated) VOTING_PAGE_STATE.evaluatedEntryIds.push(row.entryId); VOTING_PAGE_STATE.criteriaScoresByEntry[row.entryId] = Object.assign({}, row.criteriaScores || {}); });
+  if (typeof window !== "undefined" && !VOTING_PAGE_STATE.countdownTimer) VOTING_PAGE_STATE.countdownTimer = window.setInterval(votingPageCountdownTick_,1000);
+  if (typeof window !== "undefined") window.setTimeout(votingPageCountdownTick_,30);
   return '<div class="page voting-page">' + '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div><button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' + votingPageSections_(payload) + '</div>';
 }
