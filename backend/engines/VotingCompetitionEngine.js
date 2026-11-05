@@ -1102,7 +1102,7 @@ function votingCompetitionPublicEntry_(entry, settings) {
     description: settings.showDescription ? entry.description : "",
     ingredients: settings.showIngredients ? entry.ingredients : "",
     customData: customVisible,
-    categoryIds: entry.customData && Array.isArray(entry.customData.cookoffCategoryIds) ? entry.customData.cookoffCategoryIds : []
+    categoryIds: entry.customData && Array.isArray(entry.customData.cookoffCategoryIds) ? entry.customData.cookoffCategoryIds : null
   };
 }
 
