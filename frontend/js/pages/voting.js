@@ -284,7 +284,7 @@ function votingPageCompactRow_(entry, position, settings) {
   var actions = ranked ?
     '<div class="cookoff-r9-reorder">' +
       '<button type="button" aria-label="Move dish up" onclick="votingBallotMove_(\'' + id + '\',-1)">▲</button>' +
-      '<span class="cookoff-r9-grip" role="img" aria-label="Touch and drag to rank" ontouchstart="votingPageTouchStart_(event)" ontouchmove="event.preventDefault()" ontouchend="votingPageTouchEnd_(event)">⠿</span>' +
+      '<span class="cookoff-r9-grip" role="img" aria-label="Touch and drag to rank" ontouchstart="votingPageTouchStart_(event)" ontouchmove="event.preventDefault()" ontouchend="votingPageTouchEnd_(event)" ontouchcancel="votingPageTouchCancel_()">⠿</span>' +
       '<button type="button" aria-label="Move dish down" onclick="votingBallotMove_(\'' + id + '\',1)">▼</button>' +
     '</div>' : (!tastingRequired || ate ? '<button class="cookoff-r9-add" type="button" onclick="votingBallotAdd_(\'' + id + '\')">+ Rank</button>' : '');
   return '<article class="cookoff-r9-dish' + (tastingRequired && !ate ? ' is-untasted' : '') + '" data-ballot-entry-id="' + id + '"' +
@@ -310,21 +310,35 @@ function votingPageCompactRow_(entry, position, settings) {
   '</article>';
 }
 var VOTING_R9_TOUCH_ID = '';
+var VOTING_R9_TOUCH_START = null;
+function votingPageTouchCancel_() {
+  VOTING_R9_TOUCH_ID = '';
+  VOTING_R9_TOUCH_START = null;
+}
 function votingPageTouchStart_(event) {
+  votingPageTouchCancel_();
+  if (!event || !event.touches || event.touches.length !== 1) return;
   var row = event.target && event.target.closest('.cookoff-r9-dish');
-  VOTING_R9_TOUCH_ID = row ? row.dataset.ballotEntryId : '';
+  var id = row && row.dataset.ballotEntryId;
+  if (!id || VOTING_PAGE_STATE.selectedEntryIds.indexOf(id) === -1) return;
+  VOTING_R9_TOUCH_ID = id;
+  VOTING_R9_TOUCH_START = { x: event.touches[0].clientX, y: event.touches[0].clientY };
 }
 function votingPageTouchEnd_(event) {
-  if (!VOTING_R9_TOUCH_ID || !event.changedTouches || !event.changedTouches.length) return;
+  var fromId = VOTING_R9_TOUCH_ID;
+  var start = VOTING_R9_TOUCH_START;
+  votingPageTouchCancel_();
+  if (!fromId || !start || !event || !event.changedTouches || event.changedTouches.length !== 1) return;
   var touch = event.changedTouches[0];
+  if (Math.abs(touch.clientY - start.y) < 12 && Math.abs(touch.clientX - start.x) < 12) return;
   var target = document.elementFromPoint(touch.clientX, touch.clientY);
   var row = target && target.closest('.cookoff-r9-dish');
   var toId = row && row.dataset.ballotEntryId;
-  var from = VOTING_PAGE_STATE.selectedEntryIds.indexOf(VOTING_R9_TOUCH_ID);
-  var to = VOTING_PAGE_STATE.selectedEntryIds.indexOf(toId);
-  VOTING_R9_TOUCH_ID = '';
+  var rows = VOTING_PAGE_STATE.selectedEntryIds;
+  var from = rows.indexOf(fromId);
+  var to = rows.indexOf(toId);
   if (from < 0 || to < 0 || from === to) return;
-  VOTING_PAGE_STATE.selectedEntryIds.splice(to, 0, VOTING_PAGE_STATE.selectedEntryIds.splice(from, 1)[0]);
+  rows.splice(to, 0, rows.splice(from, 1)[0]);
   votingRenderBallotWorkspace_();
 }
 function votingPageCompactWorkspace_(payload) {
