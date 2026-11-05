@@ -97,7 +97,8 @@ assert(html.includes('data-cookoff-tab="results" aria-pressed="true"'), 'Results
 const touch = new Function('window', 'platformImgHtml', 'document', pageSource +
   '\nreturn { state: VOTING_PAGE_STATE, start: votingPageTouchStart_, end: votingPageTouchEnd_, cancel: votingPageTouchCancel_ };'
 )(windowStub, platformImgHtml, {
-  elementFromPoint: () => ({ closest: () => ({ dataset: { ballotEntryId: 'red' } }) })
+  elementFromPoint: () => ({ closest: () => ({ dataset: { ballotEntryId: 'red' } }) }),
+  getElementById: () => null
 });
 touch.state.selectedEntryIds = ['red', 'blue'];
 const grip = { closest: () => ({ dataset: { ballotEntryId: 'blue' } }) };
