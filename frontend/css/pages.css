@@ -4604,3 +4604,40 @@ body.game-profile-choice-open { overflow:hidden; }
 .cookoff-r9-tab.is-current{background:#ffcc00;border-color:#ffcc00;color:#121827}
 .cookoff-r9-panel[hidden]{display:none!important}
 @media(max-width:600px){.voting-page .voting-page-header{gap:8px}.cookoff-r9-nav{position:sticky;top:0;z-index:12;background:#10192a;padding:5px 0}.cookoff-r9-tab{font-size:.78rem;min-height:44px}}
+
+
+/* Cookoff R9 — compact touch ballot based on participant sketch. */
+.cookoff-r9-workspace{display:flex;flex-direction:column;gap:7px}
+.cookoff-r9-workspace h3{font-size:.93rem;margin:12px 0 3px}
+.cookoff-r9-intro{font-size:.8rem;line-height:1.35;margin:0 0 4px}
+.cookoff-r9-meter{font-size:.76rem;font-weight:800;color:#dce6ff}
+.cookoff-r9-dish{border:1px solid #52617d;border-radius:9px;overflow:hidden;background:#313b54;position:relative}
+.cookoff-r9-row{display:flex;min-height:68px}
+.cookoff-r9-rank{width:37px;flex:0 0 37px;background:var(--cookoff-dish-color,#687482);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.2rem;color:#fff;text-shadow:0 1px 3px #0009}
+.cookoff-r9-main{position:relative;flex:1;min-width:0;display:flex;align-items:end;overflow:hidden}
+.cookoff-r9-photo,.cookoff-r9-shade{position:absolute;inset:0;pointer-events:none}
+.cookoff-r9-photo-image{height:100%!important;width:100%!important;object-fit:cover;opacity:.38}
+.cookoff-r9-shade{background:linear-gradient(0deg,var(--cookoff-dish-color,#394967) 0%,#111827aa 48%,transparent 100%);opacity:.9}
+.cookoff-r9-title{position:relative;z-index:1;display:flex;flex-direction:column;gap:3px;padding:9px 10px;min-width:0;text-shadow:0 1px 3px #0009}
+.cookoff-r9-title small{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.cookoff-r9-title strong{font-size:.98rem;line-height:1.15;overflow-wrap:anywhere}
+.cookoff-r9-dish.is-untasted .cookoff-r9-photo-image{filter:grayscale(1);opacity:.25}
+.cookoff-r9-dish.is-untasted .cookoff-r9-shade{background:linear-gradient(0deg,#535764,transparent)}
+.cookoff-r9-reorder{display:flex;flex:0 0 40px;flex-direction:column;justify-content:center;align-items:center;background:#222d43}
+.cookoff-r9-reorder button{border:0;background:transparent;color:white;font-size:.95rem;min-height:25px;width:40px;cursor:pointer}
+.cookoff-r9-grip{min-height:26px;min-width:40px;display:flex;align-items:center;justify-content:center;color:#eaf0ff;touch-action:none;font-size:1.25rem;cursor:grab}
+.cookoff-r9-add{align-self:center;min-height:38px;background:#ffcc00;color:#141827;border:0;border-radius:7px;font-weight:900;margin:4px;padding:5px}
+.cookoff-r9-quick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:5px 8px;background:#263249;font-size:.78rem}
+.cookoff-r9-quick label{display:inline-flex;align-items:center;gap:5px;font-weight:800;white-space:nowrap}
+.cookoff-r9-quick input[type=checkbox]{width:19px;height:19px;accent-color:#ffcc00}
+.cookoff-r9-quick details{flex:1;min-width:110px}
+.cookoff-r9-quick summary{font-weight:750;cursor:pointer;text-align:right}
+.cookoff-r9-quick details[open]{flex-basis:100%;padding:8px 2px;border-top:1px solid #566078}
+.cookoff-r9-quick details[open] p{margin:4px 0 8px;overflow-wrap:anywhere}
+.cookoff-r9-remove{background:transparent;border:0;color:#e3e7f0;text-decoration:underline;font-size:.73rem}
+@media(max-width:700px){
+ .voting-page .voting-ballot-card{padding:11px}
+ .voting-page .voting-section-heading h2{font-size:1.13rem}
+ .voting-page .voting-final-submit .button{min-height:47px;width:100%}
+ .cookoff-r9-quick summary{min-height:26px}
+}
