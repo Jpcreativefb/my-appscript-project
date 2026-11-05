@@ -69,18 +69,22 @@ var sampleEntries=[
  {entryId:"d",entryName:"Sweet Fire",displayNumber:"4",displayColor:"Yellow",description:"Sweet-heat spicy chili.",ingredients:"Tomato, peppers, honey.",imageUrl:samplePhoto("#ae8c29","DISH 4")},
  {entryId:"e",entryName:"Midnight Chili",displayNumber:"5",displayColor:"Purple",description:"Dark spices and bold flavor.",ingredients:"Beef, cocoa, black beans.",imageUrl:samplePhoto("#7953a8","DISH 5")}
 ];
-var demo={phase:"vote",tastedOnly:true,evaluated:["a","b","c"],rankings:["a","b","c"],ballots:0};
+var demo={phase:"vote",tastedOnly:true,evaluated:["a","b","c"],rankingsByCategory:{overall:["a","b","c"],creative:[],heat:[]},ballots:0};
 function demoPayload(){
  var entry=demo.phase==="entry",results=demo.phase==="results";
  return {success:true,gameName:"Cookoff Test — R9",gameDescription:"Rate the dishes you actually tasted.",
  registrationOpen:entry,votingOpen:!entry&&!results,resultsVisible:results,ballotCount:demo.ballots,
  entries:sampleEntries,ownEntry:null,
  settings:{entryLabel:"Dish",registrationEnabled:true,approvalRequired:true,allowParticipantEdits:true,
- numberAssignment:"auto",colorAssignment:"auto",rankingUi:"auto",rankLimit:5,votingMethod:"top-n",
+ numberAssignment:"auto-sequential",colorAssignment:"auto-palette",entryIdentifierMode:"color",rankingUi:"auto",rankLimit:5,votingMethod:"top-n",
+ entryCategories:[{id:"overall",label:"Best Overall",defaultSelected:true,audience:"both"},{id:"creative",label:"Most Creative",defaultSelected:true,audience:"both"},{id:"heat",label:"Bring the HEAT!",defaultSelected:true,audience:"both"}],
+ allowMultipleEntries:true,maxEntriesPerParticipant:0,entryRules:"Keep each dish labeled and list allergens.",pickupInstructions:"Pick up your color sign at the host check-in table.",
  judgingMode:"rank",scoringMode:"custom-points",pointValues:[10,7,5,3,1],
  evaluatedOnly:demo.tastedOnly,minimumEvaluatedEntries:0,resultsVisibility:"after-close",
  instructions:"Mark tasted dishes and put your favorites in order.",customFields:[]},
- ballot:demo.rankings.map(function(id,i){return {entryId:id,rank:i+1};}),
+ ballot:demo.rankingsByCategory.overall.map(function(id,i){return {entryId:id,rank:i+1};}),
+ ballotsByCategory:Object.fromEntries(Object.entries(demo.rankingsByCategory).map(function(row){return [row[0],row[1].map(function(id,i){return {entryId:id,rank:i+1};})];})),
+ draftsByCategory:Object.fromEntries(Object.entries(demo.rankingsByCategory).map(function(row){return [row[0],row[1].map(function(id,i){return {entryId:id,rank:i+1};})];})),
  evaluations:sampleEntries.map(function(entry){return {entryId:entry.entryId,evaluated:demo.evaluated.includes(entry.entryId),criteriaScores:{}};}),
  results:results?sampleEntries.map(function(entry,i){return Object.assign({},entry,{position:i+1,totalPoints:25-i*4,firstPlaceVotes:i===0?2:0,topThreeVotes:Math.max(0,3-i)});}):[]};
 }
@@ -89,7 +93,7 @@ async function apiGetVotingCompetitionState(){return demoPayload();}
 async function apiSaveVotingCompetitionBallot(payload){
  demo.evaluated=(payload.evaluatedEntryIds||[]).slice();
  if(payload.evaluationOnly) return {success:true,evaluationSaved:true};
- demo.rankings=(payload.rankings||[]).map(function(r){return r.entryId;});
+ demo.rankingsByCategory[payload.categoryId||"overall"]=(payload.rankings||[]).map(function(r){return r.entryId;});
  demo.ballots=1;
  feedback("Demo ballot saved in memory — no server request.");
  return {success:true};
@@ -105,7 +109,9 @@ async function renderDemo(){
   VOTING_PAGE_STATE.gameId=APP_STATE.gameId;
   VOTING_PAGE_STATE.payload=payload;
   VOTING_PAGE_STATE.effectiveUi="drag";
-  VOTING_PAGE_STATE.selectedEntryIds=demo.rankings.slice();
+  VOTING_PAGE_STATE.activeCategoryId="overall";
+  VOTING_PAGE_STATE.localRankingsByCategory={};
+  VOTING_PAGE_STATE.selectedEntryIds=demo.rankingsByCategory.overall.slice();
   VOTING_PAGE_STATE.evaluatedEntryIds=demo.evaluated.slice();
   VOTING_PAGE_STATE.criteriaScoresByEntry={};
   document.getElementById("preview-root").innerHTML=
@@ -123,12 +129,12 @@ document.getElementById("demo-stage").addEventListener("change",function(){
 });
 document.getElementById("demo-tasted").addEventListener("change",function(){
  demo.tastedOnly=this.checked;
- if(!demo.tastedOnly) demo.rankings=sampleEntries.map(function(e){return e.entryId;});
- else demo.rankings=demo.rankings.filter(function(id){return demo.evaluated.includes(id);});
+ if(!demo.tastedOnly) demo.rankingsByCategory.overall=sampleEntries.map(function(e){return e.entryId;});
+ else Object.keys(demo.rankingsByCategory).forEach(function(cat){demo.rankingsByCategory[cat]=demo.rankingsByCategory[cat].filter(function(id){return demo.evaluated.includes(id);});});
  feedback("");renderDemo();
 });
 document.getElementById("demo-reset").addEventListener("click",function(){
- demo={phase:"vote",tastedOnly:true,evaluated:["a","b","c"],rankings:["a","b","c"],ballots:0};
+ demo={phase:"vote",tastedOnly:true,evaluated:["a","b","c"],rankingsByCategory:{overall:["a","b","c"],creative:[],heat:[]},ballots:0};
  document.getElementById("demo-stage").value="vote";
  document.getElementById("demo-tasted").checked=true;
  feedback("");renderDemo();
@@ -138,7 +144,7 @@ var originalEvaluationChange=votingEvaluationChanged_;
 votingEvaluationChanged_=function(id,checked){
  originalEvaluationChange(id,checked);
  demo.evaluated=VOTING_PAGE_STATE.evaluatedEntryIds.slice();
- demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();
+ demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();
 };
 var originalMove=votingBallotMove_;
 votingBallotMove_=function(id,direction){originalMove(id,direction);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
