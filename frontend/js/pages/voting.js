@@ -224,8 +224,9 @@ function votingEvaluationChanged_(entryId, checked) {
   entryId = String(entryId || '');
   VOTING_PAGE_STATE.evaluatedEntryIds = VOTING_PAGE_STATE.evaluatedEntryIds.filter(function(id) { return id !== entryId; });
   if (checked) VOTING_PAGE_STATE.evaluatedEntryIds.push(entryId);
-  if (!checked) VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return id !== entryId; });
-  if (checked && votingPageIsCompactMobile_() && VOTING_PAGE_STATE.payload && (VOTING_PAGE_STATE.payload.settings || {}).judgingMode !== 'criteria') {
+  var settings = VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.settings || {};
+  if (!checked && settings.evaluatedOnly) VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return id !== entryId; });
+  if (checked && settings.evaluatedOnly && votingPageIsCompactMobile_() && VOTING_PAGE_STATE.payload && settings.judgingMode !== 'criteria') {
     var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
     if (VOTING_PAGE_STATE.selectedEntryIds.indexOf(entryId) < 0 && VOTING_PAGE_STATE.selectedEntryIds.length < limit) VOTING_PAGE_STATE.selectedEntryIds.push(entryId);
   }
@@ -271,6 +272,8 @@ function votingPageColorHex_(color) {
 function votingPageCompactRow_(entry, position, settings) {
   var id = votingPageEscape_(entry.entryId);
   var ate = votingPageIsEvaluated_(entry.entryId);
+  var tastingRequired = settings.evaluatedOnly === true;
+  var showTasting = tastingRequired || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === 'combined';
   var ranked = position > 0;
   var identifier = settings.colorAssignment !== 'none' && entry.displayColor ? entry.displayColor :
     (entry.displayNumber ? '#' + entry.displayNumber : 'Dish');
@@ -283,8 +286,8 @@ function votingPageCompactRow_(entry, position, settings) {
       '<button type="button" aria-label="Move dish up" onclick="votingBallotMove_(\'' + id + '\',-1)">▲</button>' +
       '<span class="cookoff-r9-grip" role="img" aria-label="Touch and drag to rank" ontouchstart="votingPageTouchStart_(event)" ontouchmove="event.preventDefault()" ontouchend="votingPageTouchEnd_(event)">⠿</span>' +
       '<button type="button" aria-label="Move dish down" onclick="votingBallotMove_(\'' + id + '\',1)">▼</button>' +
-    '</div>' : (ate ? '<button class="cookoff-r9-add" type="button" onclick="votingBallotAdd_(\'' + id + '\')">+ Rank</button>' : '');
-  return '<article class="cookoff-r9-dish' + (ate ? '' : ' is-untasted') + '" data-ballot-entry-id="' + id + '"' +
+    '</div>' : (!tastingRequired || ate ? '<button class="cookoff-r9-add" type="button" onclick="votingBallotAdd_(\'' + id + '\')">+ Rank</button>' : '');
+  return '<article class="cookoff-r9-dish' + (tastingRequired && !ate ? ' is-untasted' : '') + '" data-ballot-entry-id="' + id + '"' +
     (ranked ? ' draggable="true" ondragstart="votingBallotDragStart_(event)" ondragover="votingBallotDragOver_(event)" ondrop="votingBallotDrop_(event)"' : '') +
     ' style="--cookoff-dish-color:' + swatch + '">' +
     '<div class="cookoff-r9-row">' +
@@ -296,7 +299,7 @@ function votingPageCompactRow_(entry, position, settings) {
       '</div>' + actions +
     '</div>' +
     '<div class="cookoff-r9-quick">' +
-      '<label><input type="checkbox" ' + (ate ? 'checked' : '') + ' onchange="votingEvaluationChanged_(\'' + id + '\',this.checked)"> Ate / Tasted</label>' +
+      (showTasting ? '<label><input type="checkbox" ' + (ate ? 'checked' : '') + ' onchange="votingEvaluationChanged_(\'' + id + '\',this.checked)"> Ate / Tasted</label>' : '') +
       '<details><summary>Info / Ingredients</summary>' +
         (entry.description ? '<p>' + votingPageEscape_(entry.description) + '</p>' : '') +
         (entry.ingredients ? '<p><strong>Ingredients:</strong> ' + votingPageEscape_(entry.ingredients) + '</p>' : '') +
@@ -331,14 +334,14 @@ function votingPageCompactWorkspace_(payload) {
   var byId = {};
   entries.forEach(function(e) { byId[e.entryId] = e; });
   VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) {
-    return !!byId[id] && votingPageIsEvaluated_(id);
+    return !!byId[id] && (!settings.evaluatedOnly || votingPageIsEvaluated_(id));
   });
   var selected = VOTING_PAGE_STATE.selectedEntryIds.slice(0, limit);
   var selectedSet = {};
   selected.forEach(function(id) { selectedSet[id] = true; });
   return '<div class="cookoff-r9-workspace">' +
-    '<p class="cookoff-r9-intro">Mark the dishes you ate, then drag or use ▲ ▼ to rank them. Untasted dishes earn no points.</p>' +
-    '<div class="cookoff-r9-meter">' + selected.length + ' ranked · ' + VOTING_PAGE_STATE.evaluatedEntryIds.length + ' tasted</div>' +
+    '<p class="cookoff-r9-intro">' + (settings.evaluatedOnly ? 'Mark the dishes you ate, then drag or use ▲ ▼ to rank them. Untasted dishes earn no points.' : 'Add the dishes you want to rank, then drag or use ▲ ▼ to arrange them.') + '</p>' +
+    '<div class="cookoff-r9-meter">' + selected.length + ' ranked' + (settings.evaluatedOnly || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === 'combined' ? ' · ' + VOTING_PAGE_STATE.evaluatedEntryIds.length + ' tasted' : '') + '</div>' +
     '<h3>Your Ranking</h3>' +
     (selected.length ? selected.map(function(id,i) { return votingPageCompactRow_(byId[id],i+1,settings); }).join('') : '<p class="voting-empty-state">Mark a dish Ate to start ranking.</p>') +
     '<h3>Other Dishes</h3>' +
@@ -533,7 +536,7 @@ function votingBallotAdd_(entryId) {
   var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
   var eligible = votingPageEligibleEntries_(VOTING_PAGE_STATE.payload).some(function(entry) { return entry.entryId === entryId; });
   if (!eligible || !entryId || VOTING_PAGE_STATE.selectedEntryIds.indexOf(entryId) !== -1 || VOTING_PAGE_STATE.selectedEntryIds.length >= limit) return;
-  if (votingPageIsCompactMobile_() && !votingPageIsEvaluated_(entryId)) return;
+  if (votingPageIsCompactMobile_() && VOTING_PAGE_STATE.payload && (VOTING_PAGE_STATE.payload.settings || {}).evaluatedOnly && !votingPageIsEvaluated_(entryId)) return;
   VOTING_PAGE_STATE.selectedEntryIds.push(entryId);
   votingRenderBallotWorkspace_();
 }
@@ -599,7 +602,7 @@ async function votingSaveBallot_() {
   var settings = VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.settings || {};
   var rankings = votingCollectBallot_();
   var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
-  if (votingPageIsCompactMobile_() && rankings.some(function(row) { return !votingPageIsEvaluated_(row.entryId); })) {
+  if (votingPageIsCompactMobile_() && settings.evaluatedOnly && rankings.some(function(row) { return !votingPageIsEvaluated_(row.entryId); })) {
     if (message) { message.textContent = 'Only tasted dishes may be ranked.'; message.classList.add('error'); }
     return;
   }
