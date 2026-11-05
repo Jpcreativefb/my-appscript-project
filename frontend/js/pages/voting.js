@@ -109,9 +109,46 @@ function votingPageCloseEntryRules_() {
   if (el && el.close) el.close();
 }
 
+
+/* R9 multiple entries: maintain one active owned entry while preserving all others. */
+function votingPageOwnEntries_(payload) {
+  if (Array.isArray(payload.ownEntries)) return payload.ownEntries;
+  return payload.ownEntry ? [payload.ownEntry] : [];
+}
+function votingPageActiveOwnEntry_(payload) {
+  var entries = votingPageOwnEntries_(payload);
+  var activeId = VOTING_PAGE_STATE.activeEntryId;
+  if (activeId === '__new__') return null;
+  return entries.find(function(e){return e.entryId === activeId;}) || entries[0] || null;
+}
+function votingPageEditOwnEntry_(entryId) {
+  VOTING_PAGE_STATE.activeEntryId = entryId || '__new__';
+  VOTING_PAGE_STATE.submissionId = '';
+  var payload = VOTING_PAGE_STATE.payload;
+  var panel = document.querySelector('.cookoff-r9-panel[data-cookoff-panel="entry"]');
+  if (panel && payload) panel.innerHTML = votingPageParticipantCard_(payload);
+  votingPageSwitchSection_('entry');
+}
+function votingPageOwnEntriesHtml_(payload) {
+  var mine = votingPageOwnEntries_(payload);
+  if (!mine.length) return '';
+  var settings = payload.settings || {};
+  var limit = settings.allowMultipleEntries ? Number(settings.maxEntriesPerParticipant || 0) : 1;
+  var canAdd = payload.registrationOpen && settings.allowMultipleEntries && (limit === 0 || mine.length < limit);
+  return '<section class="cookoff-r9-own-entries"><h3>My Cookoff Dishes</h3>' +
+    mine.map(function(e) {
+      var safeId = votingPageEscape_(e.entryId);
+      return '<div class="cookoff-r9-owned-row"><strong>' + votingPageEscape_(e.entryName) + '</strong><span>' +
+        votingPageEscape_([e.displayColor,e.displayNumber ? '#' + e.displayNumber : '',e.status].filter(Boolean).join(' · ')) +
+        '</span>' + (payload.registrationOpen ? '<button type="button" onclick="votingPageEditOwnEntry_(\'' + safeId + '\')">Edit</button>' : '') + '</div>';
+    }).join('') +
+    (canAdd ? '<button class="cookoff-r9-another" type="button" onclick="votingPageEditOwnEntry_(\'__new__\')">+ SUBMIT ANOTHER DISH</button>' : '') +
+    '</section>';
+}
+
 function votingPageParticipantCard_(payload) {
   var settings = payload.settings || {};
-  var entry = payload.ownEntry || null;
+  var entry = votingPageActiveOwnEntry_(payload);
   var label = votingPageEntryLabel_(payload);
   if (!payload.registrationOpen && !entry) {
     return '<section class="card voting-registration-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Participant Registration</span><h2>Registration is closed</h2></div></div><p>New participant entries are not being accepted right now.</p></section>';
@@ -147,6 +184,7 @@ function votingPageParticipantCard_(payload) {
   return '<section class="card voting-registration-card">' +
     '<div class="voting-section-heading"><div><span class="voting-eyebrow">Participant Entry</span><h2>Submit Your ' + votingPageEscape_(label) + '</h2><p>Your information becomes a voting card after approval.</p></div><span class="voting-entry-status ' + votingPageEscape_(entry && entry.status || 'new') + '">' + votingPageEscape_(statusText) + '</span></div>' +
     (entry && entry.adminNotes ? '<div class="voting-admin-note"><strong>Admin note:</strong> ' + votingPageEscape_(entry.adminNotes) + '</div>' : '') +
+    votingPageOwnEntriesHtml_(payload) +
     '<div class="voting-entry-form-grid">' +
       '<label class="voting-form-field"><span>Your Name / Team Name</span><input id="votingParticipantName" type="text" value="' + votingPageEscape_(entry && entry.participantName || '') + '" ' + (canEdit ? '' : 'disabled') + '></label>' +
       '<label class="voting-form-field"><span>' + votingPageEscape_(label) + ' Name *</span><input id="votingParticipantEntryName" type="text" value="' + votingPageEscape_(entry && entry.entryName || '') + '" required ' + (canEdit ? '' : 'disabled') + '></label>' +
@@ -571,6 +609,8 @@ async function votingSaveParticipant_() {
   function value(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   var payload = {
     gameId: VOTING_PAGE_STATE.gameId,
+    entryId: votingPageActiveOwnEntry_(VOTING_PAGE_STATE.payload || {}) && votingPageActiveOwnEntry_(VOTING_PAGE_STATE.payload || {}).entryId || "",
+    submissionId: VOTING_PAGE_STATE.submissionId || (VOTING_PAGE_STATE.submissionId = String(Date.now()) + "-" + Math.random().toString(36).slice(2)),
     participantName: value('votingParticipantName'),
     entryName: value('votingParticipantEntryName'),
     imageUrl: VOTING_PAGE_STATE.uploadedImageUrl,
@@ -593,13 +633,15 @@ async function votingSaveParticipant_() {
     var res = await apiSaveVotingParticipant(payload);
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save entry.');
     if (message) { message.textContent = 'GOOD LUCK! CAN’T WAIT TO TASTE THAT DISH!!'; message.classList.remove('error'); }
-    var oldEntry = VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.ownEntry || {};
+    var oldEntry = votingPageActiveOwnEntry_(VOTING_PAGE_STATE.payload || {}) || {};
     if (res.displayNumber || res.displayColor || oldEntry.displayNumber || oldEntry.displayColor) {
       var assignment = document.querySelector('.cookoff-r9-assignment');
       if (assignment) assignment.outerHTML = votingPageAssignedIdentity_({displayNumber:res.displayNumber || oldEntry.displayNumber,displayColor:res.displayColor || oldEntry.displayColor},settings);
     }
     var saveButton = document.querySelector('.voting-registration-card .voting-save-row button');
     if (saveButton) saveButton.disabled = true;
+    VOTING_PAGE_STATE.submissionId = '';
+    VOTING_PAGE_STATE.activeEntryId = res.entryId || '';
     window.setTimeout(function() { navigate('voting', { skipUnsavedCheck: true }); }, 1800);
   } catch (err) {
     if (message) { message.textContent = err && err.message ? err.message : 'Could not save entry.'; message.classList.add('error'); }
