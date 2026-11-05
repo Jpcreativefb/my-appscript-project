@@ -53,7 +53,9 @@ const VOTING_COMPETITION_SETTINGS_HEADERS = [
   "EntryRules",
   "HostEntryInfo",
   "PickupInstructions",
-  "RegistrationDeadline"
+  "RegistrationDeadline",
+  "OfficialJudgesJSON",
+  "JudgeMultiplier"
 ];
 
 const VOTING_COMPETITION_PARTICIPANT_HEADERS = [
@@ -90,7 +92,9 @@ const VOTING_COMPETITION_BALLOT_HEADERS = [
   "FinalScore",
   "CriteriaJSON",
   "Locked",
-  "CategoryId"
+  "CategoryId",
+  "VoterRole",
+  "VoterMultiplier"
 ];
 
 const VOTING_COMPETITION_EVALUATION_HEADERS = [
@@ -240,7 +244,9 @@ function votingCompetitionDefaultSettings_(gameId) {
     entryRules: "",
     hostEntryInfo: "",
     pickupInstructions: "",
-    registrationDeadline: ""
+    registrationDeadline: "",
+    officialJudges: [],
+    judgeMultiplier: 3
   };
 }
 
@@ -477,6 +483,20 @@ function votingCompetitionColorPalette_(value) {
     seen[key] = true; return true;
   });
 }
+function votingCompetitionOfficialJudges_(value) {
+  const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, []);
+  return Array.from(new Set(rows.map(votingCompetitionKey_).filter(Boolean))).slice(0,200);
+}
+function votingCompetitionJudgeRole_(settings, username, categoryId) {
+  const judge = (settings.officialJudges || []).indexOf(votingCompetitionKey_(username)) !== -1;
+  const category = (settings.entryCategories || []).find(function(c){return c.id === categoryId;});
+  const audience = category && category.audience || 'both';
+  if (audience === 'judges' && !judge) throw new Error("This category is reserved for appointed judges.");
+  return {
+    role:judge && audience !== 'public' ? 'judge' : 'public',
+    multiplier:judge && audience !== 'public' ? Math.max(1,Number(settings.judgeMultiplier || 1)) : 1
+  };
+}
 function votingCompetitionEntryCategories_(value) {
   const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, []);
   const seen = {};
@@ -487,7 +507,8 @@ function votingCompetitionEntryCategories_(value) {
     const id = votingCompetitionSlug_(row.id || label);
     if (!id || !label || seen[id]) return null;
     seen[id] = true;
-    return {id:id,label:label,defaultSelected:row.defaultSelected !== false};
+    const audience = ["public","judges","both"].indexOf(votingCompetitionKey_(row.audience)) >= 0 ? votingCompetitionKey_(row.audience) : "both";
+    return {id:id,label:label,defaultSelected:row.defaultSelected !== false,audience:audience};
   }).filter(Boolean).slice(0,30);
 }
 function votingCompetitionRegistrationOpen_(settings, nowMs) {
@@ -579,7 +600,9 @@ function votingCompetitionGetSettings_(gameId) {
     entryRules: votingCompetitionString_(row[col.entryrules]),
     hostEntryInfo: votingCompetitionString_(row[col.hostentryinfo]),
     pickupInstructions: votingCompetitionString_(row[col.pickupinstructions]),
-    registrationDeadline: votingCompetitionString_(row[col.registrationdeadline])
+    registrationDeadline: votingCompetitionString_(row[col.registrationdeadline]),
+    officialJudges: votingCompetitionOfficialJudges_(row[col.officialjudgesjson]),
+    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(row[col.judgemultiplier],3)))
   };
 }
 
@@ -632,7 +655,9 @@ function votingCompetitionSaveSettings_(gameId, payload) {
     entryRules: votingCompetitionString_(payload.entryRules),
     hostEntryInfo: votingCompetitionString_(payload.hostEntryInfo),
     pickupInstructions: votingCompetitionString_(payload.pickupInstructions),
-    registrationDeadline: votingCompetitionString_(payload.registrationDeadline)
+    registrationDeadline: votingCompetitionString_(payload.registrationDeadline),
+    officialJudges: votingCompetitionOfficialJudges_(payload.officialJudges),
+    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(payload.judgeMultiplier,3)))
   };
   if (settings.registrationDeadline && !Number.isFinite(Date.parse(settings.registrationDeadline))) throw new Error("Registration deadline must be a valid date/time.");
   if ((settings.entryIdentifierMode === "color" || settings.entryIdentifierMode === "combo") && !settings.entryColorPalette.length) throw new Error("Select at least one Cookoff color.");
@@ -655,6 +680,7 @@ function votingCompetitionSaveSettings_(gameId, payload) {
   row[col.entrycategoriesjson] = JSON.stringify(settings.entryCategories); row[col.entryrules] = settings.entryRules;
   row[col.hostentryinfo] = settings.hostEntryInfo; row[col.pickupinstructions] = settings.pickupInstructions;
   row[col.registrationdeadline] = settings.registrationDeadline;
+  row[col.officialjudgesjson] = JSON.stringify(settings.officialJudges); row[col.judgemultiplier] = settings.judgeMultiplier;
   if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]); else sh.getRange(sh.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
   if (typeof clearGameCaches === "function") clearGameCaches(gameId);
   return { success: true, settings: settings };
@@ -964,7 +990,7 @@ function votingCompetitionReadBallots_(gameId) {
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
   const col = votingCompetitionHeaderMap_(headers);
   return sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).getValues().map(function(row, index) {
-    return { rowNumber:index+2, timestamp:row[col.timestamp], updatedAt:row[col.updatedat], gameId:votingCompetitionString_(row[col.gameid]), username:votingCompetitionString_(row[col.username]), entryId:votingCompetitionString_(row[col.entryid]), rank:votingCompetitionNumber_(row[col.rank],0), points:votingCompetitionNumber_(row[col.points],0), rawRankPoints:votingCompetitionNumber_(row[col.rawrankpoints],0), criteriaScore:votingCompetitionNumber_(row[col.criteriascore],0), coverageWeight:votingCompetitionNumber_(row[col.coverageweight],1), finalScore:votingCompetitionNumber_(row[col.finalscore],votingCompetitionNumber_(row[col.points],0)), criteriaScores:votingCompetitionJson_(row[col.criteriajson],{}), locked:votingCompetitionBool_(row[col.locked],false), categoryId:votingCompetitionString_(row[col.categoryid]) };
+    return { rowNumber:index+2, timestamp:row[col.timestamp], updatedAt:row[col.updatedat], gameId:votingCompetitionString_(row[col.gameid]), username:votingCompetitionString_(row[col.username]), entryId:votingCompetitionString_(row[col.entryid]), rank:votingCompetitionNumber_(row[col.rank],0), points:votingCompetitionNumber_(row[col.points],0), rawRankPoints:votingCompetitionNumber_(row[col.rawrankpoints],0), criteriaScore:votingCompetitionNumber_(row[col.criteriascore],0), coverageWeight:votingCompetitionNumber_(row[col.coverageweight],1), finalScore:votingCompetitionNumber_(row[col.finalscore],votingCompetitionNumber_(row[col.points],0)), criteriaScores:votingCompetitionJson_(row[col.criteriajson],{}), locked:votingCompetitionBool_(row[col.locked],false), categoryId:votingCompetitionString_(row[col.categoryid]), voterRole:votingCompetitionString_(row[col.voterrole])||"public", voterMultiplier:votingCompetitionNumber_(row[col.votermultiplier],1) };
   }).filter(function(row) { return !gameId || row.gameId === gameId; });
 }
 
@@ -1032,6 +1058,7 @@ function votingCompetitionSaveBallot_(payload) {
   if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
   const settings = votingCompetitionGetSettings_(gameId);
   const categoryId = votingCompetitionCategoryId_(settings, payload.categoryId);
+  const voterRole = votingCompetitionJudgeRole_(settings,username,categoryId);
   if (!votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
   const publishedEntries = votingCompetitionReadParticipants_(gameId).filter(function(entry) { return entry.status === "approved" && entry.published === true; });
   if (!publishedEntries.length) throw new Error("There are no published entries available to vote on.");
@@ -1060,18 +1087,18 @@ function votingCompetitionSaveBallot_(payload) {
         return evaluation && evaluation.criteriaScores && Object.keys(evaluation.criteriaScores).length > 0;
       });
       if (!candidates.length) throw new Error("Score at least one evaluated entry before submitting.");
-      candidates.forEach(function(entry) { const evaluation = evaluationMap[entry.entryId]; const criteriaScore = votingCompetitionWeightedCriteriaScore_(settings.criteria, evaluation.criteriaScores); specs.push({entryId:entry.entryId,rank:0,rawRankPoints:0,criteriaScore:criteriaScore,finalScore:criteriaScore*coverageWeight,criteriaScores:evaluation.criteriaScores}); });
+      candidates.forEach(function(entry) { const evaluation = evaluationMap[entry.entryId]; const criteriaScore = votingCompetitionWeightedCriteriaScore_(settings.criteria, evaluation.criteriaScores); specs.push({entryId:entry.entryId,rank:0,rawRankPoints:0,criteriaScore:criteriaScore,finalScore:criteriaScore*coverageWeight*voterRole.multiplier,criteriaScores:evaluation.criteriaScores}); });
     } else {
       rankings.slice().sort(function(a,b){return Number(a.rank||0)-Number(b.rank||0);}).forEach(function(item) {
         const entryId = votingCompetitionString_(item.entryId); const rank = votingCompetitionNumber_(item.rank,0); const rawRankPoints = votingCompetitionPointsForRank_(rank,settings,limit);
         let criteriaScore=0, criteriaScores={}, rawScore=rawRankPoints;
         if (judgingMode === "combined") { const evaluation=evaluationMap[entryId]||{}; criteriaScores=evaluation.criteriaScores||{}; criteriaScore=votingCompetitionWeightedCriteriaScore_(settings.criteria,criteriaScores); rawScore=votingCompetitionCombinedScore_(rawRankPoints,maxRankPoints,criteriaScore,settings); }
-        specs.push({entryId:entryId,rank:rank,rawRankPoints:rawRankPoints,criteriaScore:criteriaScore,finalScore:rawScore*coverageWeight,criteriaScores:criteriaScores});
+        specs.push({entryId:entryId,rank:rank,rawRankPoints:rawRankPoints,criteriaScore:criteriaScore,finalScore:rawScore*coverageWeight*voterRole.multiplier,criteriaScores:criteriaScores});
       });
     }
     const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_BALLOTS_SHEET,VOTING_COMPETITION_BALLOT_HEADERS); const data=sh.getDataRange().getValues(); const headers=data[0].map(votingCompetitionString_); const col=votingCompetitionHeaderMap_(headers); const matchingRows=[];
     for (let i=1;i<data.length;i++) if (votingCompetitionString_(data[i][col.gameid])===gameId && votingCompetitionKey_(data[i][col.username])===votingCompetitionKey_(username) && votingCompetitionString_(data[i][col.categoryid])===categoryId) matchingRows.push(i+1);
-    const now=new Date(); const rows=specs.map(function(spec){ const row=new Array(headers.length).fill(""); const finalScore=Math.round(Number(spec.finalScore||0)*1000000)/1000000; row[col.timestamp]=now; row[col.updatedat]=now; row[col.gameid]=gameId; row[col.username]=username; row[col.entryid]=spec.entryId; row[col.rank]=spec.rank; row[col.points]=finalScore; row[col.rawrankpoints]=spec.rawRankPoints; row[col.criteriascore]=spec.criteriaScore; row[col.coverageweight]=coverageWeight; row[col.finalscore]=finalScore; row[col.criteriajson]=JSON.stringify(spec.criteriaScores||{}); row[col.locked]=false; row[col.categoryid]=categoryId; return row; });
+    const now=new Date(); const rows=specs.map(function(spec){ const row=new Array(headers.length).fill(""); const finalScore=Math.round(Number(spec.finalScore||0)*1000000)/1000000; row[col.timestamp]=now; row[col.updatedat]=now; row[col.gameid]=gameId; row[col.username]=username; row[col.entryid]=spec.entryId; row[col.rank]=spec.rank; row[col.points]=finalScore; row[col.rawrankpoints]=spec.rawRankPoints; row[col.criteriascore]=spec.criteriaScore; row[col.coverageweight]=coverageWeight; row[col.finalscore]=finalScore; row[col.criteriajson]=JSON.stringify(spec.criteriaScores||{}); row[col.locked]=false; row[col.categoryid]=categoryId; row[col.voterrole]=voterRole.role; row[col.votermultiplier]=voterRole.multiplier; return row; });
     const reuse=Math.min(matchingRows.length,rows.length); for(let i=0;i<reuse;i++) sh.getRange(matchingRows[i],1,1,headers.length).setValues([rows[i]]); if(rows.length>reuse) sh.getRange(sh.getLastRow()+1,1,rows.length-reuse,headers.length).setValues(rows.slice(reuse)); if(matchingRows.length>rows.length) matchingRows.slice(rows.length).sort(function(a,b){return b-a;}).forEach(function(rowNumber){sh.deleteRow(rowNumber);});
     if(typeof clearGameCaches==="function") clearGameCaches(gameId);
     return {success:true,gameId:gameId,categoryId:categoryId,saved:rows.length,evaluatedCount:evaluatedCount,coverageWeight:coverageWeight};
