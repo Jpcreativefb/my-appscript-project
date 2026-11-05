@@ -1105,13 +1105,67 @@ function votingCompetitionResultsVisible_(settings, game) {
 }
 
 function apiGetVotingCompetitionState_(payload) {
-  payload=payload||{}; const username=votingCompetitionString_(payload.username); const gameId=votingCompetitionString_(payload.gameId||(typeof getDefaultGameId==="function"?getDefaultGameId():"")); if(!username||!gameId)throw new Error("Username and GameId are required.");
-  const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId); if(!game||votingCompetitionKey_(game.type)!=="voting")throw new Error("This is not a Voting / Competition game.");
-  const settings=votingCompetitionGetSettings_(gameId); const participants=votingCompetitionReadParticipants_(gameId); const published=participants.filter(function(entry){return entry.status==="approved"&&entry.published===true;}); const evaluations=votingCompetitionReadEvaluations_(gameId,username); const evaluationMap=votingCompetitionEvaluationMap_(evaluations); const eligible=votingCompetitionEligibleEntries_(published,evaluationMap,settings); const ballots=votingCompetitionReadBallots_(gameId);
-  const userBallot=ballots.filter(function(row){return votingCompetitionKey_(row.username)===votingCompetitionKey_(username);}).map(function(row){return{entryId:row.entryId,rank:row.rank,points:row.points,criteriaScore:row.criteriaScore,coverageWeight:row.coverageWeight};}).sort(function(a,b){return a.rank-b.rank;});
-  const ownEntries=participants.filter(function(entry){return votingCompetitionKey_(entry.username)===votingCompetitionKey_(username);});
-  const ownEntry=ownEntries[0]||null; const resultBundle=votingCompetitionResults_(gameId,settings,participants,ballots); const resultsVisible=votingCompetitionResultsVisible_(settings,game); const votingOpen=votingCompetitionVotingOpen_(settings,game);
-  return {success:true,gameId:gameId,gameName:game.name||gameId,gameDescription:game.description||"",settings:settings,registrationOpen:votingCompetitionRegistrationOpen_(settings),votingOpen:votingOpen,votingDeadlinePassed:votingCompetitionDeadlinePassed_(settings),ballotLimit:votingCompetitionBallotLimit_(settings,eligible.length),entries:published.map(function(entry){return votingCompetitionPublicEntry_(entry,settings);}),evaluations:evaluations.map(function(row){return{entryId:row.entryId,evaluated:row.evaluated,criteriaScores:row.criteriaScores||{}};}),ownEntries:ownEntries.map(function(e){return{entryId:e.entryId,participantName:e.participantName,entryName:e.entryName,imageUrl:e.imageUrl,imageFileId:e.imageFileId,displayNumber:e.displayNumber,displayColor:e.displayColor,description:e.description,ingredients:e.ingredients,customData:e.customData||{},status:e.status,published:e.published,adminNotes:e.adminNotes};}),ownEntry:ownEntry?{entryId:ownEntry.entryId,participantName:ownEntry.participantName,entryName:ownEntry.entryName,imageUrl:ownEntry.imageUrl,imageFileId:ownEntry.imageFileId,displayNumber:ownEntry.displayNumber,displayColor:ownEntry.displayColor,description:ownEntry.description,ingredients:ownEntry.ingredients,customData:ownEntry.customData||{},status:ownEntry.status,published:ownEntry.published,adminNotes:ownEntry.adminNotes}:null,ballot:userBallot,resultsVisible:resultsVisible,ballotCount:resultBundle.ballotCount,results:resultsVisible?resultBundle.results.map(function(row){return Object.assign({},row,{participantName: settings.showParticipantNames ? row.participantName : "",imageUrl: settings.showPhoto ? row.imageUrl : ""});}):[]};
+  payload = payload || {};
+  const username = votingCompetitionString_(payload.username);
+  const gameId = votingCompetitionString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
+  if (!username || !gameId) throw new Error("Username and GameId are required.");
+  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
+  if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
+  const settings = votingCompetitionGetSettings_(gameId);
+  const participants = votingCompetitionReadParticipants_(gameId);
+  const published = participants.filter(function(e){return e.status === "approved" && e.published === true;});
+  const evaluations = votingCompetitionReadEvaluations_(gameId, username);
+  const evaluationMap = votingCompetitionEvaluationMap_(evaluations);
+  const ballots = votingCompetitionReadBallots_(gameId);
+  const ownEntries = participants.filter(function(e){return votingCompetitionKey_(e.username) === votingCompetitionKey_(username);});
+  const ownEntry = ownEntries[0] || null;
+  const resultsVisible = votingCompetitionResultsVisible_(settings, game);
+  const votingOpen = votingCompetitionVotingOpen_(settings, game);
+  const categories = settings.entryCategories || [];
+  const activeCategory = categories.length ? categories[0].id : "";
+  const ballotByCategory = {};
+  const resultsByCategory = {};
+  const resultCountByCategory = {};
+  const categoryIds = categories.length ? categories.map(function(c){return c.id;}) : [""];
+  categoryIds.forEach(function(categoryId) {
+    const categoryEntries = votingCompetitionEntriesForCategory_(published, categoryId);
+    const categoryBallots = ballots.filter(function(row){return votingCompetitionString_(row.categoryId)===categoryId;});
+    ballotByCategory[categoryId] = categoryBallots.filter(function(row) {
+      return votingCompetitionKey_(row.username)===votingCompetitionKey_(username);
+    }).map(function(row) {
+      return {entryId:row.entryId,rank:row.rank,points:row.points,criteriaScore:row.criteriaScore,coverageWeight:row.coverageWeight};
+    }).sort(function(a,b){return a.rank-b.rank;});
+    const result = votingCompetitionResults_(gameId, settings, categoryEntries, categoryBallots);
+    resultCountByCategory[categoryId] = result.ballotCount;
+    resultsByCategory[categoryId] = resultsVisible ? result.results.map(function(row){
+      return Object.assign({},row,{
+        participantName:settings.showParticipantNames ? row.participantName : "",
+        imageUrl:settings.showPhoto ? row.imageUrl : ""
+      });
+    }) : [];
+  });
+  function ownPublic(e) {
+    return {entryId:e.entryId,participantName:e.participantName,entryName:e.entryName,
+      imageUrl:e.imageUrl,imageFileId:e.imageFileId,displayNumber:e.displayNumber,
+      displayColor:e.displayColor,description:e.description,ingredients:e.ingredients,
+      customData:e.customData||{},status:e.status,published:e.published,adminNotes:e.adminNotes};
+  }
+  const currentEntries = votingCompetitionEntriesForCategory_(published,activeCategory);
+  const eligible = votingCompetitionEligibleEntries_(currentEntries,evaluationMap,settings);
+  return {
+    success:true,gameId:gameId,gameName:game.name||gameId,gameDescription:game.description||"",
+    settings:settings,registrationOpen:votingCompetitionRegistrationOpen_(settings),
+    votingOpen:votingOpen,votingDeadlinePassed:votingCompetitionDeadlinePassed_(settings),
+    ballotLimit:votingCompetitionBallotLimit_(settings,eligible.length),
+    categoryId:activeCategory,categories:categories,
+    entries:published.map(function(entry){return votingCompetitionPublicEntry_(entry,settings);}),
+    evaluations:evaluations.map(function(row){return {entryId:row.entryId,evaluated:row.evaluated,criteriaScores:row.criteriaScores||{}};}),
+    ownEntries:ownEntries.map(ownPublic),ownEntry:ownEntry?ownPublic(ownEntry):null,
+    ballot:ballotByCategory[activeCategory]||[],ballotsByCategory:ballotByCategory,
+    resultsVisible:resultsVisible,ballotCount:resultCountByCategory[activeCategory]||0,
+    ballotCountByCategory:resultCountByCategory,
+    results:resultsByCategory[activeCategory]||[],resultsByCategory:resultsByCategory
+  };
 }
 
 function adminGetVotingCompetitionDashboard_(payload) {
