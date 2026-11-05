@@ -32,7 +32,7 @@ payload.votingOpen = true;
 html = page.sections(payload);
 assert(!html.includes('data-cookoff-tab="entry"'), 'Entry tab must disappear once registration closes');
 assert(html.includes('data-cookoff-panel="vote"'), 'Vote area missing when voting opens');
-assert(html.includes('Ate / Tasted'), 'Tasted checkbox missing');
+assert(html.includes(' Tasted</label>'), 'Tasted checkbox missing');
 assert(html.includes('Info / Ingredients'), 'Expandable detail control missing');
 assert(html.includes('cookoff-r9-grip'), 'Touch ranking handle missing');
 assert(html.includes('Move dish up'), 'Arrow ranking fallback missing');
@@ -59,7 +59,7 @@ assert.deepStrictEqual(page.state.selectedEntryIds, ['blue', 'red'],
   'Ranked entries must remain ranked when tasted-only is OFF');
 assert(unrestrictedHtml.includes('Add the dishes you want to rank'),
   'Unrestricted mode should explain selection without tasting');
-assert(!unrestrictedHtml.includes('Ate / Tasted'),
+assert(!unrestrictedHtml.includes(' Tasted</label>'),
   'Unrestricted rank-only mode should not require a tasted checkbox');
 assert(unrestrictedHtml.includes('Blue Chili') && unrestrictedHtml.includes('Red Chili'),
   'Unrestricted mode must preserve existing ballot items');
@@ -74,7 +74,7 @@ page.state.selectedEntryIds = ['blue', 'red'];
 const tastedHtml = page.compact(payload);
 assert.deepStrictEqual(page.state.selectedEntryIds, ['red'],
   'Tasted-only mode must remove an untasted ranked entry');
-assert(tastedHtml.includes('Ate / Tasted'), 'Tasted-only checkbox must be visible');
+assert(tastedHtml.includes(' Tasted</label>'), 'Tasted-only checkbox must be visible');
 assert(tastedHtml.includes('1 ranked'), 'Ranking count should reflect tasted eligibility');
 assert(tastedHtml.includes('is-untasted'), 'Untasted entries should look inactive');
 
@@ -84,7 +84,7 @@ settings.minimumEvaluatedEntries = 2;
 page.state.evaluatedEntryIds = ['red'];
 page.state.selectedEntryIds = ['red', 'blue'];
 const minimumHtml = page.compact(payload);
-assert(minimumHtml.includes('Ate / Tasted'), 'Minimum-evaluated setting requires tasting controls');
+assert(minimumHtml.includes(' Tasted</label>'), 'Minimum-evaluated setting requires tasting controls');
 assert.deepStrictEqual(page.state.selectedEntryIds, ['red', 'blue'],
   'Minimum evaluated count must not silently switch on tasted-only ranking');
 
