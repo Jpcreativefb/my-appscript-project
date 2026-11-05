@@ -1212,6 +1212,9 @@ function apiGetVotingCompetitionState_(payload) {
   const evaluations = votingCompetitionReadEvaluations_(gameId, username);
   const evaluationMap = votingCompetitionEvaluationMap_(evaluations);
   const ballots = votingCompetitionReadBallots_(gameId);
+  const drafts = votingCompetitionReadDrafts_(gameId,username);
+  const draftsByCategory = {};
+  drafts.forEach(function(d){draftsByCategory[d.categoryId]=d.rankings;});
   const ownEntries = participants.filter(function(e){return votingCompetitionKey_(e.username) === votingCompetitionKey_(username);});
   const ownEntry = ownEntries[0] || null;
   const resultsVisible = votingCompetitionResultsVisible_(settings, game);
@@ -1256,7 +1259,7 @@ function apiGetVotingCompetitionState_(payload) {
     entries:published.map(function(entry){return votingCompetitionPublicEntry_(entry,settings);}),
     evaluations:evaluations.map(function(row){return {entryId:row.entryId,evaluated:row.evaluated,criteriaScores:row.criteriaScores||{}};}),
     ownEntries:ownEntries.map(ownPublic),ownEntry:ownEntry?ownPublic(ownEntry):null,
-    ballot:ballotByCategory[activeCategory]||[],ballotsByCategory:ballotByCategory,
+    ballot:ballotByCategory[activeCategory]||[],ballotsByCategory:ballotByCategory,draftsByCategory:draftsByCategory,
     resultsVisible:resultsVisible,ballotCount:resultCountByCategory[activeCategory]||0,
     ballotCountByCategory:resultCountByCategory,
     results:resultsByCategory[activeCategory]||[],resultsByCategory:resultsByCategory
