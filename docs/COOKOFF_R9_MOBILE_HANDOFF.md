@@ -35,3 +35,47 @@ Baseline: `feature/cookoff-experience-r1` at `4811fa7dd4e4dfd9cc7eb347459f3fd1ed
 
 ## Boundaries
 Do not create a separate Cookoff engine or type; preserve `VotingCompetitionEngine`, dedicated sheets, identity guards, result reveal rules and scoring-contract lock. No merge, deploy, setup operations, or live ballots without Director authorization.
+
+
+## Integration checkpoint — November 5, 2026
+The R9 branch now includes unaccepted changes to:
+- Authenticated multi-entry submission and server-locked unique color, number, and combination assignment.
+- Admin-managed identifier mode, palette, multi-dish limits, registration deadline, entry awards, rules, host instructions, and pickup directions.
+- Per-category ballots and standings with global tasted-state reuse.
+- Official judge authorization and weighted scoring by category audience.
+- Alternate direct rank entry, per-category partial draft saving, and optional countdown/Next Category navigation.
+- A private Apps Script draft-finalization handler with opt-in installation function. **No time trigger has been installed.**
+- New tests: cookoff_r9_integration_tests.js and cookoff_r9_multi_entry_tests.js.
+
+### NOT RELEASE-READY / PENDING DESIGN + IMPLEMENTATION
+- Contestant automatic locked first-place self-rank is not implemented yet, particularly when the contestant owns multiple dishes.
+- Pre-submit reservation that displays a permanent randomized identifier upon entering the form is not implemented; assignment is durable on successful submission only.
+- Entry divisions separate from award categories, per-category criteria-scoring settings, and full category-specific judging lifecycle require further work.
+- A trigger must be explicitly installed in the isolated preview Apps Script project and an after-deadline finalization test must pass; doing nothing does **not** guarantee drafts are counted.
+- Criteria-only drafts are not auto-finalized by the current rank-based finalizer.
+- Physical phone, multi-user access, concurrent submission, and timer-trigger tests are still pending.
+- Reconcile branch with current accepted release. This branch MUST NOT be pushed directly to production because its underlying history diverges from the release branch.
+
+### Required Work Mac tests before preview deployment
+```bash
+cd ~/Documents/PATTC-Cookoff-R9-Review
+git pull --ff-only
+node --check backend/engines/VotingCompetitionEngine.js
+node --check frontend/js/pages/adminGameSetup.js
+node --check frontend/js/pages/voting.js
+node tests/cookoff_r9_mobile_smoke_tests.js
+node tests/cookoff_r9_integration_tests.js
+node tests/cookoff_r9_multi_entry_tests.js
+node tests/cookoff_v1_final_tests.js
+node tests/voting_competition_v1218z_tests.js
+git diff --check HEAD~34 HEAD
+git status --short
+```
+
+### Deployment safety gate
+1. Do not run the old `install_voting_competition_v1218z.sh` script: it deploys to production.
+2. Confirm the exact Apps Script Preview ID and Cloudflare Pages Preview source before attempting staging.
+3. Obtain PASS on all targeted regression tests, frontend-browser validation and isolated Apps Script runtime simulations; do not rely on a single syntax test.
+4. Test two simultaneous real entries for distinct assignments, two dishes owned by one account, cross-account ownership, judge-only access, categorized ballots, restart/reload draft restoration, and after-deadline finalization.
+5. Confirm all requested self-ranking/reservation/division rules and run physical-phone acceptance.
+6. Only then prepare a release candidate, rollback checkpoints and a separate production authorization.
