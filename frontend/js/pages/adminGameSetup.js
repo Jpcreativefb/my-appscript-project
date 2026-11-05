@@ -1285,6 +1285,9 @@ async function adminVotingSaveSettings_(gameId) {
       }).filter(function(c){return c.label;}),
       officialJudges: adminVotingValue_("adminVotingOfficialJudges").split(/\r?\n|,/).map(function(u){return u.trim();}).filter(Boolean),
       judgeMultiplier: Number(adminVotingValue_("adminVotingJudgeMultiplier") || 3),
+      autoFinalizeDrafts: adminVotingChecked_("adminVotingAutoFinalize"),
+      allowPartialAutoFinalize: adminVotingChecked_("adminVotingPartialAuto"),
+      showVotingCountdown: adminVotingChecked_("adminVotingCountdown"),
       entryRules: adminVotingValue_("adminVotingEntryRules"),
       hostEntryInfo: adminVotingValue_("adminVotingHostInfo"),
       pickupInstructions: adminVotingValue_("adminVotingPickupInstructions"),
@@ -1459,6 +1462,9 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
           <label class="admin-field"><span>Combined Rank Weight</span><input id="adminVotingCombinedRankWeight" type="number" min="0" step="0.01" value="${adminSetupEscapeHtml(settings.combinedRankWeight == null ? 0.5 : settings.combinedRankWeight)}"></label>
           <label class="admin-field"><span>Combined Criteria Weight</span><input id="adminVotingCombinedCriteriaWeight" type="number" min="0" step="0.01" value="${adminSetupEscapeHtml(settings.combinedCriteriaWeight == null ? 0.5 : settings.combinedCriteriaWeight)}"></label>
           <label class="admin-field"><span>Voting Deadline</span><input id="adminVotingDeadline" type="datetime-local" value="${adminSetupEscapeHtml(adminSetupFormatDateTimeLocal(settings.votingDeadline || ""))}"></label>
+          <label class="admin-checkbox-field"><input type="checkbox" id="adminVotingAutoFinalize" ${settings.autoFinalizeDrafts ? "checked" : ""}><span>Auto finalize saved drafts at the deadline (requires server time trigger)</span></label>
+          <label class="admin-checkbox-field"><input type="checkbox" id="adminVotingPartialAuto" ${settings.allowPartialAutoFinalize ? "checked" : ""}><span>Count partially ranked drafts if valid at deadline</span></label>
+          <label class="admin-checkbox-field"><input type="checkbox" id="adminVotingCountdown" ${settings.showVotingCountdown ? "checked" : ""}><span>Show voting countdown clock on phone</span></label>
         </div>
         <label class="admin-field admin-cookoff-criteria-field"><span>Judging Criteria</span><textarea id="adminVotingCriteria" rows="5" placeholder="taste|Taste|1|10|40&#10;texture|Texture|1|10|25">${adminSetupEscapeHtml((settings.criteria || []).map(function(item) { return [item.id, item.label, item.minScore, item.maxScore, item.weight].join("|"); }).join("\n"))}</textarea><small class="admin-field-note">One criterion per line: stable-id | label | minimum | maximum | weight. Weights are normalized by the server.</small></label>
         <p class="admin-field-note">After the first valid ballot is accepted, Cookoff scoring mode, criteria/weights, evaluated minimum, ballot weighting, and incompatible rank-size changes are server locked.</p>
