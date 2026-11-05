@@ -4596,3 +4596,11 @@ body.game-profile-choice-open { overflow:hidden; }
   .voting-final-submit .button { width: 100%; min-height: 48px; }
   .admin-cookoff-controls { grid-template-columns: minmax(0, 1fr); }
 }
+
+
+/* Cookoff R9 — mobile-first separated competition surfaces */
+.cookoff-r9-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0 14px}
+.cookoff-r9-tab{min-height:46px;border:1px solid #566178;border-radius:11px;background:#273149;color:#f8fafc;font-weight:800;font-size:.88rem;padding:8px 5px;cursor:pointer}
+.cookoff-r9-tab.is-current{background:#ffcc00;border-color:#ffcc00;color:#121827}
+.cookoff-r9-panel[hidden]{display:none!important}
+@media(max-width:600px){.voting-page .voting-page-header{gap:8px}.cookoff-r9-nav{position:sticky;top:0;z-index:12;background:#10192a;padding:5px 0}.cookoff-r9-tab{font-size:.78rem;min-height:44px}}
