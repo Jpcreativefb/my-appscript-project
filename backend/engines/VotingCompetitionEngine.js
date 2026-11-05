@@ -57,7 +57,10 @@ const VOTING_COMPETITION_SETTINGS_HEADERS = [
   "PickupInstructions",
   "RegistrationDeadline",
   "OfficialJudgesJSON",
-  "JudgeMultiplier"
+  "JudgeMultiplier",
+  "AutoFinalizeDrafts",
+  "AllowPartialAutoFinalize",
+  "ShowVotingCountdown"
 ];
 
 const VOTING_COMPETITION_PARTICIPANT_HEADERS = [
@@ -248,7 +251,10 @@ function votingCompetitionDefaultSettings_(gameId) {
     pickupInstructions: "",
     registrationDeadline: "",
     officialJudges: [],
-    judgeMultiplier: 3
+    judgeMultiplier: 3,
+    autoFinalizeDrafts: false,
+    allowPartialAutoFinalize: false,
+    showVotingCountdown: false
   };
 }
 
@@ -604,7 +610,10 @@ function votingCompetitionGetSettings_(gameId) {
     pickupInstructions: votingCompetitionString_(row[col.pickupinstructions]),
     registrationDeadline: votingCompetitionString_(row[col.registrationdeadline]),
     officialJudges: votingCompetitionOfficialJudges_(row[col.officialjudgesjson]),
-    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(row[col.judgemultiplier],3)))
+    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(row[col.judgemultiplier],3))),
+    autoFinalizeDrafts: votingCompetitionBool_(row[col.autofinalizedrafts],false),
+    allowPartialAutoFinalize: votingCompetitionBool_(row[col.allowpartialautofinalize],false),
+    showVotingCountdown: votingCompetitionBool_(row[col.showvotingcountdown],false)
   };
 }
 
@@ -659,7 +668,10 @@ function votingCompetitionSaveSettings_(gameId, payload) {
     pickupInstructions: votingCompetitionString_(payload.pickupInstructions),
     registrationDeadline: votingCompetitionString_(payload.registrationDeadline),
     officialJudges: votingCompetitionOfficialJudges_(payload.officialJudges),
-    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(payload.judgeMultiplier,3)))
+    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(payload.judgeMultiplier,3))),
+    autoFinalizeDrafts: votingCompetitionBool_(payload.autoFinalizeDrafts,false),
+    allowPartialAutoFinalize: votingCompetitionBool_(payload.allowPartialAutoFinalize,false),
+    showVotingCountdown: votingCompetitionBool_(payload.showVotingCountdown,false)
   };
   if (settings.registrationDeadline && !Number.isFinite(Date.parse(settings.registrationDeadline))) throw new Error("Registration deadline must be a valid date/time.");
   if ((settings.entryIdentifierMode === "color" || settings.entryIdentifierMode === "combo") && !settings.entryColorPalette.length) throw new Error("Select at least one Cookoff color.");
@@ -683,6 +695,8 @@ function votingCompetitionSaveSettings_(gameId, payload) {
   row[col.hostentryinfo] = settings.hostEntryInfo; row[col.pickupinstructions] = settings.pickupInstructions;
   row[col.registrationdeadline] = settings.registrationDeadline;
   row[col.officialjudgesjson] = JSON.stringify(settings.officialJudges); row[col.judgemultiplier] = settings.judgeMultiplier;
+  row[col.autofinalizedrafts] = settings.autoFinalizeDrafts; row[col.allowpartialautofinalize] = settings.allowPartialAutoFinalize;
+  row[col.showvotingcountdown] = settings.showVotingCountdown;
   if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]); else sh.getRange(sh.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
   if (typeof clearGameCaches === "function") clearGameCaches(gameId);
   return { success: true, settings: settings };
@@ -1105,8 +1119,9 @@ function votingCompetitionValidateBallot_(rankings, entries, settings) {
   });
 }
 
-function votingCompetitionSaveBallot_(payload) {
+function votingCompetitionSaveBallot_(payload, internalOptions) {
   payload = payload || {};
+  internalOptions = internalOptions || {};
   const username = votingCompetitionString_(payload.username); const gameId = votingCompetitionString_(payload.gameId);
   if (!username || !gameId) throw new Error("Username and GameId are required.");
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
@@ -1114,7 +1129,8 @@ function votingCompetitionSaveBallot_(payload) {
   const settings = votingCompetitionGetSettings_(gameId);
   const categoryId = votingCompetitionCategoryId_(settings, payload.categoryId);
   const voterRole = votingCompetitionJudgeRole_(settings,username,categoryId);
-  if (!votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
+  const internalAuto = internalOptions.serverDeadlineFinalization === true && settings.autoFinalizeDrafts === true && votingCompetitionDeadlinePassed_(settings);
+  if (!internalAuto && !votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
   const publishedEntries = votingCompetitionReadParticipants_(gameId).filter(function(entry) { return entry.status === "approved" && entry.published === true; });
   if (!publishedEntries.length) throw new Error("There are no published entries available to vote on.");
   votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
@@ -1135,9 +1151,15 @@ function votingCompetitionSaveBallot_(payload) {
       votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,false);
       return {success:true,gameId:gameId,categoryId:categoryId,draftSaved:true,saved:rankings.length};
     }
-    if (judgingMode !== "criteria") votingCompetitionValidateBallot_(rankings, eligibleEntries, settings);
+    let validationSettings = settings;
+    if (internalAuto && settings.allowPartialAutoFinalize === true && judgingMode !== "criteria" && rankings.length > 0) {
+      const fullLimit = votingCompetitionBallotLimit_(settings,eligibleEntries.length);
+      if (rankings.length > fullLimit) throw new Error("Draft contains too many ranks.");
+      validationSettings = Object.assign({},settings,{votingMethod:"top-n",rankLimit:rankings.length});
+    }
+    if (judgingMode !== "criteria") votingCompetitionValidateBallot_(rankings, eligibleEntries, validationSettings);
     const coverageWeight = votingCompetitionCoverageWeight_(evaluatedCount, categoryEntries.length, settings.ballotWeighting);
-    const limit = votingCompetitionBallotLimit_(settings, eligibleEntries.length);
+    const limit = votingCompetitionBallotLimit_(validationSettings, eligibleEntries.length);
     const maxRankPoints = limit ? votingCompetitionPointsForRank_(1, settings, limit) : 0;
     const specs = [];
     if (judgingMode === "criteria") {
@@ -1165,6 +1187,36 @@ function votingCompetitionSaveBallot_(payload) {
     if(typeof clearGameCaches==="function") clearGameCaches(gameId);
     return {success:true,gameId:gameId,categoryId:categoryId,saved:rows.length,evaluatedCount:evaluatedCount,coverageWeight:coverageWeight};
   } finally { lock.releaseLock(); }
+}
+
+
+/* Private time-trigger operation; never expose this as a public API route. */
+function votingCompetitionFinalizeDueDrafts_() {
+  const drafts = votingCompetitionReadDrafts_("","");
+  const result = {checked:0,finalized:0,skipped:0,errors:[]};
+  drafts.filter(function(row){return !row.finalized;}).forEach(function(draft) {
+    result.checked++;
+    try {
+      const settings = votingCompetitionGetSettings_(draft.gameId);
+      if (!settings.autoFinalizeDrafts || !votingCompetitionDeadlinePassed_(settings)) {result.skipped++;return;}
+      if (!draft.rankings || !draft.rankings.length) {result.skipped++;return;}
+      votingCompetitionSaveBallot_({
+        gameId:draft.gameId,username:draft.username,categoryId:draft.categoryId,
+        rankings:draft.rankings
+      },{serverDeadlineFinalization:true});
+      result.finalized++;
+    } catch(err) {
+      result.errors.push({gameId:draft.gameId,categoryId:draft.categoryId,message:String(err && err.message || err)});
+    }
+  });
+  if (result.errors.length && typeof Logger !== "undefined") Logger.log(JSON.stringify(result));
+  return result;
+}
+function votingCompetitionInstallDraftFinalizer_() {
+  const target = "votingCompetitionFinalizeDueDrafts_";
+  if (ScriptApp.getProjectTriggers().some(function(t){return t.getHandlerFunction()===target;})) return {installed:false,alreadyExists:true};
+  ScriptApp.newTrigger(target).timeBased().everyMinutes(1).create();
+  return {installed:true,alreadyExists:false};
 }
 
 function votingCompetitionResults_(gameId, settings, participants, ballots) {
@@ -1254,7 +1306,7 @@ function apiGetVotingCompetitionState_(payload) {
   const eligible = votingCompetitionEligibleEntries_(currentEntries,evaluationMap,settings);
   return {
     success:true,gameId:gameId,gameName:game.name||gameId,gameDescription:game.description||"",
-    settings:settings,isOfficialJudge:(settings.officialJudges||[]).indexOf(votingCompetitionKey_(username))>=0,registrationOpen:votingCompetitionRegistrationOpen_(settings),
+    settings:settings,serverNow:Date.now(),isOfficialJudge:(settings.officialJudges||[]).indexOf(votingCompetitionKey_(username))>=0,registrationOpen:votingCompetitionRegistrationOpen_(settings),
     votingOpen:votingOpen,votingDeadlinePassed:votingCompetitionDeadlinePassed_(settings),
     ballotLimit:votingCompetitionBallotLimit_(settings,eligible.length),
     categoryId:activeCategory,categories:categories,
