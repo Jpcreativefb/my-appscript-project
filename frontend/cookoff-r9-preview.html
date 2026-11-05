@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cookoff R9 — Offline Mobile Preview</title>
+<link rel="stylesheet" href="./css/pages.css">
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#0d1526;color:#f6f8ff}
+.preview-shell{max-width:850px;margin:auto;padding:10px}
+.preview-toolbar{border:1px solid #45536b;background:#202c43;border-radius:12px;padding:10px;margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.preview-toolbar strong{color:#ffcc00;flex:1 0 100%;font-size:.93rem}
+.preview-toolbar select{background:#111a2d;color:#fff;padding:9px;border:1px solid #72819b;border-radius:8px;min-height:42px}
+.preview-toolbar label{display:flex;align-items:center;gap:6px;font-size:.84rem}
+.preview-toolbar button{border:1px solid #ffcc00;color:#101928;background:#ffcc00;padding:9px;border-radius:8px;font-weight:800;min-height:42px}
+.preview-notice{background:#203047;border:1px solid #52647e;border-radius:9px;padding:9px;font-size:.78rem;margin-bottom:12px}
+.preview-notice strong{color:#ffcc00}
+#preview-root{max-width:660px;margin:auto}
+#preview-root .page{padding:0}
+#preview-root .voting-page-header .button{background:#ffcc00;color:#151a25;border-radius:8px;padding:10px;border:0}
+#preview-feedback{font-size:.84rem;min-height:1.3em;color:#b5ffd0;font-weight:700;margin:6px 0}
+.preview-toolbar input{accent-color:#ffcc00}
+@media(max-width:500px){.preview-shell{padding:6px}.preview-toolbar{padding:9px;gap:8px}#preview-root{width:100%}}
+</style>
+</head>
+<body>
+<main class="preview-shell">
+ <div class="preview-toolbar">
+  <strong>Cookoff R9 · Local Mobile Preview</strong>
+  <label>Stage <select id="demo-stage">
+   <option value="vote">Voting Open</option>
+   <option value="entry">Entry Registration</option>
+   <option value="results">Results Released</option>
+  </select></label>
+  <label><input type="checkbox" id="demo-tasted" checked>Tasted-only voting</label>
+  <button id="demo-reset" type="button">Reset Demo</button>
+ </div>
+ <p class="preview-notice"><strong>OFFLINE DEMO.</strong> Five invented test dishes. Uses actual R9 voting renderer. No login, external API, or production data. "Save Ballot" only updates this page's memory.</p>
+ <div id="preview-feedback" role="status" aria-live="polite"></div>
+ <div id="preview-root"></div>
+</main>
+<script>
+/* Intentionally no PATTC app bundle, api.js, storage, network requests, or external assets. */
+var APP_STATE={gameId:"cookoff-r9-offline"};
+function setPageLoadStep() {}
+function navigate(){ renderDemo(); }
+function platformImgHtml(src,opts){
+ var element=document.createElement("img");
+ element.src=src;
+ element.alt=(opts&&opts.alt)||"Dish photo";
+ element.className=(opts&&opts.className)||"";
+ return element.outerHTML;
+}
+function samplePhoto(color,label) {
+ var svg='<svg xmlns="http://www.w3.org/2000/svg" width="480" height="185" viewBox="0 0 480 185">'+
+  '<rect width="480" height="185" fill="'+color+'"/><ellipse cx="275" cy="100" rx="130" ry="70" fill="#ddd4c5"/>'+
+  '<ellipse cx="275" cy="95" rx="117" ry="57" fill="#713a2a"/>'+
+  '<g fill="#c66d40"><circle cx="242" cy="85" r="23"/><circle cx="298" cy="74" r="21"/><circle cx="323" cy="107" r="20"/></g>'+
+  '<g fill="#e5b55d"><circle cx="266" cy="118" r="11"/><circle cx="329" cy="81" r="8"/><circle cx="214" cy="104" r="9"/></g>'+
+  '<text x="14" y="30" font-family="sans-serif" font-size="19" font-weight="bold" fill="white">'+label+'</text></svg>';
+ return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+var sampleEntries=[
+ {entryId:"a",entryName:"Texas Hot Chili",displayNumber:"1",displayColor:"Red",description:"Rich smoky chili with medium heat.",ingredients:"Beef, tomato, beans, peppers.",imageUrl:samplePhoto("#b34c3c","DISH 1")},
+ {entryId:"b",entryName:"Smoky Mountain Chili",displayNumber:"2",displayColor:"Blue",description:"Slow cooked with smoky chipotle.",ingredients:"Beef, onions, chipotle.",imageUrl:samplePhoto("#386da8","DISH 2")},
+ {entryId:"c",entryName:"Garden Heat",displayNumber:"3",displayColor:"Green",description:"Vegetarian chili with mild warmth.",ingredients:"Beans, corn, peppers.",imageUrl:samplePhoto("#37835a","DISH 3")},
+ {entryId:"d",entryName:"Sweet Fire",displayNumber:"4",displayColor:"Yellow",description:"Sweet-heat spicy chili.",ingredients:"Tomato, peppers, honey.",imageUrl:samplePhoto("#ae8c29","DISH 4")},
+ {entryId:"e",entryName:"Midnight Chili",displayNumber:"5",displayColor:"Purple",description:"Dark spices and bold flavor.",ingredients:"Beef, cocoa, black beans.",imageUrl:samplePhoto("#7953a8","DISH 5")}
+];
+var demo={phase:"vote",tastedOnly:true,evaluated:["a","b","c"],rankings:["a","b","c"],ballots:0};
+function demoPayload(){
+ var entry=demo.phase==="entry",results=demo.phase==="results";
+ return {success:true,gameName:"Cookoff Test — R9",gameDescription:"Rate the dishes you actually tasted.",
+ registrationOpen:entry,votingOpen:!entry&&!results,resultsVisible:results,ballotCount:demo.ballots,
+ entries:sampleEntries,ownEntry:null,
+ settings:{entryLabel:"Dish",registrationEnabled:true,approvalRequired:true,allowParticipantEdits:true,
+ numberAssignment:"auto",colorAssignment:"auto",rankingUi:"auto",rankLimit:5,votingMethod:"top-n",
+ judgingMode:"rank",scoringMode:"custom-points",pointValues:[10,7,5,3,1],
+ evaluatedOnly:demo.tastedOnly,minimumEvaluatedEntries:0,resultsVisibility:"after-close",
+ instructions:"Mark tasted dishes and put your favorites in order.",customFields:[]},
+ ballot:demo.rankings.map(function(id,i){return {entryId:id,rank:i+1};}),
+ evaluations:sampleEntries.map(function(entry){return {entryId:entry.entryId,evaluated:demo.evaluated.includes(entry.entryId),criteriaScores:{}};}),
+ results:results?sampleEntries.map(function(entry,i){return Object.assign({},entry,{position:i+1,totalPoints:25-i*4,firstPlaceVotes:i===0?2:0,topThreeVotes:Math.max(0,3-i)});}):[]};
+}
+function feedback(message){document.getElementById("preview-feedback").textContent=message;}
+async function apiGetVotingCompetitionState(){return demoPayload();}
+async function apiSaveVotingCompetitionBallot(payload){
+ demo.evaluated=(payload.evaluatedEntryIds||[]).slice();
+ if(payload.evaluationOnly) return {success:true,evaluationSaved:true};
+ demo.rankings=(payload.rankings||[]).map(function(r){return r.entryId;});
+ demo.ballots=1;
+ feedback("Demo ballot saved in memory — no server request.");
+ return {success:true};
+}
+async function apiSaveVotingCompetitionParticipant(){throw Error("Entry submission is disabled in the offline preview.");}
+async function apiUploadVotingParticipantImage(){throw Error("Uploads are disabled in this offline preview.");}
+</script>
+<script src="./js/pages/voting.js"></script>
+<script>
+async function renderDemo(){
+ try {
+  var payload=demoPayload();
+  VOTING_PAGE_STATE.gameId=APP_STATE.gameId;
+  VOTING_PAGE_STATE.payload=payload;
+  VOTING_PAGE_STATE.effectiveUi="drag";
+  VOTING_PAGE_STATE.selectedEntryIds=demo.rankings.slice();
+  VOTING_PAGE_STATE.evaluatedEntryIds=demo.evaluated.slice();
+  VOTING_PAGE_STATE.criteriaScoresByEntry={};
+  document.getElementById("preview-root").innerHTML=
+   '<div class="page voting-page"><header class="voting-page-header"><div><span class="voting-eyebrow">COOKOFF / DEMO</span><h1>'+payload.gameName+'</h1><p>'+payload.gameDescription+'</p></div></header>'+
+   votingPageSections_(payload)+'</div>';
+  if(demo.phase==="entry") votingPageSwitchSection_("entry");
+  if(demo.phase==="vote") votingPageSwitchSection_("vote");
+  if(demo.phase==="results") votingPageSwitchSection_("results");
+ } catch(error) {
+  document.getElementById("preview-root").textContent="Preview error: "+error.message;
+ }
+}
+document.getElementById("demo-stage").addEventListener("change",function(){
+ demo.phase=this.value; feedback(""); renderDemo();
+});
+document.getElementById("demo-tasted").addEventListener("change",function(){
+ demo.tastedOnly=this.checked;
+ if(!demo.tastedOnly) demo.rankings=sampleEntries.map(function(e){return e.entryId;});
+ else demo.rankings=demo.rankings.filter(function(id){return demo.evaluated.includes(id);});
+ feedback("");renderDemo();
+});
+document.getElementById("demo-reset").addEventListener("click",function(){
+ demo={phase:"vote",tastedOnly:true,evaluated:["a","b","c"],rankings:["a","b","c"],ballots:0};
+ document.getElementById("demo-stage").value="vote";
+ document.getElementById("demo-tasted").checked=true;
+ feedback("");renderDemo();
+});
+/* Mirror local state changes after interaction. No backend persistence. */
+var originalEvaluationChange=votingEvaluationChanged_;
+votingEvaluationChanged_=function(id,checked){
+ originalEvaluationChange(id,checked);
+ demo.evaluated=VOTING_PAGE_STATE.evaluatedEntryIds.slice();
+ demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();
+};
+var originalMove=votingBallotMove_;
+votingBallotMove_=function(id,direction){originalMove(id,direction);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+var originalDrop=votingBallotDrop_;
+votingBallotDrop_=function(event){originalDrop(event);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+var originalTouch=votingPageTouchEnd_;
+votingPageTouchEnd_=function(event){originalTouch(event);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+var originalAdd=votingBallotAdd_;
+votingBallotAdd_=function(id){originalAdd(id);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+var originalRemove=votingBallotRemove_;
+votingBallotRemove_=function(id){originalRemove(id);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+renderDemo();
+</script>
+</body>
+</html>
