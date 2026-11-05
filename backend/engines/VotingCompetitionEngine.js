@@ -742,66 +742,110 @@ function votingCompetitionSaveParticipant_(payload) {
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
   const settings = votingCompetitionGetSettings_(gameId);
-  if (!settings.registrationEnabled || settings.registrationLocked) throw new Error("Participant registration is closed.");
-
-  const participants = votingCompetitionReadParticipants_(gameId);
-  const existing = participants.find(function(entry) { return votingCompetitionKey_(entry.username) === votingCompetitionKey_(username); }) || null;
-  if (existing && !settings.allowParticipantEdits) throw new Error("This entry can no longer be edited.");
-  if (existing && existing.status === "approved" && !settings.allowParticipantEdits) throw new Error("This approved entry can no longer be edited.");
-
+  if (!votingCompetitionRegistrationOpen_(settings)) throw new Error("Participant registration is closed.");
   const entryName = votingCompetitionString_(payload.entryName);
   if (!entryName) throw new Error((settings.entryLabel || "Entry") + " name is required.");
-  const participantName = votingCompetitionString_(payload.participantName) || username;
-  const customData = votingCompetitionValidateCustomData_(settings, payload.customData || {});
 
-  let displayNumber = existing ? existing.displayNumber : "";
-  if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
-  else if (settings.numberAssignment === "auto-sequential" && !displayNumber) displayNumber = votingCompetitionNextDisplayNumber_(participants);
+  const submissionId = votingCompetitionString_(payload.submissionId).slice(0,100);
+  const requestedId = votingCompetitionString_(payload.entryId);
+  // Protect read-choose-write from simultaneous submissions by different players.
+  // Never accept an identifier chosen in the browser for server-assigned modes.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Another entry is being registered. Please retry.");
+  try {
+    const participants = votingCompetitionReadParticipants_(gameId);
+    const mine = participants.filter(function(entry) {
+      return votingCompetitionKey_(entry.username) === votingCompetitionKey_(username);
+    });
+    let existing = null;
+    if (requestedId) {
+      existing = participants.find(function(entry) { return entry.entryId === requestedId; }) || null;
+      if (!existing || votingCompetitionKey_(existing.username) !== votingCompetitionKey_(username)) {
+        throw new Error("You do not own this competition entry.");
+      }
+    } else if (submissionId) {
+      existing = mine.find(function(entry) {
+        return votingCompetitionString_(entry.customData && entry.customData._cookoffSubmissionId) === submissionId;
+      }) || null;
+    }
+    if (!existing && !settings.allowMultipleEntries) existing = mine[0] || null;
+    if (existing && !settings.allowParticipantEdits && !(
+      submissionId && votingCompetitionString_(existing.customData && existing.customData._cookoffSubmissionId) === submissionId
+    )) throw new Error("This entry can no longer be edited.");
+    if (!existing && mine.length && !settings.allowMultipleEntries) throw new Error("Only one dish is allowed per contestant.");
+    const maxEntries = settings.allowMultipleEntries ? Number(settings.maxEntriesPerParticipant || 0) : 1;
+    if (!existing && maxEntries > 0 && mine.length >= maxEntries) throw new Error("You reached the maximum number of dishes for this Cookoff.");
 
-  let displayColor = existing ? existing.displayColor : "";
-  if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
-  else if (settings.colorAssignment === "auto-palette" && !displayColor) displayColor = votingCompetitionNextDisplayColor_(participants);
-  else if (settings.colorAssignment === "none") displayColor = "";
+    const customData = votingCompetitionValidateCustomData_(settings, payload.customData || {});
+    const categories = Array.isArray(settings.entryCategories) ? settings.entryCategories : [];
+    if (categories.length) {
+      const eligible = {};
+      categories.forEach(function(category) { eligible[category.id] = true; });
+      const requested = payload.customData && payload.customData.cookoffCategoryIds;
+      const choices = Array.isArray(requested) ? requested.map(votingCompetitionString_) :
+        categories.filter(function(category) { return category.defaultSelected !== false; }).map(function(category) { return category.id; });
+      if (choices.some(function(id){return !eligible[id];})) throw new Error("Unknown Cookoff entry category.");
+      customData.cookoffCategoryIds = Array.from(new Set(choices));
+    }
+    if (submissionId) customData._cookoffSubmissionId = submissionId;
+    else if (existing && existing.customData && existing.customData._cookoffSubmissionId) {
+      customData._cookoffSubmissionId = existing.customData._cookoffSubmissionId;
+    }
 
-  const status = settings.approvalRequired ? "submitted" : "approved";
-  const published = !settings.approvalRequired;
-  const entryId = existing && existing.entryId
-    ? existing.entryId
-    : ("entry-" + Utilities.getUuid().replace(/-/g, "").substring(0, 16).toLowerCase());
-  const now = new Date();
-  const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET, VOTING_COMPETITION_PARTICIPANT_HEADERS);
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
-  const col = votingCompetitionHeaderMap_(headers);
-  const row = new Array(headers.length).fill("");
-  row[col.timestamp] = existing && existing.timestamp ? existing.timestamp : now;
-  row[col.updatedat] = now;
-  row[col.gameid] = gameId;
-  row[col.username] = username;
-  row[col.entryid] = entryId;
-  row[col.participantname] = participantName;
-  row[col.entryname] = entryName;
-  row[col.imageurl] = votingCompetitionString_(payload.imageUrl) || (existing ? existing.imageUrl : "");
-  row[col.imagefileid] = votingCompetitionString_(payload.imageFileId) || (existing ? existing.imageFileId : "");
-  row[col.displaynumber] = displayNumber;
-  row[col.displaycolor] = displayColor;
-  row[col.description] = votingCompetitionString_(payload.description);
-  row[col.ingredients] = votingCompetitionString_(payload.ingredients);
-  row[col.customdatajson] = JSON.stringify(customData);
-  row[col.status] = status;
-  row[col.published] = published;
-  row[col.adminnotes] = existing ? existing.adminNotes : "";
-
-  if (existing) sh.getRange(existing.rowNumber, 1, 1, headers.length).setValues([row]);
-  else sh.getRange(sh.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
-
-  if (typeof clearGameCaches === "function") clearGameCaches(gameId);
-  return {
-    success: true,
-    entryId: entryId,
-    status: status,
-    published: published,
-    message: published ? "Entry saved and published." : "Entry submitted for admin approval."
-  };
+    let displayNumber = existing ? existing.displayNumber : "";
+    let displayColor = existing ? existing.displayColor : "";
+    if (!existing) {
+      if (settings.entryIdentifierMode !== "legacy") {
+        const assigned = votingCompetitionAssignIdentity_(settings, participants);
+        displayNumber = assigned.displayNumber;
+        displayColor = assigned.displayColor;
+      } else {
+        if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
+        else if (settings.numberAssignment === "auto-sequential") displayNumber = votingCompetitionNextDisplayNumber_(participants);
+        if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
+        else if (settings.colorAssignment === "auto-palette") displayColor = votingCompetitionNextDisplayColor_(participants);
+      }
+    } else if (settings.entryIdentifierMode === "legacy") {
+      if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
+      if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
+    }
+    const participantName = votingCompetitionString_(payload.participantName) || username;
+    const status = settings.approvalRequired ? "submitted" : "approved";
+    const published = !settings.approvalRequired;
+    const entryId = existing && existing.entryId
+      ? existing.entryId
+      : ("entry-" + Utilities.getUuid().replace(/-/g, "").substring(0,16).toLowerCase());
+    const now = new Date();
+    const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET, VOTING_COMPETITION_PARTICIPANT_HEADERS);
+    const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
+    const col = votingCompetitionHeaderMap_(headers);
+    const row = new Array(headers.length).fill("");
+    row[col.timestamp] = existing && existing.timestamp ? existing.timestamp : now;
+    row[col.updatedat] = now;
+    row[col.gameid] = gameId;
+    row[col.username] = username;
+    row[col.entryid] = entryId;
+    row[col.participantname] = participantName;
+    row[col.entryname] = entryName;
+    row[col.imageurl] = votingCompetitionString_(payload.imageUrl) || (existing ? existing.imageUrl : "");
+    row[col.imagefileid] = votingCompetitionString_(payload.imageFileId) || (existing ? existing.imageFileId : "");
+    row[col.displaynumber] = displayNumber;
+    row[col.displaycolor] = displayColor;
+    row[col.description] = votingCompetitionString_(payload.description);
+    row[col.ingredients] = votingCompetitionString_(payload.ingredients);
+    row[col.customdatajson] = JSON.stringify(customData);
+    row[col.status] = status;
+    row[col.published] = published;
+    row[col.adminnotes] = existing ? existing.adminNotes : "";
+    if (existing) sh.getRange(existing.rowNumber,1,1,headers.length).setValues([row]);
+    else sh.getRange(sh.getLastRow()+1,1,1,headers.length).setValues([row]);
+    if (typeof clearGameCaches === "function") clearGameCaches(gameId);
+    return {success:true,entryId:entryId,displayNumber:displayNumber,displayColor:displayColor,
+      status:status,published:published,
+      message:published ? "Entry saved and published." : "Entry submitted for admin approval."};
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function votingCompetitionUploadParticipantImage_(payload) {
