@@ -517,6 +517,44 @@ async function votingSaveBallot_() {
   }
 }
 
+
+/* Cookoff R9: separate player surfaces without changing voting authority. */
+function votingPageSwitchSection_(section) {
+  var root = document.querySelector('.voting-page');
+  if (!root) return;
+  ['entry', 'vote', 'results'].forEach(function(name) {
+    var panel = root.querySelector('[data-cookoff-panel="' + name + '"]');
+    var tab = root.querySelector('[data-cookoff-tab="' + name + '"]');
+    if (panel) panel.hidden = name !== section;
+    if (tab) {
+      tab.setAttribute('aria-pressed', name === section ? 'true' : 'false');
+      tab.classList.toggle('is-current', name === section);
+    }
+  });
+  VOTING_PAGE_STATE.activeSection = section;
+  if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+}
+
+function votingPageSections_(payload) {
+  var entryOpen = payload.registrationOpen === true;
+  var canVote = Array.isArray(payload.entries) && payload.entries.length > 0;
+  var hasResults = payload.resultsVisible === true;
+  var active = (!entryOpen && hasResults && !payload.votingOpen) ? 'results'
+    : (!entryOpen || payload.votingOpen) && canVote ? 'vote' : entryOpen ? 'entry' : 'results';
+  var choices = [];
+  if (entryOpen) choices.push({ id: 'entry', label: 'Enter Cookoff' });
+  if (canVote || !entryOpen) choices.push({ id: 'vote', label: 'Vote / Judge' });
+  choices.push({ id: 'results', label: 'Results' });
+  if (!choices.some(function(item) { return item.id === active; })) active = choices[0].id;
+  VOTING_PAGE_STATE.activeSection = active;
+  return '<nav class="cookoff-r9-nav" aria-label="Competition areas">' + choices.map(function(item) {
+    return '<button class="cookoff-r9-tab' + (active === item.id ? ' is-current' : '') + '" type="button" data-cookoff-tab="' + item.id + '" aria-pressed="' + (active === item.id ? 'true' : 'false') + '" onclick="votingPageSwitchSection_(\'' + item.id + '\')">' + item.label + '</button>';
+  }).join('') + '</nav>' +
+    '<div class="cookoff-r9-panel" data-cookoff-panel="entry"' + (active !== 'entry' ? ' hidden' : '') + '>' + (entryOpen ? votingPageParticipantCard_(payload) : '') + '</div>' +
+    '<div class="cookoff-r9-panel" data-cookoff-panel="vote"' + (active !== 'vote' ? ' hidden' : '') + '>' + votingPageVotingCard_(payload) + '</div>' +
+    '<div class="cookoff-r9-panel" data-cookoff-panel="results"' + (active !== 'results' ? ' hidden' : '') + '>' + votingPageResultsCard_(payload) + '</div>';
+}
+
 async function renderVotingPage() {
   var gameId = typeof APP_STATE !== 'undefined' ? String(APP_STATE.gameId || '').trim() : '';
   if (!gameId) return '<div class="page"><div class="card error-card">Choose a Voting / Competition game first.</div></div>';
@@ -527,5 +565,5 @@ async function renderVotingPage() {
   VOTING_PAGE_STATE.selectedEntryIds = (payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
   VOTING_PAGE_STATE.evaluatedEntryIds = []; VOTING_PAGE_STATE.criteriaScoresByEntry = {};
   (payload.evaluations || []).forEach(function(row) { if (row.evaluated) VOTING_PAGE_STATE.evaluatedEntryIds.push(row.entryId); VOTING_PAGE_STATE.criteriaScoresByEntry[row.entryId] = Object.assign({}, row.criteriaScores || {}); });
-  return '<div class="page voting-page">' + '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div><button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' + votingPageParticipantCard_(payload) + votingPageVotingCard_(payload) + votingPageResultsCard_(payload) + '</div>';
+  return '<div class="page voting-page">' + '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div><button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' + votingPageSections_(payload) + '</div>';
 }
