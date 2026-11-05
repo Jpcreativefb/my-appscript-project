@@ -147,15 +147,15 @@ votingEvaluationChanged_=function(id,checked){
  demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();
 };
 var originalMove=votingBallotMove_;
-votingBallotMove_=function(id,direction){originalMove(id,direction);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+votingBallotMove_=function(id,direction){originalMove(id,direction);demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();};
 var originalDrop=votingBallotDrop_;
-votingBallotDrop_=function(event){originalDrop(event);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+votingBallotDrop_=function(event){originalDrop(event);demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();};
 var originalTouch=votingPageTouchEnd_;
-votingPageTouchEnd_=function(event){originalTouch(event);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+votingPageTouchEnd_=function(event){originalTouch(event);demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();};
 var originalAdd=votingBallotAdd_;
-votingBallotAdd_=function(id){originalAdd(id);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+votingBallotAdd_=function(id){originalAdd(id);demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();};
 var originalRemove=votingBallotRemove_;
-votingBallotRemove_=function(id){originalRemove(id);demo.rankings=VOTING_PAGE_STATE.selectedEntryIds.slice();};
+votingBallotRemove_=function(id){originalRemove(id);demo.rankingsByCategory[VOTING_PAGE_STATE.activeCategoryId||"overall"]=VOTING_PAGE_STATE.selectedEntryIds.slice();};
 renderDemo();
 </script>
 </body>
