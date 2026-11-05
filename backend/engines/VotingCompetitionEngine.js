@@ -1135,7 +1135,7 @@ function votingCompetitionSaveBallot_(payload, internalOptions) {
   if (!internalAuto && !votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
   const publishedEntries = votingCompetitionReadParticipants_(gameId).filter(function(entry) { return entry.status === "approved" && entry.published === true; });
   if (!publishedEntries.length) throw new Error("There are no published entries available to vote on.");
-  votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
+  if ((settings.entryCategories || []).length) votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
   const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   if (!lock.tryLock(3500)) throw new Error("Another vote is being saved. Please try once more.");
   try {
@@ -1149,6 +1149,7 @@ function votingCompetitionSaveBallot_(payload, internalOptions) {
     const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
     const judgingMode = votingCompetitionNormalizeJudgingMode_(settings.judgingMode);
     if (payload.draftOnly === true) {
+      if (!(settings.entryCategories || []).length) throw new Error("Draft saving is not enabled for this competition.");
       votingCompetitionValidateDraft_(rankings, eligibleEntries, settings);
       votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,false);
       return {success:true,gameId:gameId,categoryId:categoryId,draftSaved:true,saved:rankings.length};
@@ -1185,7 +1186,7 @@ function votingCompetitionSaveBallot_(payload, internalOptions) {
     for (let i=1;i<data.length;i++) if (votingCompetitionString_(data[i][col.gameid])===gameId && votingCompetitionKey_(data[i][col.username])===votingCompetitionKey_(username) && votingCompetitionString_(data[i][col.categoryid])===categoryId) matchingRows.push(i+1);
     const now=new Date(); const rows=specs.map(function(spec){ const row=new Array(headers.length).fill(""); const finalScore=Math.round(Number(spec.finalScore||0)*1000000)/1000000; row[col.timestamp]=now; row[col.updatedat]=now; row[col.gameid]=gameId; row[col.username]=username; row[col.entryid]=spec.entryId; row[col.rank]=spec.rank; row[col.points]=finalScore; row[col.rawrankpoints]=spec.rawRankPoints; row[col.criteriascore]=spec.criteriaScore; row[col.coverageweight]=coverageWeight; row[col.finalscore]=finalScore; row[col.criteriajson]=JSON.stringify(spec.criteriaScores||{}); row[col.locked]=false; row[col.categoryid]=categoryId; row[col.voterrole]=voterRole.role; row[col.votermultiplier]=voterRole.multiplier; return row; });
     const reuse=Math.min(matchingRows.length,rows.length); for(let i=0;i<reuse;i++) sh.getRange(matchingRows[i],1,1,headers.length).setValues([rows[i]]); if(rows.length>reuse) sh.getRange(sh.getLastRow()+1,1,rows.length-reuse,headers.length).setValues(rows.slice(reuse)); if(matchingRows.length>rows.length) matchingRows.slice(rows.length).sort(function(a,b){return b-a;}).forEach(function(rowNumber){sh.deleteRow(rowNumber);});
-    votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,true);
+    if ((settings.entryCategories || []).length) votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,true);
     if(typeof clearGameCaches==="function") clearGameCaches(gameId);
     return {success:true,gameId:gameId,categoryId:categoryId,saved:rows.length,evaluatedCount:evaluatedCount,coverageWeight:coverageWeight};
   } finally { lock.releaseLock(); }
@@ -1268,7 +1269,7 @@ function apiGetVotingCompetitionState_(payload) {
   const evaluations = votingCompetitionReadEvaluations_(gameId, username);
   const evaluationMap = votingCompetitionEvaluationMap_(evaluations);
   const ballots = votingCompetitionReadBallots_(gameId);
-  const drafts = votingCompetitionReadDrafts_(gameId,username);
+  const drafts = (settings.entryCategories || []).length ? votingCompetitionReadDrafts_(gameId,username) : [];
   const draftsByCategory = {};
   drafts.forEach(function(d){draftsByCategory[d.categoryId]=d.rankings;});
   const ownEntries = participants.filter(function(e){return votingCompetitionKey_(e.username) === votingCompetitionKey_(username);});
