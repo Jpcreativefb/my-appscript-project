@@ -578,6 +578,8 @@ function votingRenderBallotWorkspace_() {
 function votingPageVotingCard_(payload) {
   var settings = payload.settings || {};
   var entries = votingPageCategoryEntries_(payload);
+  var currentCategory = (payload.settings && payload.settings.entryCategories || []).find(function(c){return c.id === votingPageActiveCategoryId_(payload);});
+  if (currentCategory && currentCategory.audience === "judges" && !payload.isOfficialJudge) return '<section class="card voting-ballot-card">' + votingPageCategorySelector_(payload) + '<h3>Official Judges Only</h3><p>This award category is reserved for appointed judges.</p></section>';
   if (!entries.length) return '<section class="card voting-ballot-card"><div class="voting-section-heading"><div><span class="voting-eyebrow">Voting</span><h2>No published entries yet</h2></div></div><p>Approved participant entries will appear here automatically.</p></section>';
   var limit = votingPageBallotLimit_(payload);
   var judgingMode = settings.judgingMode || 'rank';
