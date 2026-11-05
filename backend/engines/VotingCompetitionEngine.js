@@ -1306,7 +1306,7 @@ function apiGetVotingCompetitionState_(payload) {
   const eligible = votingCompetitionEligibleEntries_(currentEntries,evaluationMap,settings);
   return {
     success:true,gameId:gameId,gameName:game.name||gameId,gameDescription:game.description||"",
-    settings:settings,serverNow:Date.now(),isOfficialJudge:(settings.officialJudges||[]).indexOf(votingCompetitionKey_(username))>=0,registrationOpen:votingCompetitionRegistrationOpen_(settings),
+    settings:settings,serverNow:Date.now(),votingDeadlineEpoch:votingCompetitionDeadlineTime_(settings),isOfficialJudge:(settings.officialJudges||[]).indexOf(votingCompetitionKey_(username))>=0,registrationOpen:votingCompetitionRegistrationOpen_(settings),
     votingOpen:votingOpen,votingDeadlinePassed:votingCompetitionDeadlinePassed_(settings),
     ballotLimit:votingCompetitionBallotLimit_(settings,eligible.length),
     categoryId:activeCategory,categories:categories,
