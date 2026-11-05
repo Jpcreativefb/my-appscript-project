@@ -779,6 +779,7 @@ function votingCompetitionSaveParticipant_(payload) {
   const requestedId = votingCompetitionString_(payload.entryId);
   // Protect read-choose-write from simultaneous submissions by different players.
   // Never accept an identifier chosen in the browser for server-assigned modes.
+  votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET,VOTING_COMPETITION_PARTICIPANT_HEADERS);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Another entry is being registered. Please retry.");
   try {
@@ -1116,6 +1117,7 @@ function votingCompetitionSaveBallot_(payload) {
   if (!votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
   const publishedEntries = votingCompetitionReadParticipants_(gameId).filter(function(entry) { return entry.status === "approved" && entry.published === true; });
   if (!publishedEntries.length) throw new Error("There are no published entries available to vote on.");
+  votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
   const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   if (!lock.tryLock(3500)) throw new Error("Another vote is being saved. Please try once more.");
   try {
