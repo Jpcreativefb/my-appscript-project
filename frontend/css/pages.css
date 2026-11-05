@@ -4661,3 +4661,23 @@ body.game-profile-choice-open { overflow:hidden; }
  background:#1d2940;color:#fff;padding:20px;white-space:pre-line;line-height:1.5}
 .cookoff-r9-rules-dialog::backdrop{background:#000b}
 .voting-registration-card .voting-save-row button{width:100%;min-height:52px;font-size:1rem;font-weight:900;background:#ffcc00;color:#141827;border-radius:10px}
+
+
+/* R9 multi-entry and category ballot controls. */
+.cookoff-r9-own-entries{margin:12px 0 18px;border:1px solid #53617c;border-radius:12px;padding:12px}
+.cookoff-r9-own-entries h3{font-size:1rem;margin:2px 0 10px}
+.cookoff-r9-owned-row{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;border-bottom:1px solid #46536c;padding:9px 0}
+.cookoff-r9-owned-row strong{flex:1 1 140px;font-size:.89rem}
+.cookoff-r9-owned-row span{font-size:.73rem;color:#d3dcf1}
+.cookoff-r9-owned-row button,.cookoff-r9-another{min-height:40px;padding:7px 12px;border-radius:8px;border:1px solid #ffcc00;background:#28334a;color:#fff;font-weight:800}
+.cookoff-r9-another{width:100%;margin-top:12px;background:#ffcc00;color:#141827;min-height:48px}
+.cookoff-r9-category-select{display:grid;gap:5px;margin:8px 0 14px}
+.cookoff-r9-category-select span{font-size:.78rem;font-weight:800}
+.cookoff-r9-category-select select{width:100%;min-height:45px;border:1px solid #66758e;border-radius:9px;background:#121d32;color:#fff;padding:8px;font-size:1rem;font-weight:750}
+.cookoff-r9-mode{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0 7px}
+.cookoff-r9-mode span{font-size:.75rem;font-weight:800;flex:1}
+.cookoff-r9-mode button{background:#27344e;color:#f4f7ff;border:1px solid #687994;min-height:37px;border-radius:7px;font-size:.75rem;font-weight:800;padding:5px 9px}
+.cookoff-r9-mode button.active{background:#ffcc00;color:#151b26;border-color:#ffcc00}
+.cookoff-r9-direct-rank{display:flex;flex-direction:column;gap:3px;align-self:center;padding:4px 5px;font-size:.69rem;font-weight:800}
+.cookoff-r9-direct-rank select{background:#18223a;border:1px solid #7584a0;border-radius:6px;color:white;min-height:37px;width:76px;padding:3px}
+@media(max-width:430px){.cookoff-r9-mode button{padding:5px 7px}.cookoff-r9-direct-rank select{width:72px}.cookoff-r9-owned-row span{flex:1 1 100%}}
