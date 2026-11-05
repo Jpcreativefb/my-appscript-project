@@ -859,7 +859,7 @@ function votingCompetitionUploadParticipantImage_(payload) {
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
   const settings = votingCompetitionGetSettings_(gameId);
-  if (!settings.registrationEnabled || settings.registrationLocked) throw new Error("Participant registration is closed.");
+  if (!votingCompetitionRegistrationOpen_(settings)) throw new Error("Participant registration is closed.");
   const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
   if (!extensions[mimeType]) throw new Error("Photo must be JPG, PNG, WEBP, or GIF.");
   if (!base64) throw new Error("Photo data is missing.");
@@ -891,6 +891,13 @@ function votingCompetitionAdminUpdateParticipant_(payload) {
   const participants = votingCompetitionReadParticipants_(gameId);
   const existing = participants.find(function(entry) { return entry.entryId === entryId; });
   if (!existing) throw new Error("Participant entry not found.");
+  const settings = votingCompetitionGetSettings_(gameId);
+  if (settings.entryIdentifierMode !== "legacy") {
+    if (Object.prototype.hasOwnProperty.call(payload,"displayNumber") &&
+      votingCompetitionString_(payload.displayNumber) !== existing.displayNumber) throw new Error("Assigned Cookoff number is locked.");
+    if (Object.prototype.hasOwnProperty.call(payload,"displayColor") &&
+      votingCompetitionString_(payload.displayColor) !== existing.displayColor) throw new Error("Assigned Cookoff color is locked.");
+  }
 
   const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET, VOTING_COMPETITION_PARTICIPANT_HEADERS);
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
@@ -1094,7 +1101,8 @@ function votingCompetitionPublicEntry_(entry, settings) {
     displayColor: entry.displayColor,
     description: settings.showDescription ? entry.description : "",
     ingredients: settings.showIngredients ? entry.ingredients : "",
-    customData: customVisible
+    customData: customVisible,
+    categoryIds: entry.customData && Array.isArray(entry.customData.cookoffCategoryIds) ? entry.customData.cookoffCategoryIds : []
   };
 }
 
