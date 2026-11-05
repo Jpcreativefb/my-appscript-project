@@ -49,6 +49,45 @@ page.state.evaluatedEntryIds = ['red'];
 page.compact(payload);
 assert.deepStrictEqual(page.state.selectedEntryIds, ['red'], 'Untasted entry must be removed from selected ranking');
 
+// R9 eligibility modes must match the Admin setting, rather than force tasting on every game.
+settings.evaluatedOnly = false;
+settings.minimumEvaluatedEntries = 0;
+page.state.evaluatedEntryIds = [];
+page.state.selectedEntryIds = ['blue', 'red'];
+let unrestrictedHtml = page.compact(payload);
+assert.deepStrictEqual(page.state.selectedEntryIds, ['blue', 'red'],
+  'Ranked entries must remain ranked when tasted-only is OFF');
+assert(unrestrictedHtml.includes('Add the dishes you want to rank'),
+  'Unrestricted mode should explain selection without tasting');
+assert(!unrestrictedHtml.includes('Ate / Tasted'),
+  'Unrestricted rank-only mode should not require a tasted checkbox');
+assert(unrestrictedHtml.includes('Blue Chili') && unrestrictedHtml.includes('Red Chili'),
+  'Unrestricted mode must preserve existing ballot items');
+assert(unrestrictedHtml.includes('+ Rank'),
+  'Untasted entries must be selectable when evaluated-only is OFF');
+
+// Tasted-only ON, with fewer tasted dishes than the configured Top N.
+settings.evaluatedOnly = true;
+settings.rankLimit = 5;
+page.state.evaluatedEntryIds = ['red'];
+page.state.selectedEntryIds = ['blue', 'red'];
+const tastedHtml = page.compact(payload);
+assert.deepStrictEqual(page.state.selectedEntryIds, ['red'],
+  'Tasted-only mode must remove an untasted ranked entry');
+assert(tastedHtml.includes('Ate / Tasted'), 'Tasted-only checkbox must be visible');
+assert(tastedHtml.includes('1 ranked'), 'Ranking count should reflect tasted eligibility');
+assert(tastedHtml.includes('is-untasted'), 'Untasted entries should look inactive');
+
+// A minimum evaluated count without evaluated-only is still a distinct Admin rule.
+settings.evaluatedOnly = false;
+settings.minimumEvaluatedEntries = 2;
+page.state.evaluatedEntryIds = ['red'];
+page.state.selectedEntryIds = ['red', 'blue'];
+const minimumHtml = page.compact(payload);
+assert(minimumHtml.includes('Ate / Tasted'), 'Minimum-evaluated setting requires tasting controls');
+assert.deepStrictEqual(page.state.selectedEntryIds, ['red', 'blue'],
+  'Minimum evaluated count must not silently switch on tasted-only ranking');
+
 payload.votingOpen = false;
 payload.resultsVisible = true;
 html = page.sections(payload);
