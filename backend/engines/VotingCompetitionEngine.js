@@ -44,7 +44,16 @@ const VOTING_COMPETITION_SETTINGS_HEADERS = [
   "CombinedCriteriaWeight",
   "BallotWeighting",
   "VotingDeadline",
-  "UpdatedAt"
+  "UpdatedAt",
+  "EntryIdentifierMode",
+  "EntryColorPaletteJSON",
+  "AllowMultipleEntries",
+  "MaxEntriesPerParticipant",
+  "EntryCategoriesJSON",
+  "EntryRules",
+  "HostEntryInfo",
+  "PickupInstructions",
+  "RegistrationDeadline"
 ];
 
 const VOTING_COMPETITION_PARTICIPANT_HEADERS = [
@@ -221,7 +230,16 @@ function votingCompetitionDefaultSettings_(gameId) {
     combinedRankWeight: 0.5,
     combinedCriteriaWeight: 0.5,
     ballotWeighting: "equal",
-    votingDeadline: ""
+    votingDeadline: "",
+    entryIdentifierMode: "legacy",
+    entryColorPalette: VOTING_COMPETITION_COLOR_PALETTE.slice(),
+    allowMultipleEntries: false,
+    maxEntriesPerParticipant: 1,
+    entryCategories: [],
+    entryRules: "",
+    hostEntryInfo: "",
+    pickupInstructions: "",
+    registrationDeadline: ""
   };
 }
 
@@ -443,6 +461,74 @@ function votingCompetitionNormalizeCustomFields_(value) {
   }).filter(function(field) { return !!field.label; }).slice(0, 30);
 }
 
+
+/* R9 competition settings remain optional to preserve existing Voting games. */
+function votingCompetitionIdentifierMode_(value) {
+  const mode = votingCompetitionKey_(value);
+  return ["legacy","color","number","combo"].indexOf(mode) >= 0 ? mode : "legacy";
+}
+function votingCompetitionColorPalette_(value) {
+  const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, VOTING_COMPETITION_COLOR_PALETTE);
+  const seen = {};
+  return rows.map(votingCompetitionString_).filter(function(color) {
+    const key = color.toLowerCase();
+    if (!color || seen[key] || !VOTING_COMPETITION_COLOR_PALETTE.some(function(c){return c.toLowerCase()===key;})) return false;
+    seen[key] = true; return true;
+  });
+}
+function votingCompetitionEntryCategories_(value) {
+  const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, []);
+  const seen = {};
+  return rows.map(function(row) {
+    if (typeof row === "string") row = {label:row};
+    row = row || {};
+    const label = votingCompetitionString_(row.label || row.name);
+    const id = votingCompetitionSlug_(row.id || label);
+    if (!id || !label || seen[id]) return null;
+    seen[id] = true;
+    return {id:id,label:label,defaultSelected:row.defaultSelected !== false};
+  }).filter(Boolean).slice(0,30);
+}
+function votingCompetitionRegistrationOpen_(settings, nowMs) {
+  if (!settings || settings.registrationEnabled !== true || settings.registrationLocked === true) return false;
+  const deadline = votingCompetitionString_(settings.registrationDeadline);
+  if (!deadline) return true;
+  const when = Date.parse(deadline);
+  return Number.isFinite(when) && (nowMs === undefined ? Date.now() : nowMs) < when;
+}
+function votingCompetitionAssignIdentity_(settings, participants) {
+  const mode = votingCompetitionIdentifierMode_(settings.entryIdentifierMode);
+  if (mode === "legacy") return {
+    displayNumber: settings.numberAssignment === "auto-sequential" ? votingCompetitionNextDisplayNumber_(participants) : "",
+    displayColor: settings.colorAssignment === "auto-palette" ? votingCompetitionNextDisplayColor_(participants) : ""
+  };
+  const palette = votingCompetitionColorPalette_(settings.entryColorPalette);
+  const used = {};
+  (participants || []).forEach(function(p) {
+    const number = votingCompetitionString_(p.displayNumber);
+    const color = votingCompetitionKey_(p.displayColor);
+    used[(mode === "color" ? color : mode === "number" ? number : color + "|" + number)] = true;
+  });
+  if (mode === "color") {
+    const colors = palette.filter(function(c){return !used[c.toLowerCase()];});
+    if (!colors.length) throw new Error("All Cookoff colors are assigned. Ask the host to add colors or switch to Color + Number.");
+    return {displayColor:colors[Math.floor(Math.random()*colors.length)],displayNumber:""};
+  }
+  if (mode === "combo" && !palette.length) throw new Error("Admin must configure at least one entry color.");
+  // Choose from the available pool under the same Apps Script lock used for the row write.
+  const maxNumber = mode === "number" ? 9999 : 999;
+  const choices = [];
+  if (mode === "number") {
+    for (let i=1;i<=maxNumber;i++) if (!used[String(i)]) choices.push({displayNumber:String(i),displayColor:""});
+  } else {
+    palette.forEach(function(color){for (let i=1;i<=maxNumber;i++) {
+      if (!used[color.toLowerCase()+"|"+i]) choices.push({displayNumber:String(i),displayColor:color});
+    }});
+  }
+  if (!choices.length) throw new Error("No unique Cookoff identifiers remain. Contact the host.");
+  return choices[Math.floor(Math.random()*choices.length)];
+}
+
 function votingCompetitionGetSettings_(gameId) {
   gameId = votingCompetitionString_(gameId);
   const defaults = votingCompetitionDefaultSettings_(gameId);
@@ -483,7 +569,16 @@ function votingCompetitionGetSettings_(gameId) {
     combinedRankWeight: weights.rankWeight,
     combinedCriteriaWeight: weights.criteriaWeight,
     ballotWeighting: votingCompetitionNormalizeBallotWeighting_(row[col.ballotweighting]),
-    votingDeadline: votingCompetitionString_(row[col.votingdeadline])
+    votingDeadline: votingCompetitionString_(row[col.votingdeadline]),
+    entryIdentifierMode: votingCompetitionIdentifierMode_(row[col.entryidentifiermode]),
+    entryColorPalette: votingCompetitionColorPalette_(row[col.entrycolorpalettejson]),
+    allowMultipleEntries: votingCompetitionBool_(row[col.allowmultipleentries], false),
+    maxEntriesPerParticipant: Math.max(0,Math.min(100,Math.floor(votingCompetitionNumber_(row[col.maxentriesperparticipant],1)))),
+    entryCategories: votingCompetitionEntryCategories_(row[col.entrycategoriesjson]),
+    entryRules: votingCompetitionString_(row[col.entryrules]),
+    hostEntryInfo: votingCompetitionString_(row[col.hostentryinfo]),
+    pickupInstructions: votingCompetitionString_(row[col.pickupinstructions]),
+    registrationDeadline: votingCompetitionString_(row[col.registrationdeadline])
   };
 }
 
@@ -527,8 +622,19 @@ function votingCompetitionSaveSettings_(gameId, payload) {
     combinedRankWeight: weights.rankWeight,
     combinedCriteriaWeight: weights.criteriaWeight,
     ballotWeighting: votingCompetitionNormalizeBallotWeighting_(payload.ballotWeighting),
-    votingDeadline: deadline
+    votingDeadline: deadline,
+    entryIdentifierMode: votingCompetitionIdentifierMode_(payload.entryIdentifierMode),
+    entryColorPalette: votingCompetitionColorPalette_(payload.entryColorPalette),
+    allowMultipleEntries: votingCompetitionBool_(payload.allowMultipleEntries,false),
+    maxEntriesPerParticipant: Math.max(0,Math.min(100,Math.floor(votingCompetitionNumber_(payload.maxEntriesPerParticipant,1)))),
+    entryCategories: votingCompetitionEntryCategories_(payload.entryCategories),
+    entryRules: votingCompetitionString_(payload.entryRules),
+    hostEntryInfo: votingCompetitionString_(payload.hostEntryInfo),
+    pickupInstructions: votingCompetitionString_(payload.pickupInstructions),
+    registrationDeadline: votingCompetitionString_(payload.registrationDeadline)
   };
+  if (settings.registrationDeadline && !Number.isFinite(Date.parse(settings.registrationDeadline))) throw new Error("Registration deadline must be a valid date/time.");
+  if ((settings.entryIdentifierMode === "color" || settings.entryIdentifierMode === "combo") && !settings.entryColorPalette.length) throw new Error("Select at least one Cookoff color.");
   if (!settings.pointValues.length) settings.pointValues = [10, 7, 5, 3, 1];
   if (settings.votingMethod === "favorite") settings.rankLimit = 1;
   if ((settings.judgingMode === "criteria" || settings.judgingMode === "combined") && !settings.criteria.length) throw new Error("Criteria or Combined judging requires at least one criterion.");
@@ -543,6 +649,11 @@ function votingCompetitionSaveSettings_(gameId, payload) {
   for (let i = 1; i < data.length; i++) if (votingCompetitionString_(data[i][col.gameid]) === gameId) { rowNumber = i + 1; break; }
   const row = new Array(headers.length).fill("");
   row[col.gameid] = gameId; row[col.entrylabel] = settings.entryLabel; row[col.registrationenabled] = settings.registrationEnabled; row[col.approvalrequired] = settings.approvalRequired; row[col.allowparticipantedits] = settings.allowParticipantEdits; row[col.registrationlocked] = settings.registrationLocked; row[col.votinglocked] = settings.votingLocked; row[col.votingmethod] = settings.votingMethod; row[col.rankingui] = settings.rankingUi; row[col.ranklimit] = settings.rankLimit; row[col.scoringmode] = settings.scoringMode; row[col.pointvaluesjson] = JSON.stringify(settings.pointValues); row[col.resultsvisibility] = settings.resultsVisibility; row[col.showparticipantnames] = settings.showParticipantNames; row[col.showphoto] = settings.showPhoto; row[col.showdescription] = settings.showDescription; row[col.showingredients] = settings.showIngredients; row[col.numberassignment] = settings.numberAssignment; row[col.colorassignment] = settings.colorAssignment; row[col.instructions] = settings.instructions; row[col.customfieldsjson] = JSON.stringify(settings.customFields); row[col.evaluatedonly] = settings.evaluatedOnly; row[col.minimumevaluatedentries] = settings.minimumEvaluatedEntries; row[col.judgingmode] = settings.judgingMode; row[col.criteriajson] = JSON.stringify(settings.criteria); row[col.combinedrankweight] = settings.combinedRankWeight; row[col.combinedcriteriaweight] = settings.combinedCriteriaWeight; row[col.ballotweighting] = settings.ballotWeighting; row[col.votingdeadline] = settings.votingDeadline; row[col.updatedat] = new Date();
+  row[col.entryidentifiermode] = settings.entryIdentifierMode; row[col.entrycolorpalettejson] = JSON.stringify(settings.entryColorPalette);
+  row[col.allowmultipleentries] = settings.allowMultipleEntries; row[col.maxentriesperparticipant] = settings.maxEntriesPerParticipant;
+  row[col.entrycategoriesjson] = JSON.stringify(settings.entryCategories); row[col.entryrules] = settings.entryRules;
+  row[col.hostentryinfo] = settings.hostEntryInfo; row[col.pickupinstructions] = settings.pickupInstructions;
+  row[col.registrationdeadline] = settings.registrationDeadline;
   if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]); else sh.getRange(sh.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
   if (typeof clearGameCaches === "function") clearGameCaches(gameId);
   return { success: true, settings: settings };
