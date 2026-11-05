@@ -93,5 +93,25 @@ payload.resultsVisible = true;
 html = page.sections(payload);
 assert(html.includes('data-cookoff-tab="results" aria-pressed="true"'), 'Results must open after voting closes and results release');
 
+// Touch gestures: tapping or canceling must never silently reorder a ballot.
+const touch = new Function('window', 'platformImgHtml', 'document', pageSource +
+  '\\nreturn { state: VOTING_PAGE_STATE, start: votingPageTouchStart_, end: votingPageTouchEnd_, cancel: votingPageTouchCancel_ };'
+)(windowStub, platformImgHtml, {
+  elementFromPoint: () => ({ closest: () => ({ dataset: { ballotEntryId: 'red' } }) })
+});
+touch.state.selectedEntryIds = ['red', 'blue'];
+const grip = { closest: () => ({ dataset: { ballotEntryId: 'blue' } }) };
+touch.start({ target: grip, touches: [{ clientX: 20, clientY: 20 }] });
+touch.end({ changedTouches: [{ clientX: 20, clientY: 20 }] });
+assert.deepStrictEqual(touch.state.selectedEntryIds, ['red', 'blue'], 'Tap must not reorder ballot');
+touch.start({ target: grip, touches: [{ clientX: 20, clientY: 20 }] });
+touch.cancel();
+touch.end({ changedTouches: [{ clientX: 20, clientY: 150 }] });
+assert.deepStrictEqual(touch.state.selectedEntryIds, ['red', 'blue'], 'Canceled gesture must not reorder');
+touch.start({ target: grip, touches: [{ clientX: 20, clientY: 20 }] });
+touch.end({ changedTouches: [{ clientX: 20, clientY: 150 }] });
+assert.deepStrictEqual(touch.state.selectedEntryIds, ['blue', 'red'], 'Real drag must reorder');
+assert(pageSource.includes('ontouchcancel="votingPageTouchCancel_()"'), 'Touch-cancel binding missing');
+
 assert(css.includes('.cookoff-r9-dish') && css.includes('.cookoff-r9-nav'), 'R9 mobile CSS missing');
 console.log('cookoff-r9-mobile-smoke: PASS');
