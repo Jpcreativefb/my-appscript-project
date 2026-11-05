@@ -197,6 +197,7 @@ function votingPageCriteriaControls_(entry, settings) {
 
 function votingPageEvaluationWorkspace_(payload) {
   var settings = payload.settings || {};
+  if (votingPageIsCompactMobile_() && settings.judgingMode !== 'criteria') return '';
   var enabled = settings.evaluatedOnly || Number(settings.minimumEvaluatedEntries || 0) > 0 || settings.judgingMode === "criteria" || settings.judgingMode === "combined";
   if (!enabled) return "";
   var minimum = Number(settings.minimumEvaluatedEntries || 0);
@@ -223,7 +224,11 @@ function votingEvaluationChanged_(entryId, checked) {
   entryId = String(entryId || '');
   VOTING_PAGE_STATE.evaluatedEntryIds = VOTING_PAGE_STATE.evaluatedEntryIds.filter(function(id) { return id !== entryId; });
   if (checked) VOTING_PAGE_STATE.evaluatedEntryIds.push(entryId);
-  if (!checked && VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.settings && VOTING_PAGE_STATE.payload.settings.evaluatedOnly) VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return id !== entryId; });
+  if (!checked) VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return id !== entryId; });
+  if (checked && votingPageIsCompactMobile_() && VOTING_PAGE_STATE.payload && (VOTING_PAGE_STATE.payload.settings || {}).judgingMode !== 'criteria') {
+    var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
+    if (VOTING_PAGE_STATE.selectedEntryIds.indexOf(entryId) < 0 && VOTING_PAGE_STATE.selectedEntryIds.length < limit) VOTING_PAGE_STATE.selectedEntryIds.push(entryId);
+  }
   votingRenderBallotWorkspace_();
   votingSaveEvaluationState_();
 }
@@ -252,9 +257,100 @@ function votingPageNumberedWorkspace_(payload) {
   }).join('') + '</div>';
 }
 
+
+/* Compact mobile ballot. The backend remains authoritative for eligibility and scores. */
+function votingPageIsCompactMobile_() {
+  try { return window.matchMedia('(max-width: 700px)').matches; } catch (ignore) { return false; }
+}
+function votingPageColorHex_(color) {
+  var colors = {red:'#d64b42',blue:'#357cce',green:'#25835b',yellow:'#e5b929',
+    orange:'#dc8030',purple:'#8754c2',pink:'#cc5d97',teal:'#168b92',
+    black:'#292d35',white:'#e2e5e9',silver:'#a7adb8',gold:'#c69e24'};
+  return colors[String(color || '').trim().toLowerCase()] || '#65748b';
+}
+function votingPageCompactRow_(entry, position, settings) {
+  var id = votingPageEscape_(entry.entryId);
+  var ate = votingPageIsEvaluated_(entry.entryId);
+  var ranked = position > 0;
+  var identifier = settings.colorAssignment !== 'none' && entry.displayColor ? entry.displayColor :
+    (entry.displayNumber ? '#' + entry.displayNumber : 'Dish');
+  var swatch = votingPageColorHex_(entry.displayColor);
+  var photo = entry.imageUrl ? platformImgHtml(entry.imageUrl, {
+    className:'cookoff-r9-photo-image',variant:'thumb',alt:entry.entryName || 'Dish'
+  }) : '';
+  var actions = ranked ?
+    '<div class="cookoff-r9-reorder">' +
+      '<button type="button" aria-label="Move dish up" onclick="votingBallotMove_(\'' + id + '\',-1)">▲</button>' +
+      '<span class="cookoff-r9-grip" role="img" aria-label="Touch and drag to rank" ontouchstart="votingPageTouchStart_(event)" ontouchmove="event.preventDefault()" ontouchend="votingPageTouchEnd_(event)">⠿</span>' +
+      '<button type="button" aria-label="Move dish down" onclick="votingBallotMove_(\'' + id + '\',1)">▼</button>' +
+    '</div>' : (ate ? '<button class="cookoff-r9-add" type="button" onclick="votingBallotAdd_(\'' + id + '\')">+ Rank</button>' : '');
+  return '<article class="cookoff-r9-dish' + (ate ? '' : ' is-untasted') + '" data-ballot-entry-id="' + id + '"' +
+    (ranked ? ' draggable="true" ondragstart="votingBallotDragStart_(event)" ondragover="votingBallotDragOver_(event)" ondrop="votingBallotDrop_(event)"' : '') +
+    ' style="--cookoff-dish-color:' + swatch + '">' +
+    '<div class="cookoff-r9-row">' +
+      '<div class="cookoff-r9-rank">' + (ranked ? position : '–') + '</div>' +
+      '<div class="cookoff-r9-main">' +
+        '<div class="cookoff-r9-photo">' + photo + '</div>' +
+        '<div class="cookoff-r9-shade"></div>' +
+        '<div class="cookoff-r9-title"><small>' + votingPageEscape_(identifier) + '</small><strong>' + votingPageEscape_(entry.entryName) + '</strong></div>' +
+      '</div>' + actions +
+    '</div>' +
+    '<div class="cookoff-r9-quick">' +
+      '<label><input type="checkbox" ' + (ate ? 'checked' : '') + ' onchange="votingEvaluationChanged_(\'' + id + '\',this.checked)"> Ate / Tasted</label>' +
+      '<details><summary>Info / Ingredients</summary>' +
+        (entry.description ? '<p>' + votingPageEscape_(entry.description) + '</p>' : '') +
+        (entry.ingredients ? '<p><strong>Ingredients:</strong> ' + votingPageEscape_(entry.ingredients) + '</p>' : '') +
+        votingPageCustomVisible_(entry, settings) + votingPageCriteriaControls_(entry, settings) +
+      '</details>' +
+      (ranked ? '<button type="button" class="cookoff-r9-remove" onclick="votingBallotRemove_(\'' + id + '\')">Remove</button>' : '') +
+    '</div>' +
+  '</article>';
+}
+var VOTING_R9_TOUCH_ID = '';
+function votingPageTouchStart_(event) {
+  var row = event.target && event.target.closest('.cookoff-r9-dish');
+  VOTING_R9_TOUCH_ID = row ? row.dataset.ballotEntryId : '';
+}
+function votingPageTouchEnd_(event) {
+  if (!VOTING_R9_TOUCH_ID || !event.changedTouches || !event.changedTouches.length) return;
+  var touch = event.changedTouches[0];
+  var target = document.elementFromPoint(touch.clientX, touch.clientY);
+  var row = target && target.closest('.cookoff-r9-dish');
+  var toId = row && row.dataset.ballotEntryId;
+  var from = VOTING_PAGE_STATE.selectedEntryIds.indexOf(VOTING_R9_TOUCH_ID);
+  var to = VOTING_PAGE_STATE.selectedEntryIds.indexOf(toId);
+  VOTING_R9_TOUCH_ID = '';
+  if (from < 0 || to < 0 || from === to) return;
+  VOTING_PAGE_STATE.selectedEntryIds.splice(to, 0, VOTING_PAGE_STATE.selectedEntryIds.splice(from, 1)[0]);
+  votingRenderBallotWorkspace_();
+}
+function votingPageCompactWorkspace_(payload) {
+  var settings = payload.settings || {};
+  var limit = votingPageBallotLimit_(payload);
+  var entries = Array.isArray(payload.entries) ? payload.entries : [];
+  var byId = {};
+  entries.forEach(function(e) { byId[e.entryId] = e; });
+  VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) {
+    return !!byId[id] && votingPageIsEvaluated_(id);
+  });
+  var selected = VOTING_PAGE_STATE.selectedEntryIds.slice(0, limit);
+  var selectedSet = {};
+  selected.forEach(function(id) { selectedSet[id] = true; });
+  return '<div class="cookoff-r9-workspace">' +
+    '<p class="cookoff-r9-intro">Mark the dishes you ate, then drag or use ▲ ▼ to rank them. Untasted dishes earn no points.</p>' +
+    '<div class="cookoff-r9-meter">' + selected.length + ' ranked · ' + VOTING_PAGE_STATE.evaluatedEntryIds.length + ' tasted</div>' +
+    '<h3>Your Ranking</h3>' +
+    (selected.length ? selected.map(function(id,i) { return votingPageCompactRow_(byId[id],i+1,settings); }).join('') : '<p class="voting-empty-state">Mark a dish Ate to start ranking.</p>') +
+    '<h3>Other Dishes</h3>' +
+    entries.filter(function(e) { return !selectedSet[e.entryId]; }).map(function(e) { return votingPageCompactRow_(e,0,settings); }).join('') +
+    '<div id="votingEvaluationMessage" class="voting-inline-message"></div>' +
+  '</div>';
+}
+
 function votingPageOrderWorkspaceHtml_() {
   var payload = VOTING_PAGE_STATE.payload || {};
   var settings = payload.settings || {};
+  if (votingPageIsCompactMobile_()) return votingPageCompactWorkspace_(payload);
   var limit = votingPageBallotLimit_(payload);
   var eligibleIds = votingPageEligibleEntries_(payload).map(function(entry) { return entry.entryId; });
   VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return eligibleIds.indexOf(id) !== -1; });
@@ -437,6 +533,7 @@ function votingBallotAdd_(entryId) {
   var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
   var eligible = votingPageEligibleEntries_(VOTING_PAGE_STATE.payload).some(function(entry) { return entry.entryId === entryId; });
   if (!eligible || !entryId || VOTING_PAGE_STATE.selectedEntryIds.indexOf(entryId) !== -1 || VOTING_PAGE_STATE.selectedEntryIds.length >= limit) return;
+  if (votingPageIsCompactMobile_() && !votingPageIsEvaluated_(entryId)) return;
   VOTING_PAGE_STATE.selectedEntryIds.push(entryId);
   votingRenderBallotWorkspace_();
 }
@@ -502,6 +599,10 @@ async function votingSaveBallot_() {
   var settings = VOTING_PAGE_STATE.payload && VOTING_PAGE_STATE.payload.settings || {};
   var rankings = votingCollectBallot_();
   var limit = votingPageBallotLimit_(VOTING_PAGE_STATE.payload);
+  if (votingPageIsCompactMobile_() && rankings.some(function(row) { return !votingPageIsEvaluated_(row.entryId); })) {
+    if (message) { message.textContent = 'Only tasted dishes may be ranked.'; message.classList.add('error'); }
+    return;
+  }
   if (settings.judgingMode !== 'criteria' && rankings.length !== limit) {
     if (message) { message.textContent = 'Rank exactly ' + limit + (limit === 1 ? ' entry.' : ' entries.'); message.classList.add('error'); }
     return;
