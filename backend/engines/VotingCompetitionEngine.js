@@ -13,6 +13,8 @@ const VOTING_COMPETITION_SETTINGS_SHEET = "VotingCompetitionSettings";
 const VOTING_COMPETITION_PARTICIPANTS_SHEET = "VotingParticipants";
 const VOTING_COMPETITION_BALLOTS_SHEET = "VotingCompetitionBallots";
 const VOTING_COMPETITION_EVALUATIONS_SHEET = "VotingCompetitionEvaluations";
+const VOTING_COMPETITION_DRAFTS_SHEET = "VotingCompetitionDrafts";
+const VOTING_COMPETITION_DRAFT_HEADERS = ["Timestamp","UpdatedAt","GameId","Username","CategoryId","RankingsJSON","Finalized"];
 
 const VOTING_COMPETITION_SETTINGS_HEADERS = [
   "GameId",
@@ -983,6 +985,58 @@ function votingCompetitionSaveEvaluationStateUnlocked_(gameId, username, publish
   return votingCompetitionReadEvaluations_(gameId, username);
 }
 
+
+/* Partial rankings are separate from counted ballots. */
+function votingCompetitionReadDrafts_(gameId, username) {
+  const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
+  if (sh.getLastRow() <= 1) return [];
+  const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
+  const col = votingCompetitionHeaderMap_(headers);
+  return sh.getRange(2,1,sh.getLastRow()-1,headers.length).getValues().map(function(row,index) {
+    return {rowNumber:index+2,gameId:votingCompetitionString_(row[col.gameid]),
+      username:votingCompetitionString_(row[col.username]),
+      categoryId:votingCompetitionString_(row[col.categoryid]),
+      rankings:votingCompetitionJson_(row[col.rankingsjson],[]),
+      updatedAt:row[col.updatedat],
+      finalized:votingCompetitionBool_(row[col.finalized],false)};
+  }).filter(function(row) {
+    return (!gameId || row.gameId===gameId) &&
+      (!username || votingCompetitionKey_(row.username)===votingCompetitionKey_(username));
+  });
+}
+function votingCompetitionSaveDraftUnlocked_(gameId, username, categoryId, rankings, finalized) {
+  const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
+  const existing = votingCompetitionReadDrafts_(gameId,username).find(function(row){return row.categoryId===categoryId;});
+  const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
+  const col = votingCompetitionHeaderMap_(headers);
+  const now = new Date();
+  const row = new Array(headers.length).fill("");
+  row[col.timestamp] = existing ? existing.updatedAt : now;
+  row[col.updatedat] = now;
+  row[col.gameid] = gameId;
+  row[col.username] = username;
+  row[col.categoryid] = categoryId;
+  row[col.rankingsjson] = JSON.stringify(rankings);
+  row[col.finalized] = finalized === true;
+  const rowNumber = existing ? existing.rowNumber : sh.getLastRow()+1;
+  sh.getRange(rowNumber,1,1,headers.length).setValues([row]);
+}
+function votingCompetitionValidateDraft_(rankings,entries,settings) {
+  rankings = Array.isArray(rankings) ? rankings : [];
+  const allowed = {};
+  entries.forEach(function(e){allowed[e.entryId]=true;});
+  const max = votingCompetitionBallotLimit_(settings,entries.length);
+  if (rankings.length>max) throw new Error("Too many ranked dishes.");
+  const seen = {};
+  rankings.forEach(function(row,index) {
+    const id = votingCompetitionString_(row && row.entryId);
+    const rank = Number(row && row.rank);
+    if (!allowed[id] || seen[id] || rank !== index+1) throw new Error("Invalid partial Cookoff ranking.");
+    seen[id]=true;
+  });
+  return rankings;
+}
+
 function votingCompetitionReadBallots_(gameId) {
   gameId = votingCompetitionString_(gameId);
   const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_BALLOTS_SHEET, VOTING_COMPETITION_BALLOT_HEADERS);
@@ -1074,6 +1128,11 @@ function votingCompetitionSaveBallot_(payload) {
     const eligibleEntries = votingCompetitionEligibleEntries_(categoryEntries, evaluationMap, settings);
     const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
     const judgingMode = votingCompetitionNormalizeJudgingMode_(settings.judgingMode);
+    if (payload.draftOnly === true) {
+      votingCompetitionValidateDraft_(rankings, eligibleEntries, settings);
+      votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,false);
+      return {success:true,gameId:gameId,categoryId:categoryId,draftSaved:true,saved:rankings.length};
+    }
     if (judgingMode !== "criteria") votingCompetitionValidateBallot_(rankings, eligibleEntries, settings);
     const coverageWeight = votingCompetitionCoverageWeight_(evaluatedCount, categoryEntries.length, settings.ballotWeighting);
     const limit = votingCompetitionBallotLimit_(settings, eligibleEntries.length);
@@ -1100,6 +1159,7 @@ function votingCompetitionSaveBallot_(payload) {
     for (let i=1;i<data.length;i++) if (votingCompetitionString_(data[i][col.gameid])===gameId && votingCompetitionKey_(data[i][col.username])===votingCompetitionKey_(username) && votingCompetitionString_(data[i][col.categoryid])===categoryId) matchingRows.push(i+1);
     const now=new Date(); const rows=specs.map(function(spec){ const row=new Array(headers.length).fill(""); const finalScore=Math.round(Number(spec.finalScore||0)*1000000)/1000000; row[col.timestamp]=now; row[col.updatedat]=now; row[col.gameid]=gameId; row[col.username]=username; row[col.entryid]=spec.entryId; row[col.rank]=spec.rank; row[col.points]=finalScore; row[col.rawrankpoints]=spec.rawRankPoints; row[col.criteriascore]=spec.criteriaScore; row[col.coverageweight]=coverageWeight; row[col.finalscore]=finalScore; row[col.criteriajson]=JSON.stringify(spec.criteriaScores||{}); row[col.locked]=false; row[col.categoryid]=categoryId; row[col.voterrole]=voterRole.role; row[col.votermultiplier]=voterRole.multiplier; return row; });
     const reuse=Math.min(matchingRows.length,rows.length); for(let i=0;i<reuse;i++) sh.getRange(matchingRows[i],1,1,headers.length).setValues([rows[i]]); if(rows.length>reuse) sh.getRange(sh.getLastRow()+1,1,rows.length-reuse,headers.length).setValues(rows.slice(reuse)); if(matchingRows.length>rows.length) matchingRows.slice(rows.length).sort(function(a,b){return b-a;}).forEach(function(rowNumber){sh.deleteRow(rowNumber);});
+    votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,true);
     if(typeof clearGameCaches==="function") clearGameCaches(gameId);
     return {success:true,gameId:gameId,categoryId:categoryId,saved:rows.length,evaluatedCount:evaluatedCount,coverageWeight:coverageWeight};
   } finally { lock.releaseLock(); }
