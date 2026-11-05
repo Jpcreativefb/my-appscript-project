@@ -1281,8 +1281,10 @@ async function adminVotingSaveSettings_(gameId) {
       allowMultipleEntries: adminVotingChecked_("adminVotingMultipleEntries"),
       maxEntriesPerParticipant: Number(adminVotingValue_("adminVotingMaxEntries") || 0),
       entryCategories: adminVotingValue_("adminVotingEntryCategories").split(/\r?\n/).map(function(line){
-        var parts=line.split("|");return {label:String(parts[0]||"").trim(),defaultSelected:String(parts[1]||"").trim().toLowerCase()!=="off"};
+        var parts=line.split("|");return {label:String(parts[0]||"").trim(),defaultSelected:String(parts[1]||"").trim().toLowerCase()!=="off",audience:["public","judges","both"].includes(String(parts[2]||"").trim().toLowerCase())?String(parts[2]).trim().toLowerCase():"both"};
       }).filter(function(c){return c.label;}),
+      officialJudges: adminVotingValue_("adminVotingOfficialJudges").split(/\r?\n|,/).map(function(u){return u.trim();}).filter(Boolean),
+      judgeMultiplier: Number(adminVotingValue_("adminVotingJudgeMultiplier") || 3),
       entryRules: adminVotingValue_("adminVotingEntryRules"),
       hostEntryInfo: adminVotingValue_("adminVotingHostInfo"),
       pickupInstructions: adminVotingValue_("adminVotingPickupInstructions"),
@@ -1408,7 +1410,9 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
             <option value="combo" ${settings.entryIdentifierMode === "combo" ? "selected" : ""}>Color + Number — unique combination</option>
           </select></label>
           <label class="admin-field"><span>Available Colors (comma separated)</span><input id="adminVotingColorPalette" value="${adminSetupEscapeHtml((settings.entryColorPalette || ["Red","Blue","Green","Orange","Yellow","Purple","Pink","Teal","Black","White","Silver","Gold"]).join(", "))}"></label>
-          <label class="admin-field"><span>Award Categories — one per line, optional |off to uncheck by default</span><textarea id="adminVotingEntryCategories" rows="4" placeholder="Best Overall&#10;Most Creative&#10;Bring the HEAT!">${adminSetupEscapeHtml((settings.entryCategories || []).map(function(c){return c.label + (c.defaultSelected === false ? "|off" : "");}).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Award Categories — Name | on/off | both/public/judges</span><textarea id="adminVotingEntryCategories" rows="4" placeholder="Best Overall&#10;Most Creative&#10;Bring the HEAT!">${adminSetupEscapeHtml((settings.entryCategories || []).map(function(c){return c.label + "|" + (c.defaultSelected === false ? "off" : "on") + "|" + (c.audience || "both");}).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Official Judge Usernames (one per line)</span><textarea id="adminVotingOfficialJudges" rows="3">${adminSetupEscapeHtml((settings.officialJudges || []).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Official Judge Multiplier</span><input type="number" id="adminVotingJudgeMultiplier" min="1" max="100" step="0.5" value="${adminSetupEscapeHtml(settings.judgeMultiplier == null ? 3 : settings.judgeMultiplier)}"></label>
           <label class="admin-field"><span>Entry Rules</span><textarea id="adminVotingEntryRules" rows="3">${adminSetupEscapeHtml(settings.entryRules || "")}</textarea></label>
           <label class="admin-field"><span>Host Information</span><textarea id="adminVotingHostInfo" rows="3">${adminSetupEscapeHtml(settings.hostEntryInfo || "")}</textarea></label>
           <label class="admin-field"><span>Where to Pick Up Display Color / Number</span><textarea id="adminVotingPickupInstructions" rows="2">${adminSetupEscapeHtml(settings.pickupInstructions || "")}</textarea></label>
