@@ -280,14 +280,48 @@ function votingPageCategorySelector_(payload) {
       (active===c.id?' selected':'') + '>' + votingPageEscape_(c.label) + '</option>';}).join('') +
     '</select></label>';
 }
+
+/* Auto-save drafts. Each category has its own timer and server-side row. */
+function votingPageDraftSnapshot_() {
+  var payload = VOTING_PAGE_STATE.payload || {};
+  return {
+    gameId:VOTING_PAGE_STATE.gameId,
+    categoryId:votingPageActiveCategoryId_(payload),
+    draftOnly:true,
+    rankings:VOTING_PAGE_STATE.selectedEntryIds.map(function(id,i){return {entryId:id,rank:i+1};}),
+    evaluatedEntryIds:VOTING_PAGE_STATE.evaluatedEntryIds.slice(),
+    criteriaScoresByEntry:Object.assign({},VOTING_PAGE_STATE.criteriaScoresByEntry)
+  };
+}
+function votingPageScheduleDraftSave_() {
+  var payload = VOTING_PAGE_STATE.payload || {};
+  if (!payload.votingOpen || !(payload.settings && payload.settings.entryCategories || []).length) return;
+  var draft = votingPageDraftSnapshot_();
+  VOTING_PAGE_STATE.draftSaveTimers = VOTING_PAGE_STATE.draftSaveTimers || {};
+  if (VOTING_PAGE_STATE.draftSaveTimers[draft.categoryId]) clearTimeout(VOTING_PAGE_STATE.draftSaveTimers[draft.categoryId]);
+  VOTING_PAGE_STATE.draftSaveTimers[draft.categoryId] = setTimeout(async function() {
+    delete VOTING_PAGE_STATE.draftSaveTimers[draft.categoryId];
+    try {
+      var response = await apiSaveVotingCompetitionBallot(draft);
+      if (!response || response.success === false) throw new Error(response && (response.error||response.message) || 'Draft save failed');
+      var hint = document.getElementById('votingDraftStatus');
+      if (hint && draft.categoryId === votingPageActiveCategoryId_(VOTING_PAGE_STATE.payload)) hint.textContent='Draft saved ✓';
+    } catch(err) {
+      var hint = document.getElementById('votingDraftStatus');
+      if (hint) hint.textContent='Draft not saved — retry before voting closes';
+    }
+  },700);
+}
+
 function votingPageChangeCategory_(categoryId) {
   var payload = VOTING_PAGE_STATE.payload;
   if (!payload) return;
   VOTING_PAGE_STATE.localRankingsByCategory = VOTING_PAGE_STATE.localRankingsByCategory || {};
   var current = votingPageActiveCategoryId_(payload);
   VOTING_PAGE_STATE.localRankingsByCategory[current] = VOTING_PAGE_STATE.selectedEntryIds.slice();
+  votingPageScheduleDraftSave_();
   VOTING_PAGE_STATE.activeCategoryId = categoryId;
-  var saved = payload.ballotsByCategory && payload.ballotsByCategory[categoryId] || [];
+  var saved = payload.draftsByCategory && payload.draftsByCategory[categoryId] || payload.ballotsByCategory && payload.ballotsByCategory[categoryId] || [];
   var next = VOTING_PAGE_STATE.localRankingsByCategory[categoryId] ||
     saved.filter(function(r){return Number(r.rank||0)>0;}).sort(function(a,b){return a.rank-b.rank;}).map(function(r){return r.entryId;});
   VOTING_PAGE_STATE.selectedEntryIds = next.slice();
@@ -362,6 +396,7 @@ function votingEvaluationChanged_(entryId, checked) {
   }
   votingRenderBallotWorkspace_();
   votingSaveEvaluationState_();
+  votingPageScheduleDraftSave_();
 }
 
 function votingCriterionChanged_(entryId, criterionId, value) {
@@ -417,6 +452,7 @@ function votingPageDirectRank_(entryId, rank) {
   if (old >= 0) rows.splice(old,1);
   rows.splice(Math.min(rank-1,rows.length),0,entryId);
   votingRenderBallotWorkspace_();
+  votingPageScheduleDraftSave_();
 }
 function votingPageDirectRankOptions_(id, ranked) {
   var rows = VOTING_PAGE_STATE.selectedEntryIds;
@@ -502,6 +538,7 @@ function votingPageTouchEnd_(event) {
   if (from < 0 || to < 0 || from === to) return;
   rows.splice(to, 0, rows.splice(from, 1)[0]);
   votingRenderBallotWorkspace_();
+  votingPageScheduleDraftSave_();
 }
 function votingPageCompactWorkspace_(payload) {
   var settings = payload.settings || {};
@@ -586,7 +623,7 @@ function votingPageVotingCard_(payload) {
   var title = judgingMode === 'criteria' ? 'Score the Entries You Evaluated' : (judgingMode === 'combined' ? 'Rank + Score Your Evaluated Entries' : (settings.votingMethod === "favorite" ? "Choose Your Favorite" : (settings.votingMethod === "rank-all" ? "Rank Every Eligible Entry" : "Rank Your Top " + limit)));
   var status = payload.votingOpen ? "Voting Open" : (payload.votingDeadlinePassed ? "Deadline Passed" : "Voting Closed");
   var rankingWorkspace = judgingMode === 'criteria' ? '' : '<div class="voting-method-note">Ranking style: <strong>' + votingPageEscape_(VOTING_PAGE_STATE.effectiveUi === 'drag' ? 'Drag & Drop' : (VOTING_PAGE_STATE.effectiveUi === 'numbered' ? 'Numbered' : 'Up / Down Arrows')) + '</strong></div><div id="votingBallotWorkspace">' + (VOTING_PAGE_STATE.effectiveUi === "numbered" ? votingPageNumberedWorkspace_(payload) : votingPageOrderWorkspaceHtml_()) + '</div>';
-  return '<section class="card voting-ballot-card">' + votingPageCategorySelector_(payload) + '<div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
+  return '<section class="card voting-ballot-card">' + votingPageCategorySelector_(payload) + '<div id="votingDraftStatus" class="cookoff-r9-draft-hint">Changes save automatically while voting is open.</div><div class="voting-section-heading"><div><span class="voting-eyebrow">Community Ballot</span><h2>' + votingPageEscape_(title) + '</h2><p>' + votingPageEscape_(settings.instructions || '') + '</p></div><span class="voting-entry-status ' + (payload.votingOpen ? 'approved' : 'rejected') + '">' + status + '</span></div>' + votingPageEvaluationWorkspace_(payload) + rankingWorkspace + (payload.votingOpen ? '<div class="voting-save-row voting-final-submit"><button class="button" type="button" onclick="votingSaveBallot_()">' + (judgingMode === 'criteria' ? 'Submit Criteria Ballot' : 'Save Ballot') + '</button><span id="votingBallotMessage" class="voting-inline-message"></span></div>' : '') + '</section>';
 }
 
 function votingPageResultsCard_(payload) {
@@ -733,11 +770,13 @@ function votingBallotAdd_(entryId) {
   if (votingPageIsCompactMobile_() && VOTING_PAGE_STATE.payload && (VOTING_PAGE_STATE.payload.settings || {}).evaluatedOnly && !votingPageIsEvaluated_(entryId)) return;
   VOTING_PAGE_STATE.selectedEntryIds.push(entryId);
   votingRenderBallotWorkspace_();
+  votingPageScheduleDraftSave_();
 }
 
 function votingBallotRemove_(entryId) {
   VOTING_PAGE_STATE.selectedEntryIds = VOTING_PAGE_STATE.selectedEntryIds.filter(function(id) { return id !== entryId; });
   votingRenderBallotWorkspace_();
+  votingPageScheduleDraftSave_();
 }
 
 function votingBallotMove_(entryId, direction) {
@@ -748,6 +787,7 @@ function votingBallotMove_(entryId, direction) {
   rows.splice(index, 1);
   rows.splice(target, 0, entryId);
   votingRenderBallotWorkspace_();
+  votingPageScheduleDraftSave_();
 }
 
 var VOTING_DRAG_ENTRY_ID = '';
@@ -772,6 +812,7 @@ function votingBallotDrop_(event) {
   rows.splice(to, 0, VOTING_DRAG_ENTRY_ID);
   VOTING_DRAG_ENTRY_ID = '';
   votingRenderBallotWorkspace_();
+  votingPageScheduleDraftSave_();
 }
 
 function votingNumberedRankChanged_(select) {
@@ -863,7 +904,7 @@ async function renderVotingPage() {
   var payload = await apiGetVotingCompetitionState(gameId);
   if (!payload || payload.success === false) return '<div class="page"><div class="card error-card">' + votingPageEscape_(payload && (payload.error || payload.message) || 'Could not load Voting / Competition game.') + '</div></div>';
   VOTING_PAGE_STATE.gameId = gameId; VOTING_PAGE_STATE.payload = payload; VOTING_PAGE_STATE.effectiveUi = votingPageResolveUi_(payload.settings && payload.settings.rankingUi);
-  VOTING_PAGE_STATE.selectedEntryIds = ((payload.ballotsByCategory && payload.ballotsByCategory[votingPageActiveCategoryId_(payload)]) || payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
+  VOTING_PAGE_STATE.selectedEntryIds = ((payload.draftsByCategory && payload.draftsByCategory[votingPageActiveCategoryId_(payload)]) || (payload.ballotsByCategory && payload.ballotsByCategory[votingPageActiveCategoryId_(payload)]) || payload.ballot || []).filter(function(row) { return Number(row.rank || 0) > 0; }).slice().sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); }).map(function(row) { return row.entryId; }).filter(Boolean);
   VOTING_PAGE_STATE.evaluatedEntryIds = []; VOTING_PAGE_STATE.criteriaScoresByEntry = {};
   (payload.evaluations || []).forEach(function(row) { if (row.evaluated) VOTING_PAGE_STATE.evaluatedEntryIds.push(row.entryId); VOTING_PAGE_STATE.criteriaScoresByEntry[row.entryId] = Object.assign({}, row.criteriaScores || {}); });
   return '<div class="page voting-page">' + '<header class="voting-page-header"><div><span class="voting-eyebrow">Voting / Competition</span><h1>' + votingPageEscape_(payload.gameName || 'Competition') + '</h1><p>' + votingPageEscape_(payload.gameDescription || payload.settings.instructions || '') + '</p></div><button class="button secondary" type="button" onclick="navigate(\'dashboard\')">Back to Games</button></header>' + votingPageSections_(payload) + '</div>';
