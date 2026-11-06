@@ -46,13 +46,15 @@ assert.equal(context.saveAccountContacts_('guestsamjones','test@example.com','',
 const security = vm.createContext({
   console,
   findUserRecordBySessionToken_: () => ({user:{Username:'guestsamjones',AccountType:'guest'}}),
-  isAdmin: () => false
+  isAdmin: () => false,
+  guestVotingEnabledForGame_: id => id === "cookoff-test"
 });
 vm.runInContext(read('backend/core/ApiSecurity.js'), security);
 assert.equal(security.apiSecurityIsPublicAction_('guestSignup'), true);
 assert.equal(security.apiSecurityRequiresPost_('guestSignup'), true);
 assert.equal(security.apiSecurityRequiresPost_('guestLogin'), true);
-assert.equal(security.apiSecurityAuthorizeRequest_('saveVotingCompetitionBallot',{token:'valid'}).username,'guestsamjones');
+assert.equal(security.apiSecurityAuthorizeRequest_('saveVotingCompetitionBallot',{token:'valid',gameId:'cookoff-test'}).username,'guestsamjones');
+assert.throws(() => security.apiSecurityAuthorizeRequest_('saveVotingCompetitionBallot',{token:'valid',gameId:'unapproved-game'}),/Guest voting is not enabled/);
 assert.throws(() => security.apiSecurityAuthorizeRequest_('savePick',{token:'valid'}),/full PATTC account/);
 assert.throws(() => security.apiSecurityAuthorizeRequest_('adminSummary',{token:'valid'}),/Admin access denied/);
 assert.throws(() => security.apiSecurityAuthorizeRequest_('saveAccountContacts',{token:'valid',username:'otheruser'}),/Session user/);
@@ -71,4 +73,8 @@ assert.match(read('frontend/js/pages/profile.js'),/renderProfileAccountContacts_
 assert.match(read('frontend/js/guest-auth-r1.js'),/joinAsGuest/);
 assert.match(read('backend/Api.js'),/guestSignup/);
 assert.match(read('backend/Api.js'),/saveAccountContacts/);
-console.log('Guest Access R1: 29 assertions PASS');
+assert.match(read('backend/Api.js'),/adminGetGuestVotingAccess/);
+assert.match(read('backend/Api.js'),/adminSetGuestVotingAccess/);
+assert.match(read('frontend/js/pages/adminGameSetup.js'),/adminVotingGuestVotingEnabled/);
+assert.match(read('backend/GuestAccessEngine.js'),/PATTC_GUEST_VOTE_ENABLED/);
+console.log('Guest Access R1 regression PASS');
