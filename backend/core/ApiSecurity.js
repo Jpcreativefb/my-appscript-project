@@ -102,6 +102,11 @@ function apiSecurityRequireSession_(payload) {
     record.user && record.user["Username"] || ""
   ).trim();
 
+  // This value comes from the persisted session owner, not from the client.
+  payload.__sessionAccountType = String(
+    record.user && record.user["AccountType"] || "member"
+  ).trim().toLowerCase();
+
   if (!username) {
     throw new Error("Invalid or expired session");
   }
@@ -157,9 +162,7 @@ function apiSecurityAuthorizeRequest_(action, payload) {
   // Guests are not full PATTC members. Allow read-only browsing, their own
   // profile/contact operations, and the existing secured Voting Competition
   // ballot endpoint. Never permit Admin or unrelated game writes.
-  const actorRecord = findUserRecordByUsername_(sessionUsername);
-  const isGuest = actorRecord &&
-    String(actorRecord.user["AccountType"] || "").toLowerCase() === "guest";
+  const isGuest = payload.__sessionAccountType === "guest";
   if (isGuest) {
     const guestExplicitActions = {
       logout:true, getAccountContacts:true, saveAccountContacts:true,
