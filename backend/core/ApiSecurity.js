@@ -154,6 +154,28 @@ function apiSecurityAuthorizeRequest_(action, payload) {
     throw new Error("Session user does not match request user");
   }
 
+  // Guests are not full PATTC members. Allow read-only browsing, their own
+  // profile/contact operations, and the existing secured Voting Competition
+  // ballot endpoint. Never permit Admin or unrelated game writes.
+  const actorRecord = findUserRecordByUsername_(sessionUsername);
+  const isGuest = actorRecord &&
+    String(actorRecord.user["AccountType"] || "").toLowerCase() === "guest";
+  if (isGuest) {
+    const guestExplicitActions = {
+      logout:true, getAccountContacts:true, saveAccountContacts:true,
+      getEditableProfile:true, saveEditableProfile:true,
+      getNotificationPreferences:true, saveNotificationPreferences:true,
+      getUserProfile:true, getUserProfileHistory:true,
+      getArchivedGameHistory:true, validateSession:true,
+      saveVotingCompetitionBallot:true
+    };
+    const readOnly = /^(get|list|search|find|load|check|browse)/i.test(action) &&
+      !apiSecurityRequiresPost_(action);
+    if (!guestExplicitActions[action] && !readOnly) {
+      throw new Error("This action requires a full PATTC account");
+    }
+  }
+
   // Default-safe rule: on every authenticated non-admin route, `username`
   // always means the actor authenticated by the bearer session. A feature that
   // needs to display another user must use targetUsername/otherUsername.
