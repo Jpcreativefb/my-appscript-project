@@ -50,7 +50,7 @@
       } else {
         localStorage.setItem("session",JSON.stringify(saved));
       }
-      window.location.href = "./app.html#home";
+      window.location.href = "./app.html#dashboard";
     } catch(err) {
       window.setAuthMessage("Connection error. Please try again.");
     } finally {
