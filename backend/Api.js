@@ -106,6 +106,13 @@ function doPost(e) {
       return json(saveAccountContacts_(body.username,body.email,body.phone,body.contactMethod));
     }
 
+    if (action === "adminGetGuestVotingAccess") {
+      return json(adminGetGuestVotingAccess_(body.gameId));
+    }
+    if (action === "adminSetGuestVotingAccess") {
+      return json(adminSetGuestVotingAccess_(body.gameId,body.enabled));
+    }
+
     if (action === "logout") {
       return json(logoutSessionToken(body.token));
     }

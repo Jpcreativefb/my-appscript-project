@@ -174,6 +174,13 @@ function apiSecurityAuthorizeRequest_(action, payload) {
     };
     const readOnly = /^(get|list|search|find|load|check|browse)/i.test(action) &&
       !apiSecurityRequiresPost_(action);
+    if (action === "saveVotingCompetitionBallot") {
+      const gameId = String(payload.gameId || "").trim();
+      if (!gameId || typeof guestVotingEnabledForGame_ !== "function" ||
+          !guestVotingEnabledForGame_(gameId)) {
+        throw new Error("Guest voting is not enabled for this competition");
+      }
+    }
     if (!guestExplicitActions[action] && !readOnly) {
       throw new Error("This action requires a full PATTC account");
     }
