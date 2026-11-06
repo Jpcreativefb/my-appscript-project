@@ -1276,6 +1276,24 @@ async function adminVotingSaveSettings_(gameId) {
       showIngredients: adminVotingChecked_("adminVotingShowIngredients"),
       numberAssignment: adminVotingValue_("adminVotingNumberAssignment"),
       colorAssignment: adminVotingValue_("adminVotingColorAssignment"),
+      entryIdentifierMode: adminVotingValue_("adminVotingEntryIdentifierMode"),
+      entryColorPalette: adminVotingValue_("adminVotingColorPalette").split(",").map(function(c){return c.trim();}).filter(Boolean),
+      contestantSelfRank: adminVotingChecked_("adminVotingContestantSelfRank"),
+      allowMultipleEntries: adminVotingChecked_("adminVotingMultipleEntries"),
+      maxEntriesPerParticipant: Number(adminVotingValue_("adminVotingMaxEntries") || 0),
+      entryDivisions: adminVotingValue_("adminVotingEntryDivisions").split(/\r?\n/),
+      entryCategories: adminVotingValue_("adminVotingEntryCategories").split(/\r?\n/).map(function(line){
+        var parts=line.split("|");return {label:String(parts[0]||"").trim(),defaultSelected:String(parts[1]||"").trim().toLowerCase()!=="off",audience:["public","judges","both"].includes(String(parts[2]||"").trim().toLowerCase())?String(parts[2]).trim().toLowerCase():"both"};
+      }).filter(function(c){return c.label;}),
+      officialJudges: adminVotingValue_("adminVotingOfficialJudges").split(/\r?\n|,/).map(function(u){return u.trim();}).filter(Boolean),
+      judgeMultiplier: Number(adminVotingValue_("adminVotingJudgeMultiplier") || 3),
+      autoFinalizeDrafts: adminVotingChecked_("adminVotingAutoFinalize"),
+      allowPartialAutoFinalize: adminVotingChecked_("adminVotingPartialAuto"),
+      showVotingCountdown: adminVotingChecked_("adminVotingCountdown"),
+      entryRules: adminVotingValue_("adminVotingEntryRules"),
+      hostEntryInfo: adminVotingValue_("adminVotingHostInfo"),
+      pickupInstructions: adminVotingValue_("adminVotingPickupInstructions"),
+      registrationDeadline: adminVotingValue_("adminVotingRegistrationDeadline"),
       instructions: adminVotingValue_("adminVotingInstructions"),
       customFields: adminVotingCollectCustomFields_()
     });
@@ -1287,12 +1305,30 @@ async function adminVotingSaveSettings_(gameId) {
   }
 }
 
+async function adminVotingCropParticipant_(button, gameId, entryId) {
+  var card = button.closest('.admin-voting-participant-card');
+  var message = document.getElementById('adminVotingParticipantMessage_' + entryId);
+  button.disabled = true;
+  try {
+    var crop = await votingCropExistingPhoto_(entryId, gameId);
+    if (!crop) return;
+    card.dataset.pendingCrop = crop;
+    var image = card.querySelector('.admin-voting-participant-image');
+    if (image) image.src = crop;
+    message.textContent = 'Crop ready to save';
+  } catch (error) { message.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
 async function adminVotingSaveParticipant_(gameId, entryId) {
   var message = document.getElementById("adminVotingParticipantMessage_" + entryId);
   function field(name) { var el = document.getElementById("adminVotingParticipant_" + name + "_" + entryId); return el; }
   if (message) { message.textContent = "Saving…"; message.classList.remove("error"); }
   try {
     var publishedEl = field("published");
+    var card = publishedEl && publishedEl.closest('.admin-voting-participant-card');
+    var crop = card && card.dataset.pendingCrop;
+    var photo = crop ? await votingUploadCrop_(crop, true, gameId) : null;
     var res = await apiAdminUpdateVotingParticipant({
       gameId: gameId,
       entryId: entryId,
@@ -1302,7 +1338,9 @@ async function adminVotingSaveParticipant_(gameId, entryId) {
       displayColor: field("displayColor") ? field("displayColor").value : "",
       status: field("status") ? field("status").value : "submitted",
       published: Boolean(publishedEl && publishedEl.checked),
-      adminNotes: field("adminNotes") ? field("adminNotes").value : ""
+      adminNotes: field("adminNotes") ? field("adminNotes").value : "",
+      imageFileId: photo && photo.fileId,
+      imageUrl: photo && photo.imageUrl
     });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || "Could not update participant.");
     if (message) message.textContent = "Saved ✓";
@@ -1328,6 +1366,7 @@ function adminVotingParticipantsHtml_(dashboard) {
         </summary>
         <div class="admin-voting-participant-body">
           ${entry.imageUrl ? platformImgHtml(entry.imageUrl, { className: "admin-voting-participant-image", variant: "thumb", alt: entry.entryName || "Participant entry" }) : ""}
+          ${entry.imageFileId ? `<button type="button" class="admin-small-button secondary" onclick="adminVotingCropParticipant_(this,'${adminSetupEscapeHtml(dashboard.gameId)}','${safeId}')">Adjust Crop</button>` : ""}
           <div class="admin-control-grid">
             <label class="admin-field"><span>Participant / Team</span><input id="adminVotingParticipant_participantName_${safeId}" value="${adminSetupEscapeHtml(entry.participantName || "")}"></label>
             <label class="admin-field"><span>Entry Name</span><input id="adminVotingParticipant_entryName_${safeId}" value="${adminSetupEscapeHtml(entry.entryName || "")}"></label>
@@ -1385,6 +1424,29 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
           <label class="admin-checkbox"><input id="adminVotingRegistrationLocked" type="checkbox" ${settings.registrationLocked ? "checked" : ""}><span>Lock participant registration / changes</span></label>
         </div>
 
+        <h3>Cookoff Entry Options</h3>
+        <div class="admin-control-grid">
+          <label class="admin-field"><span>Entry Registration Deadline</span><input id="adminVotingRegistrationDeadline" type="datetime-local" value="${adminSetupEscapeHtml(adminSetupFormatDateTimeLocal(settings.registrationDeadline || ""))}"></label>
+          <label class="admin-checkbox"><input id="adminVotingContestantSelfRank" type="checkbox" ${settings.contestantSelfRank ? "checked" : ""}><span>Contestants choose one eligible dish to lock at #1 per ranked category</span></label>
+          <label class="admin-checkbox"><input id="adminVotingMultipleEntries" type="checkbox" ${settings.allowMultipleEntries ? "checked" : ""}><span>Allow contestants to submit more than one dish</span></label>
+          <label class="admin-field"><span>Maximum Dishes Per Contestant (0 = unlimited)</span><input id="adminVotingMaxEntries" type="number" min="0" max="100" value="${adminSetupEscapeHtml(settings.maxEntriesPerParticipant == null ? 1 : settings.maxEntriesPerParticipant)}"></label>
+          <label class="admin-field"><span>Entry Identifier</span><select id="adminVotingEntryIdentifierMode">
+            <option value="legacy" ${!settings.entryIdentifierMode || settings.entryIdentifierMode === "legacy" ? "selected" : ""}>Legacy — preserve existing assignments</option>
+            <option value="color" ${settings.entryIdentifierMode === "color" ? "selected" : ""}>Colors Only — one unique color per dish</option>
+            <option value="number" ${settings.entryIdentifierMode === "number" ? "selected" : ""}>Numbers Only — one unique number per dish</option>
+            <option value="combo" ${settings.entryIdentifierMode === "combo" ? "selected" : ""}>Color + Number — unique combination</option>
+          </select></label>
+          <label class="admin-field"><span>Available Colors (comma separated)</span><input id="adminVotingColorPalette" value="${adminSetupEscapeHtml((settings.entryColorPalette || ["Red","Blue","Green","Orange","Yellow","Purple","Pink","Teal","Black","White","Silver","Gold"]).join(", "))}"></label>
+          <label class="admin-field"><span>Entry divisions (one per line)</span><textarea id="adminVotingEntryDivisions" rows="3">${adminSetupEscapeHtml((settings.entryDivisions || []).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Award Categories — Name | on/off | both/public/judges</span><textarea id="adminVotingEntryCategories" rows="4" placeholder="Best Overall&#10;Most Creative&#10;Bring the HEAT!">${adminSetupEscapeHtml((settings.entryCategories || []).map(function(c){return c.label + "|" + (c.defaultSelected === false ? "off" : "on") + "|" + (c.audience || "both");}).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Official Judge Usernames (one per line)</span><textarea id="adminVotingOfficialJudges" rows="3">${adminSetupEscapeHtml((settings.officialJudges || []).join("\n"))}</textarea></label>
+          <label class="admin-field"><span>Official Judge Multiplier</span><input type="number" id="adminVotingJudgeMultiplier" min="1" max="100" step="0.5" value="${adminSetupEscapeHtml(settings.judgeMultiplier == null ? 3 : settings.judgeMultiplier)}"></label>
+          <label class="admin-field"><span>Entry Rules</span><textarea id="adminVotingEntryRules" rows="3">${adminSetupEscapeHtml(settings.entryRules || "")}</textarea></label>
+          <label class="admin-field"><span>Host Information</span><textarea id="adminVotingHostInfo" rows="3">${adminSetupEscapeHtml(settings.hostEntryInfo || "")}</textarea></label>
+          <label class="admin-field"><span>Where to Pick Up Display Color / Number</span><textarea id="adminVotingPickupInstructions" rows="2">${adminSetupEscapeHtml(settings.pickupInstructions || "")}</textarea></label>
+        </div>
+        <p class="admin-field-note">Colors are reserved under a server lock. Colors-only mode stops accepting dishes when the palette is exhausted. Entries keep their identifier when edited.</p>
+
         <h3>Assigned Display Card</h3>
         <div class="admin-control-grid">
           <label class="admin-field"><span>Dish / Entry Number</span><select id="adminVotingNumberAssignment">
@@ -1425,6 +1487,9 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
           <label class="admin-field"><span>Combined Rank Weight</span><input id="adminVotingCombinedRankWeight" type="number" min="0" step="0.01" value="${adminSetupEscapeHtml(settings.combinedRankWeight == null ? 0.5 : settings.combinedRankWeight)}"></label>
           <label class="admin-field"><span>Combined Criteria Weight</span><input id="adminVotingCombinedCriteriaWeight" type="number" min="0" step="0.01" value="${adminSetupEscapeHtml(settings.combinedCriteriaWeight == null ? 0.5 : settings.combinedCriteriaWeight)}"></label>
           <label class="admin-field"><span>Voting Deadline</span><input id="adminVotingDeadline" type="datetime-local" value="${adminSetupEscapeHtml(adminSetupFormatDateTimeLocal(settings.votingDeadline || ""))}"></label>
+          <label class="admin-checkbox-field"><input type="checkbox" id="adminVotingAutoFinalize" ${settings.autoFinalizeDrafts ? "checked" : ""}><span>Auto finalize saved drafts at the deadline (requires server time trigger)</span></label>
+          <label class="admin-checkbox-field"><input type="checkbox" id="adminVotingPartialAuto" ${settings.allowPartialAutoFinalize ? "checked" : ""}><span>Count partially ranked drafts if valid at deadline</span></label>
+          <label class="admin-checkbox-field"><input type="checkbox" id="adminVotingCountdown" ${settings.showVotingCountdown ? "checked" : ""}><span>Show voting countdown clock on phone</span></label>
         </div>
         <label class="admin-field admin-cookoff-criteria-field"><span>Judging Criteria</span><textarea id="adminVotingCriteria" rows="5" placeholder="taste|Taste|1|10|40&#10;texture|Texture|1|10|25">${adminSetupEscapeHtml((settings.criteria || []).map(function(item) { return [item.id, item.label, item.minScore, item.maxScore, item.weight].join("|"); }).join("\n"))}</textarea><small class="admin-field-note">One criterion per line: stable-id | label | minimum | maximum | weight. Weights are normalized by the server.</small></label>
         <p class="admin-field-note">After the first valid ballot is accepted, Cookoff scoring mode, criteria/weights, evaluated minimum, ballot weighting, and incompatible rank-size changes are server locked.</p>
@@ -1439,8 +1504,8 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
           <label class="admin-field"><span>How Many to Rank</span><input id="adminVotingRankLimit" type="number" min="1" max="100" value="${adminSetupEscapeHtml(settings.rankLimit || 5)}"></label>
           <label class="admin-field"><span>Ranking Interface</span><select id="adminVotingRankingUi">
             <option value="auto" ${settings.rankingUi === "auto" ? "selected" : ""}>Auto — Drag desktop / Arrows mobile</option>
-            <option value="numbered" ${settings.rankingUi === "numbered" ? "selected" : ""}>Numbered</option>
-            <option value="drag" ${settings.rankingUi === "drag" ? "selected" : ""}>Drag & Drop</option>
+            <option value="numbered" ${settings.rankingUi === "numbered" ? "selected" : ""}>Enter Rank</option>
+            <option value="drag" ${settings.rankingUi === "drag" ? "selected" : ""}>Drag &amp; arrows</option>
             <option value="arrows" ${settings.rankingUi === "arrows" ? "selected" : ""}>Up / Down Arrows</option>
           </select></label>
           <label class="admin-field"><span>Scoring</span><select id="adminVotingScoringMode">

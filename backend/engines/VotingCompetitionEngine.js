@@ -13,6 +13,8 @@ const VOTING_COMPETITION_SETTINGS_SHEET = "VotingCompetitionSettings";
 const VOTING_COMPETITION_PARTICIPANTS_SHEET = "VotingParticipants";
 const VOTING_COMPETITION_BALLOTS_SHEET = "VotingCompetitionBallots";
 const VOTING_COMPETITION_EVALUATIONS_SHEET = "VotingCompetitionEvaluations";
+const VOTING_COMPETITION_DRAFTS_SHEET = "VotingCompetitionDrafts";
+const VOTING_COMPETITION_DRAFT_HEADERS = ["Timestamp","UpdatedAt","GameId","Username","CategoryId","RankingsJSON","Finalized"];
 
 const VOTING_COMPETITION_SETTINGS_HEADERS = [
   "GameId",
@@ -44,7 +46,23 @@ const VOTING_COMPETITION_SETTINGS_HEADERS = [
   "CombinedCriteriaWeight",
   "BallotWeighting",
   "VotingDeadline",
-  "UpdatedAt"
+  "UpdatedAt",
+  "EntryIdentifierMode",
+  "EntryColorPaletteJSON",
+  "AllowMultipleEntries",
+  "MaxEntriesPerParticipant",
+  "EntryCategoriesJSON",
+  "EntryRules",
+  "HostEntryInfo",
+  "PickupInstructions",
+  "RegistrationDeadline",
+  "OfficialJudgesJSON",
+  "JudgeMultiplier",
+  "AutoFinalizeDrafts",
+  "AllowPartialAutoFinalize",
+  "ContestantSelfRank",
+  "EntryDivisionsJSON",
+  "ShowVotingCountdown"
 ];
 
 const VOTING_COMPETITION_PARTICIPANT_HEADERS = [
@@ -80,7 +98,10 @@ const VOTING_COMPETITION_BALLOT_HEADERS = [
   "CoverageWeight",
   "FinalScore",
   "CriteriaJSON",
-  "Locked"
+  "Locked",
+  "CategoryId",
+  "VoterRole",
+  "VoterMultiplier"
 ];
 
 const VOTING_COMPETITION_EVALUATION_HEADERS = [
@@ -221,7 +242,23 @@ function votingCompetitionDefaultSettings_(gameId) {
     combinedRankWeight: 0.5,
     combinedCriteriaWeight: 0.5,
     ballotWeighting: "equal",
-    votingDeadline: ""
+    votingDeadline: "",
+    entryIdentifierMode: "legacy",
+    entryColorPalette: VOTING_COMPETITION_COLOR_PALETTE.slice(),
+    allowMultipleEntries: false,
+    maxEntriesPerParticipant: 1,
+    entryCategories: [],
+    entryDivisions: [],
+    entryRules: "",
+    hostEntryInfo: "",
+    pickupInstructions: "",
+    registrationDeadline: "",
+    officialJudges: [],
+    judgeMultiplier: 3,
+    autoFinalizeDrafts: false,
+    allowPartialAutoFinalize: false,
+    contestantSelfRank: false,
+    showVotingCountdown: false
   };
 }
 
@@ -363,6 +400,7 @@ function votingCompetitionDeadlinePassed_(settings, nowMs) {
 }
 
 function votingCompetitionVotingOpen_(settings, game, nowMs) {
+  if (settings && settings.entryIdentifierMode !== "legacy" && votingCompetitionRegistrationOpen_(settings,nowMs)) return false;
   if (settings && settings.votingLocked === true) return false;
   if (game && (game.votingLocked === true || game.lockAllPicks === true)) return false;
   return !votingCompetitionDeadlinePassed_(settings, nowMs);
@@ -400,7 +438,8 @@ function votingCompetitionScoringContract_(settings) {
     criteria: votingCompetitionNormalizeCriteria_(settings.criteria, false),
     combinedRankWeight: weights.rankWeight,
     combinedCriteriaWeight: weights.criteriaWeight,
-    ballotWeighting: votingCompetitionNormalizeBallotWeighting_(settings.ballotWeighting)
+    ballotWeighting: votingCompetitionNormalizeBallotWeighting_(settings.ballotWeighting),
+    contestantSelfRank: settings.contestantSelfRank === true
   };
 }
 
@@ -443,6 +482,102 @@ function votingCompetitionNormalizeCustomFields_(value) {
   }).filter(function(field) { return !!field.label; }).slice(0, 30);
 }
 
+
+/* R9 competition settings remain optional to preserve existing Voting games. */
+function votingCompetitionIdentifierMode_(value) {
+  const mode = votingCompetitionKey_(value);
+  return ["legacy","color","number","combo"].indexOf(mode) >= 0 ? mode : "legacy";
+}
+function votingCompetitionColorPalette_(value) {
+  const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, VOTING_COMPETITION_COLOR_PALETTE);
+  const seen = {};
+  return rows.map(votingCompetitionString_).filter(function(color) {
+    const key = color.toLowerCase();
+    if (!color || seen[key] || !VOTING_COMPETITION_COLOR_PALETTE.some(function(c){return c.toLowerCase()===key;})) return false;
+    seen[key] = true; return true;
+  });
+}
+function votingCompetitionOfficialJudges_(value) {
+  const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, []);
+  return Array.from(new Set(rows.map(votingCompetitionKey_).filter(Boolean))).slice(0,200);
+}
+function votingCompetitionJudgeRole_(settings, username, categoryId) {
+  const judge = (settings.officialJudges || []).indexOf(votingCompetitionKey_(username)) !== -1;
+  const category = (settings.entryCategories || []).find(function(c){return c.id === categoryId;});
+  const audience = category && category.audience || 'both';
+  if (audience === 'judges' && !judge) throw new Error("This category is reserved for appointed judges.");
+  return {
+    role:judge && audience !== 'public' ? 'judge' : 'public',
+    multiplier:judge && audience !== 'public' ? Math.max(1,Number(settings.judgeMultiplier || 1)) : 1
+  };
+}
+function votingCompetitionEntryDivisions_(value) {
+  const labels = Array.isArray(value) ? value : votingCompetitionJson_(value, []);
+  const seen = new Set();
+  return labels.map(function(label) {
+    label = votingCompetitionString_(label).slice(0,80);
+    return {id:votingCompetitionSlug_(label),label:label};
+  }).filter(function(division) {
+    if (!division.id || seen.has(division.id)) return false;
+    seen.add(division.id);
+    return true;
+  }).slice(0,30).map(function(division) { return division.label; });
+}
+
+function votingCompetitionEntryCategories_(value) {
+  const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, []);
+  const seen = {};
+  return rows.map(function(row) {
+    if (typeof row === "string") row = {label:row};
+    row = row || {};
+    const label = votingCompetitionString_(row.label || row.name);
+    const id = votingCompetitionSlug_(row.id || label);
+    if (!id || !label || seen[id]) return null;
+    seen[id] = true;
+    const audience = ["public","judges","both"].indexOf(votingCompetitionKey_(row.audience)) >= 0 ? votingCompetitionKey_(row.audience) : "both";
+    return {id:id,label:label,defaultSelected:row.defaultSelected !== false,audience:audience};
+  }).filter(Boolean).slice(0,30);
+}
+function votingCompetitionRegistrationOpen_(settings, nowMs) {
+  if (!settings || settings.registrationEnabled !== true || settings.registrationLocked === true) return false;
+  const deadline = votingCompetitionString_(settings.registrationDeadline);
+  if (!deadline) return true;
+  const when = Date.parse(deadline);
+  return Number.isFinite(when) && (nowMs === undefined ? Date.now() : nowMs) < when;
+}
+function votingCompetitionAssignIdentity_(settings, participants) {
+  const mode = votingCompetitionIdentifierMode_(settings.entryIdentifierMode);
+  if (mode === "legacy") return {
+    displayNumber: settings.numberAssignment === "auto-sequential" ? votingCompetitionNextDisplayNumber_(participants) : "",
+    displayColor: settings.colorAssignment === "auto-palette" ? votingCompetitionNextDisplayColor_(participants) : ""
+  };
+  const palette = votingCompetitionColorPalette_(settings.entryColorPalette);
+  const used = {};
+  (participants || []).forEach(function(p) {
+    const number = votingCompetitionString_(p.displayNumber);
+    const color = votingCompetitionKey_(p.displayColor);
+    used[(mode === "color" ? color : mode === "number" ? number : color + "|" + number)] = true;
+  });
+  if (mode === "color") {
+    const colors = palette.filter(function(c){return !used[c.toLowerCase()];});
+    if (!colors.length) throw new Error("All Cookoff colors are assigned. Ask the host to add colors or switch to Color + Number.");
+    return {displayColor:colors[Math.floor(Math.random()*colors.length)],displayNumber:""};
+  }
+  if (mode === "combo" && !palette.length) throw new Error("Admin must configure at least one entry color.");
+  // Choose from the available pool under the same Apps Script lock used for the row write.
+  const maxNumber = mode === "number" ? 9999 : 999;
+  const choices = [];
+  if (mode === "number") {
+    for (let i=1;i<=maxNumber;i++) if (!used[String(i)]) choices.push({displayNumber:String(i),displayColor:""});
+  } else {
+    palette.forEach(function(color){for (let i=1;i<=maxNumber;i++) {
+      if (!used[color.toLowerCase()+"|"+i]) choices.push({displayNumber:String(i),displayColor:color});
+    }});
+  }
+  if (!choices.length) throw new Error("No unique Cookoff identifiers remain. Contact the host.");
+  return choices[Math.floor(Math.random()*choices.length)];
+}
+
 function votingCompetitionGetSettings_(gameId) {
   gameId = votingCompetitionString_(gameId);
   const defaults = votingCompetitionDefaultSettings_(gameId);
@@ -483,7 +618,23 @@ function votingCompetitionGetSettings_(gameId) {
     combinedRankWeight: weights.rankWeight,
     combinedCriteriaWeight: weights.criteriaWeight,
     ballotWeighting: votingCompetitionNormalizeBallotWeighting_(row[col.ballotweighting]),
-    votingDeadline: votingCompetitionString_(row[col.votingdeadline])
+    votingDeadline: votingCompetitionString_(row[col.votingdeadline]),
+    entryIdentifierMode: votingCompetitionIdentifierMode_(row[col.entryidentifiermode]),
+    entryColorPalette: votingCompetitionColorPalette_(row[col.entrycolorpalettejson]),
+    allowMultipleEntries: votingCompetitionBool_(row[col.allowmultipleentries], false),
+    maxEntriesPerParticipant: Math.max(0,Math.min(100,Math.floor(votingCompetitionNumber_(row[col.maxentriesperparticipant],1)))),
+    entryCategories: votingCompetitionEntryCategories_(row[col.entrycategoriesjson]),
+    entryDivisions: votingCompetitionEntryDivisions_(row[col.entrydivisionsjson]),
+    entryRules: votingCompetitionString_(row[col.entryrules]),
+    hostEntryInfo: votingCompetitionString_(row[col.hostentryinfo]),
+    pickupInstructions: votingCompetitionString_(row[col.pickupinstructions]),
+    registrationDeadline: votingCompetitionString_(row[col.registrationdeadline]),
+    officialJudges: votingCompetitionOfficialJudges_(row[col.officialjudgesjson]),
+    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(row[col.judgemultiplier],3))),
+    autoFinalizeDrafts: votingCompetitionBool_(row[col.autofinalizedrafts],false),
+    allowPartialAutoFinalize: votingCompetitionBool_(row[col.allowpartialautofinalize],false),
+    contestantSelfRank: votingCompetitionBool_(row[col.contestantselfrank],false),
+    showVotingCountdown: votingCompetitionBool_(row[col.showvotingcountdown],false)
   };
 }
 
@@ -527,8 +678,27 @@ function votingCompetitionSaveSettings_(gameId, payload) {
     combinedRankWeight: weights.rankWeight,
     combinedCriteriaWeight: weights.criteriaWeight,
     ballotWeighting: votingCompetitionNormalizeBallotWeighting_(payload.ballotWeighting),
-    votingDeadline: deadline
+    votingDeadline: deadline,
+    entryIdentifierMode: votingCompetitionIdentifierMode_(payload.entryIdentifierMode),
+    entryColorPalette: votingCompetitionColorPalette_(payload.entryColorPalette),
+    allowMultipleEntries: votingCompetitionBool_(payload.allowMultipleEntries,false),
+    maxEntriesPerParticipant: Math.max(0,Math.min(100,Math.floor(votingCompetitionNumber_(payload.maxEntriesPerParticipant,1)))),
+    entryCategories: votingCompetitionEntryCategories_(payload.entryCategories),
+    entryDivisions: votingCompetitionEntryDivisions_(payload.entryDivisions),
+    entryRules: votingCompetitionString_(payload.entryRules),
+    hostEntryInfo: votingCompetitionString_(payload.hostEntryInfo),
+    pickupInstructions: votingCompetitionString_(payload.pickupInstructions),
+    registrationDeadline: votingCompetitionString_(payload.registrationDeadline),
+    officialJudges: votingCompetitionOfficialJudges_(payload.officialJudges),
+    judgeMultiplier: Math.max(1,Math.min(100,votingCompetitionNumber_(payload.judgeMultiplier,3))),
+    autoFinalizeDrafts: votingCompetitionBool_(payload.autoFinalizeDrafts,false),
+    allowPartialAutoFinalize: votingCompetitionBool_(payload.allowPartialAutoFinalize,false),
+    contestantSelfRank: votingCompetitionBool_(payload.contestantSelfRank,false),
+    showVotingCountdown: votingCompetitionBool_(payload.showVotingCountdown,false)
   };
+  if (settings.registrationDeadline && !Number.isFinite(Date.parse(settings.registrationDeadline))) throw new Error("Registration deadline must be a valid date/time.");
+  if (settings.registrationDeadline && settings.votingDeadline && Date.parse(settings.registrationDeadline)>=Date.parse(settings.votingDeadline)) throw new Error("Registration must close before the voting deadline.");
+  if ((settings.entryIdentifierMode === "color" || settings.entryIdentifierMode === "combo") && !settings.entryColorPalette.length) throw new Error("Select at least one Cookoff color.");
   if (!settings.pointValues.length) settings.pointValues = [10, 7, 5, 3, 1];
   if (settings.votingMethod === "favorite") settings.rankLimit = 1;
   if ((settings.judgingMode === "criteria" || settings.judgingMode === "combined") && !settings.criteria.length) throw new Error("Criteria or Combined judging requires at least one criterion.");
@@ -543,6 +713,16 @@ function votingCompetitionSaveSettings_(gameId, payload) {
   for (let i = 1; i < data.length; i++) if (votingCompetitionString_(data[i][col.gameid]) === gameId) { rowNumber = i + 1; break; }
   const row = new Array(headers.length).fill("");
   row[col.gameid] = gameId; row[col.entrylabel] = settings.entryLabel; row[col.registrationenabled] = settings.registrationEnabled; row[col.approvalrequired] = settings.approvalRequired; row[col.allowparticipantedits] = settings.allowParticipantEdits; row[col.registrationlocked] = settings.registrationLocked; row[col.votinglocked] = settings.votingLocked; row[col.votingmethod] = settings.votingMethod; row[col.rankingui] = settings.rankingUi; row[col.ranklimit] = settings.rankLimit; row[col.scoringmode] = settings.scoringMode; row[col.pointvaluesjson] = JSON.stringify(settings.pointValues); row[col.resultsvisibility] = settings.resultsVisibility; row[col.showparticipantnames] = settings.showParticipantNames; row[col.showphoto] = settings.showPhoto; row[col.showdescription] = settings.showDescription; row[col.showingredients] = settings.showIngredients; row[col.numberassignment] = settings.numberAssignment; row[col.colorassignment] = settings.colorAssignment; row[col.instructions] = settings.instructions; row[col.customfieldsjson] = JSON.stringify(settings.customFields); row[col.evaluatedonly] = settings.evaluatedOnly; row[col.minimumevaluatedentries] = settings.minimumEvaluatedEntries; row[col.judgingmode] = settings.judgingMode; row[col.criteriajson] = JSON.stringify(settings.criteria); row[col.combinedrankweight] = settings.combinedRankWeight; row[col.combinedcriteriaweight] = settings.combinedCriteriaWeight; row[col.ballotweighting] = settings.ballotWeighting; row[col.votingdeadline] = settings.votingDeadline; row[col.updatedat] = new Date();
+  row[col.entryidentifiermode] = settings.entryIdentifierMode; row[col.entrycolorpalettejson] = JSON.stringify(settings.entryColorPalette);
+  row[col.allowmultipleentries] = settings.allowMultipleEntries; row[col.maxentriesperparticipant] = settings.maxEntriesPerParticipant;
+  row[col.entrycategoriesjson] = JSON.stringify(settings.entryCategories); row[col.entryrules] = settings.entryRules;
+  row[col.hostentryinfo] = settings.hostEntryInfo; row[col.pickupinstructions] = settings.pickupInstructions;
+  row[col.registrationdeadline] = settings.registrationDeadline;
+  row[col.officialjudgesjson] = JSON.stringify(settings.officialJudges); row[col.judgemultiplier] = settings.judgeMultiplier;
+  row[col.autofinalizedrafts] = settings.autoFinalizeDrafts; row[col.allowpartialautofinalize] = settings.allowPartialAutoFinalize;
+  row[col.entrydivisionsjson] = JSON.stringify(settings.entryDivisions);
+  row[col.contestantselfrank] = settings.contestantSelfRank;
+  row[col.showvotingcountdown] = settings.showVotingCountdown;
   if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]); else sh.getRange(sh.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
   if (typeof clearGameCaches === "function") clearGameCaches(gameId);
   return { success: true, settings: settings };
@@ -631,66 +811,122 @@ function votingCompetitionSaveParticipant_(payload) {
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
   const settings = votingCompetitionGetSettings_(gameId);
-  if (!settings.registrationEnabled || settings.registrationLocked) throw new Error("Participant registration is closed.");
-
-  const participants = votingCompetitionReadParticipants_(gameId);
-  const existing = participants.find(function(entry) { return votingCompetitionKey_(entry.username) === votingCompetitionKey_(username); }) || null;
-  if (existing && !settings.allowParticipantEdits) throw new Error("This entry can no longer be edited.");
-  if (existing && existing.status === "approved" && !settings.allowParticipantEdits) throw new Error("This approved entry can no longer be edited.");
-
+  if (!votingCompetitionRegistrationOpen_(settings)) throw new Error("Participant registration is closed.");
   const entryName = votingCompetitionString_(payload.entryName);
   if (!entryName) throw new Error((settings.entryLabel || "Entry") + " name is required.");
-  const participantName = votingCompetitionString_(payload.participantName) || username;
-  const customData = votingCompetitionValidateCustomData_(settings, payload.customData || {});
 
-  let displayNumber = existing ? existing.displayNumber : "";
-  if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
-  else if (settings.numberAssignment === "auto-sequential" && !displayNumber) displayNumber = votingCompetitionNextDisplayNumber_(participants);
+  const submissionId = votingCompetitionString_(payload.submissionId).slice(0,100);
+  const requestedId = votingCompetitionString_(payload.entryId);
+  // Protect read-choose-write from simultaneous submissions by different players.
+  // Never accept an identifier chosen in the browser for server-assigned modes.
+  votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET,VOTING_COMPETITION_PARTICIPANT_HEADERS);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Another entry is being registered. Please retry.");
+  try {
+    const participants = votingCompetitionReadParticipants_(gameId);
+    const mine = participants.filter(function(entry) {
+      return votingCompetitionKey_(entry.username) === votingCompetitionKey_(username);
+    });
+    let existing = null;
+    if (requestedId) {
+      existing = participants.find(function(entry) { return entry.entryId === requestedId; }) || null;
+      if (!existing || votingCompetitionKey_(existing.username) !== votingCompetitionKey_(username)) {
+        throw new Error("You do not own this competition entry.");
+      }
+    } else if (submissionId) {
+      existing = mine.find(function(entry) {
+        return votingCompetitionString_(entry.customData && entry.customData._cookoffSubmissionId) === submissionId;
+      }) || null;
+    }
+    if (!existing && !settings.allowMultipleEntries) existing = mine[0] || null;
+    if (existing && !settings.allowParticipantEdits && !(
+      submissionId && votingCompetitionString_(existing.customData && existing.customData._cookoffSubmissionId) === submissionId
+    )) throw new Error("This entry can no longer be edited.");
+    if (!existing && mine.length && !settings.allowMultipleEntries) throw new Error("Only one dish is allowed per contestant.");
+    const maxEntries = settings.allowMultipleEntries ? Number(settings.maxEntriesPerParticipant || 0) : 1;
+    if (!existing && maxEntries > 0 && mine.length >= maxEntries) throw new Error("You reached the maximum number of dishes for this Cookoff.");
 
-  let displayColor = existing ? existing.displayColor : "";
-  if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
-  else if (settings.colorAssignment === "auto-palette" && !displayColor) displayColor = votingCompetitionNextDisplayColor_(participants);
-  else if (settings.colorAssignment === "none") displayColor = "";
+    const customData = votingCompetitionValidateCustomData_(settings, payload.customData || {});
+    const categories = Array.isArray(settings.entryCategories) ? settings.entryCategories : [];
+    if (categories.length) {
+      const eligible = {};
+      categories.forEach(function(category) { eligible[category.id] = true; });
+      const requested = payload.customData && payload.customData.cookoffCategoryIds;
+      const choices = Array.isArray(requested) ? requested.map(votingCompetitionString_) :
+        categories.filter(function(category) { return category.defaultSelected !== false; }).map(function(category) { return category.id; });
+      if (choices.some(function(id){return !eligible[id];})) throw new Error("Unknown Cookoff entry category.");
+      customData.cookoffCategoryIds = Array.from(new Set(choices));
+    }
+    if ((settings.entryDivisions || []).length) {
+      const requestedDivision = votingCompetitionString_(payload.customData && payload.customData.cookoffDivision);
+      if (settings.entryDivisions.indexOf(requestedDivision) === -1) throw new Error("Choose a valid entry division.");
+      customData.cookoffDivision = requestedDivision;
+    }
+    if (submissionId) customData._cookoffSubmissionId = submissionId;
+    else if (existing && existing.customData && existing.customData._cookoffSubmissionId) {
+      customData._cookoffSubmissionId = existing.customData._cookoffSubmissionId;
+    }
 
-  const status = settings.approvalRequired ? "submitted" : "approved";
-  const published = !settings.approvalRequired;
-  const entryId = existing && existing.entryId
-    ? existing.entryId
-    : ("entry-" + Utilities.getUuid().replace(/-/g, "").substring(0, 16).toLowerCase());
-  const now = new Date();
-  const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET, VOTING_COMPETITION_PARTICIPANT_HEADERS);
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
-  const col = votingCompetitionHeaderMap_(headers);
-  const row = new Array(headers.length).fill("");
-  row[col.timestamp] = existing && existing.timestamp ? existing.timestamp : now;
-  row[col.updatedat] = now;
-  row[col.gameid] = gameId;
-  row[col.username] = username;
-  row[col.entryid] = entryId;
-  row[col.participantname] = participantName;
-  row[col.entryname] = entryName;
-  row[col.imageurl] = votingCompetitionString_(payload.imageUrl) || (existing ? existing.imageUrl : "");
-  row[col.imagefileid] = votingCompetitionString_(payload.imageFileId) || (existing ? existing.imageFileId : "");
-  row[col.displaynumber] = displayNumber;
-  row[col.displaycolor] = displayColor;
-  row[col.description] = votingCompetitionString_(payload.description);
-  row[col.ingredients] = votingCompetitionString_(payload.ingredients);
-  row[col.customdatajson] = JSON.stringify(customData);
-  row[col.status] = status;
-  row[col.published] = published;
-  row[col.adminnotes] = existing ? existing.adminNotes : "";
+    let displayNumber = existing ? existing.displayNumber : "";
+    let displayColor = existing ? existing.displayColor : "";
+    if (!existing) {
+      if (settings.entryIdentifierMode !== "legacy") {
+        const assigned = votingCompetitionAssignIdentity_(settings, participants);
+        displayNumber = assigned.displayNumber;
+        displayColor = assigned.displayColor;
+      } else {
+        if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
+        else if (settings.numberAssignment === "auto-sequential") displayNumber = votingCompetitionNextDisplayNumber_(participants);
+        if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
+        else if (settings.colorAssignment === "auto-palette") displayColor = votingCompetitionNextDisplayColor_(participants);
+      }
+    } else if (settings.entryIdentifierMode === "legacy") {
+      if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
+      if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
+    }
+    const participantName = votingCompetitionString_(payload.participantName) || username;
+    const status = settings.approvalRequired ? "submitted" : "approved";
+    const published = !settings.approvalRequired;
+    const entryId = existing && existing.entryId
+      ? existing.entryId
+      : ("entry-" + Utilities.getUuid().replace(/-/g, "").substring(0,16).toLowerCase());
+    const now = new Date();
+    const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET, VOTING_COMPETITION_PARTICIPANT_HEADERS);
+    const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
+    const col = votingCompetitionHeaderMap_(headers);
+    const row = new Array(headers.length).fill("");
+    row[col.timestamp] = existing && existing.timestamp ? existing.timestamp : now;
+    row[col.updatedat] = now;
+    row[col.gameid] = gameId;
+    row[col.username] = username;
+    row[col.entryid] = entryId;
+    row[col.participantname] = participantName;
+    row[col.entryname] = entryName;
+    row[col.imageurl] = votingCompetitionString_(payload.imageUrl) || (existing ? existing.imageUrl : "");
+    row[col.imagefileid] = votingCompetitionString_(payload.imageFileId) || (existing ? existing.imageFileId : "");
+    row[col.displaynumber] = displayNumber;
+    row[col.displaycolor] = displayColor;
+    row[col.description] = votingCompetitionString_(payload.description);
+    row[col.ingredients] = votingCompetitionString_(payload.ingredients);
+    row[col.customdatajson] = JSON.stringify(customData);
+    row[col.status] = status;
+    row[col.published] = published;
+    row[col.adminnotes] = existing ? existing.adminNotes : "";
+    if (existing) sh.getRange(existing.rowNumber,1,1,headers.length).setValues([row]);
+    else sh.getRange(sh.getLastRow()+1,1,1,headers.length).setValues([row]);
+    if (typeof clearGameCaches === "function") clearGameCaches(gameId);
+    return {success:true,entryId:entryId,displayNumber:displayNumber,displayColor:displayColor,
+      status:status,published:published,
+      message:published ? "Entry saved and published." : "Entry submitted for admin approval."};
+  } finally {
+    lock.releaseLock();
+  }
+}
 
-  if (existing) sh.getRange(existing.rowNumber, 1, 1, headers.length).setValues([row]);
-  else sh.getRange(sh.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
-
-  if (typeof clearGameCaches === "function") clearGameCaches(gameId);
-  return {
-    success: true,
-    entryId: entryId,
-    status: status,
-    published: published,
-    message: published ? "Entry saved and published." : "Entry submitted for admin approval."
-  };
+function votingCompetitionImageFolder_() {
+  return typeof adminImageGetUploadFolder_ === "function"
+    ? adminImageGetUploadFolder_()
+    : DriveApp.createFolder("Awards App Voting Competition Images");
 }
 
 function votingCompetitionUploadParticipantImage_(payload) {
@@ -703,16 +939,36 @@ function votingCompetitionUploadParticipantImage_(payload) {
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
   const settings = votingCompetitionGetSettings_(gameId);
-  if (!settings.registrationEnabled || settings.registrationLocked) throw new Error("Participant registration is closed.");
+  const admin = typeof isAdmin === "function" && isAdmin(username);
+  if (payload.readCropSource === true) {
+    const entry = votingCompetitionReadParticipants_(gameId).find(function(row) {
+      return row.entryId === votingCompetitionString_(payload.entryId) &&
+        (admin || votingCompetitionKey_(row.username) === votingCompetitionKey_(username));
+    });
+    if (!entry || !entry.imageFileId) throw new Error("Saved photo is unavailable.");
+    const file = DriveApp.getFileById(entry.imageFileId);
+    const folderId = votingCompetitionImageFolder_().getId();
+    const parents = file.getParents();
+    let inFolder = false;
+    while (parents.hasNext()) if (parents.next().getId() === folderId) inFolder = true;
+    if (!inFolder || file.getSharingAccess() !== DriveApp.Access.ANYONE_WITH_LINK ||
+        !file.getName().startsWith("competition-" + votingCompetitionSlug_(gameId) + "-")) {
+      throw new Error("Choose the original photo to adjust this crop.");
+    }
+    const blob = file.getBlob();
+    const type = blob.getContentType();
+    const bytes = blob.getBytes();
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(type) || bytes.length > 4 * 1024 * 1024) throw new Error("Choose the original photo to adjust this crop.");
+    return {success:true,mimeType:type,base64:Utilities.base64Encode(bytes)};
+  }
+  if (!(payload.adminPhoto === true && admin) && !votingCompetitionRegistrationOpen_(settings)) throw new Error("Participant registration is closed.");
   const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
   if (!extensions[mimeType]) throw new Error("Photo must be JPG, PNG, WEBP, or GIF.");
   if (!base64) throw new Error("Photo data is missing.");
   const bytes = Utilities.base64Decode(base64);
   if (bytes.length > 4 * 1024 * 1024) throw new Error("Photo must be 4 MB or smaller after preparation.");
 
-  const folder = typeof adminImageGetUploadFolder_ === "function"
-    ? adminImageGetUploadFolder_()
-    : DriveApp.createFolder("Awards App Voting Competition Images");
+  const folder = votingCompetitionImageFolder_();
   const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmmss");
   const safeFile = ["competition", votingCompetitionSlug_(gameId), votingCompetitionSlug_(username), stamp].join("-") + "." + extensions[mimeType];
   const file = folder.createFile(Utilities.newBlob(bytes, mimeType, safeFile));
@@ -735,6 +991,13 @@ function votingCompetitionAdminUpdateParticipant_(payload) {
   const participants = votingCompetitionReadParticipants_(gameId);
   const existing = participants.find(function(entry) { return entry.entryId === entryId; });
   if (!existing) throw new Error("Participant entry not found.");
+  const settings = votingCompetitionGetSettings_(gameId);
+  if (settings.entryIdentifierMode !== "legacy") {
+    if (Object.prototype.hasOwnProperty.call(payload,"displayNumber") &&
+      votingCompetitionString_(payload.displayNumber) !== existing.displayNumber) throw new Error("Assigned Cookoff number is locked.");
+    if (Object.prototype.hasOwnProperty.call(payload,"displayColor") &&
+      votingCompetitionString_(payload.displayColor) !== existing.displayColor) throw new Error("Assigned Cookoff color is locked.");
+  }
 
   const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_PARTICIPANTS_SHEET, VOTING_COMPETITION_PARTICIPANT_HEADERS);
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
@@ -748,6 +1011,10 @@ function votingCompetitionAdminUpdateParticipant_(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, "displayNumber")) row[col.displaynumber] = votingCompetitionString_(payload.displayNumber);
   if (Object.prototype.hasOwnProperty.call(payload, "displayColor")) row[col.displaycolor] = votingCompetitionString_(payload.displayColor);
   if (Object.prototype.hasOwnProperty.call(payload, "adminNotes")) row[col.adminnotes] = votingCompetitionString_(payload.adminNotes);
+  if (payload.imageFileId && payload.imageUrl) {
+    row[col.imagefileid] = votingCompetitionString_(payload.imageFileId);
+    row[col.imageurl] = votingCompetitionString_(payload.imageUrl);
+  }
   row[col.status] = status;
   row[col.published] = Object.prototype.hasOwnProperty.call(payload, "published")
     ? votingCompetitionBool_(payload.published, false)
@@ -794,6 +1061,58 @@ function votingCompetitionSaveEvaluationStateUnlocked_(gameId, username, publish
   return votingCompetitionReadEvaluations_(gameId, username);
 }
 
+
+/* Partial rankings are separate from counted ballots. */
+function votingCompetitionReadDrafts_(gameId, username) {
+  const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
+  if (sh.getLastRow() <= 1) return [];
+  const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
+  const col = votingCompetitionHeaderMap_(headers);
+  return sh.getRange(2,1,sh.getLastRow()-1,headers.length).getValues().map(function(row,index) {
+    return {rowNumber:index+2,gameId:votingCompetitionString_(row[col.gameid]),
+      username:votingCompetitionString_(row[col.username]),
+      categoryId:votingCompetitionString_(row[col.categoryid]),
+      rankings:votingCompetitionJson_(row[col.rankingsjson],[]),
+      updatedAt:row[col.updatedat],
+      finalized:votingCompetitionBool_(row[col.finalized],false)};
+  }).filter(function(row) {
+    return (!gameId || row.gameId===gameId) &&
+      (!username || votingCompetitionKey_(row.username)===votingCompetitionKey_(username));
+  });
+}
+function votingCompetitionSaveDraftUnlocked_(gameId, username, categoryId, rankings, finalized) {
+  const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
+  const existing = votingCompetitionReadDrafts_(gameId,username).find(function(row){return row.categoryId===categoryId;});
+  const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
+  const col = votingCompetitionHeaderMap_(headers);
+  const now = new Date();
+  const row = new Array(headers.length).fill("");
+  row[col.timestamp] = existing ? existing.updatedAt : now;
+  row[col.updatedat] = now;
+  row[col.gameid] = gameId;
+  row[col.username] = username;
+  row[col.categoryid] = categoryId;
+  row[col.rankingsjson] = JSON.stringify(rankings);
+  row[col.finalized] = finalized === true;
+  const rowNumber = existing ? existing.rowNumber : sh.getLastRow()+1;
+  sh.getRange(rowNumber,1,1,headers.length).setValues([row]);
+}
+function votingCompetitionValidateDraft_(rankings,entries,settings) {
+  rankings = Array.isArray(rankings) ? rankings : [];
+  const allowed = {};
+  entries.forEach(function(e){allowed[e.entryId]=true;});
+  const max = votingCompetitionBallotLimit_(settings,entries.length);
+  if (rankings.length>max) throw new Error("Too many ranked dishes.");
+  const seen = {};
+  rankings.forEach(function(row,index) {
+    const id = votingCompetitionString_(row && row.entryId);
+    const rank = Number(row && row.rank);
+    if (!allowed[id] || seen[id] || rank !== index+1) throw new Error("Invalid partial Cookoff ranking.");
+    seen[id]=true;
+  });
+  return rankings;
+}
+
 function votingCompetitionReadBallots_(gameId) {
   gameId = votingCompetitionString_(gameId);
   const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_BALLOTS_SHEET, VOTING_COMPETITION_BALLOT_HEADERS);
@@ -801,8 +1120,24 @@ function votingCompetitionReadBallots_(gameId) {
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(votingCompetitionString_);
   const col = votingCompetitionHeaderMap_(headers);
   return sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).getValues().map(function(row, index) {
-    return { rowNumber:index+2, timestamp:row[col.timestamp], updatedAt:row[col.updatedat], gameId:votingCompetitionString_(row[col.gameid]), username:votingCompetitionString_(row[col.username]), entryId:votingCompetitionString_(row[col.entryid]), rank:votingCompetitionNumber_(row[col.rank],0), points:votingCompetitionNumber_(row[col.points],0), rawRankPoints:votingCompetitionNumber_(row[col.rawrankpoints],0), criteriaScore:votingCompetitionNumber_(row[col.criteriascore],0), coverageWeight:votingCompetitionNumber_(row[col.coverageweight],1), finalScore:votingCompetitionNumber_(row[col.finalscore],votingCompetitionNumber_(row[col.points],0)), criteriaScores:votingCompetitionJson_(row[col.criteriajson],{}), locked:votingCompetitionBool_(row[col.locked],false) };
+    return { rowNumber:index+2, timestamp:row[col.timestamp], updatedAt:row[col.updatedat], gameId:votingCompetitionString_(row[col.gameid]), username:votingCompetitionString_(row[col.username]), entryId:votingCompetitionString_(row[col.entryid]), rank:votingCompetitionNumber_(row[col.rank],0), points:votingCompetitionNumber_(row[col.points],0), rawRankPoints:votingCompetitionNumber_(row[col.rawrankpoints],0), criteriaScore:votingCompetitionNumber_(row[col.criteriascore],0), coverageWeight:votingCompetitionNumber_(row[col.coverageweight],1), finalScore:votingCompetitionNumber_(row[col.finalscore],votingCompetitionNumber_(row[col.points],0)), criteriaScores:votingCompetitionJson_(row[col.criteriajson],{}), locked:votingCompetitionBool_(row[col.locked],false), categoryId:votingCompetitionString_(row[col.categoryid]), voterRole:votingCompetitionString_(row[col.voterrole])||"public", voterMultiplier:votingCompetitionNumber_(row[col.votermultiplier],1) };
   }).filter(function(row) { return !gameId || row.gameId === gameId; });
+}
+
+
+function votingCompetitionCategoryId_(settings, value) {
+  const categories = settings && Array.isArray(settings.entryCategories) ? settings.entryCategories : [];
+  if (!categories.length) return "";
+  const requested = votingCompetitionString_(value);
+  if (!requested || !categories.some(function(c){return c.id === requested;})) throw new Error("Select a valid Cookoff voting category.");
+  return requested;
+}
+function votingCompetitionEntriesForCategory_(entries, categoryId) {
+  if (!categoryId) return entries.slice();
+  return entries.filter(function(entry){
+    const selected = entry.customData && entry.customData.cookoffCategoryIds;
+    return !Array.isArray(selected) || selected.indexOf(categoryId) >= 0;
+  });
 }
 
 function votingCompetitionBallotLimit_(settings, entryCount) {
@@ -845,56 +1180,135 @@ function votingCompetitionValidateBallot_(rankings, entries, settings) {
   });
 }
 
-function votingCompetitionSaveBallot_(payload) {
+function votingCompetitionSelfRankEntries_(entries, rankings, username, draftOnly) {
+  const owned = entries.filter(function(entry) {
+    return votingCompetitionKey_(entry.username) === votingCompetitionKey_(username);
+  });
+  if (!owned.length) return entries;
+  const ownedIds = new Set(owned.map(function(entry) { return entry.entryId; }));
+  const chosen = rankings.filter(function(row) {
+    return row && ownedIds.has(votingCompetitionString_(row.entryId));
+  });
+  if (chosen.length !== 1 || Number(chosen[0].rank) !== 1) {
+    if (draftOnly && !rankings.length) return entries;
+    throw new Error("Choose one of your eligible dishes to lock at #1.");
+  }
+  const chosenId = votingCompetitionString_(chosen[0].entryId);
+  return entries.filter(function(entry) { return entry.entryId === chosenId || !ownedIds.has(entry.entryId); });
+}
+
+function votingCompetitionSaveBallot_(payload, internalOptions) {
   payload = payload || {};
+  internalOptions = internalOptions || {};
   const username = votingCompetitionString_(payload.username); const gameId = votingCompetitionString_(payload.gameId);
   if (!username || !gameId) throw new Error("Username and GameId are required.");
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
   const settings = votingCompetitionGetSettings_(gameId);
-  if (!votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
+  const categoryId = votingCompetitionCategoryId_(settings, payload.categoryId);
+  const voterRole = votingCompetitionJudgeRole_(settings,username,categoryId);
+  const internalAuto = internalOptions.serverDeadlineFinalization === true && settings.autoFinalizeDrafts === true && votingCompetitionDeadlinePassed_(settings);
+  if (!internalAuto && !votingCompetitionVotingOpen_(settings, game)) throw new Error(votingCompetitionDeadlinePassed_(settings) ? "Voting deadline has passed." : "Voting is closed.");
   const publishedEntries = votingCompetitionReadParticipants_(gameId).filter(function(entry) { return entry.status === "approved" && entry.published === true; });
   if (!publishedEntries.length) throw new Error("There are no published entries available to vote on.");
+  if ((settings.entryCategories || []).length) votingCompetitionEnsureSheet_(VOTING_COMPETITION_DRAFTS_SHEET,VOTING_COMPETITION_DRAFT_HEADERS);
   const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   if (!lock.tryLock(3500)) throw new Error("Another vote is being saved. Please try once more.");
   try {
+    if (!internalAuto && !votingCompetitionVotingOpen_(settings, game)) throw new Error("Voting is closed.");
+    if (internalAuto) {
+      const latest = votingCompetitionReadDrafts_(gameId, username).find(function(draft) {
+        return draft.categoryId === categoryId;
+      });
+      if (!latest || latest.finalized) return {success:true, skipped:true};
+      payload.rankings = latest.rankings;
+    }
     if (Array.isArray(payload.evaluatedEntryIds) || (payload.criteriaScoresByEntry && typeof payload.criteriaScoresByEntry === "object")) votingCompetitionSaveEvaluationStateUnlocked_(gameId, username, publishedEntries, settings, payload);
     const evaluationMap = votingCompetitionEvaluationMap_(votingCompetitionReadEvaluations_(gameId, username));
-    const evaluatedCount = publishedEntries.filter(function(entry) { return evaluationMap[entry.entryId] && evaluationMap[entry.entryId].evaluated === true; }).length;
-    if (payload.evaluationOnly === true) return { success:true, gameId:gameId, evaluationSaved:true, evaluatedCount:evaluatedCount };
-    votingCompetitionAssertMinimumEvaluated_(settings, evaluatedCount);
-    const eligibleEntries = votingCompetitionEligibleEntries_(publishedEntries, evaluationMap, settings);
+    const categoryEntries = votingCompetitionEntriesForCategory_(publishedEntries,categoryId);
+    const evaluatedCount = categoryEntries.filter(function(entry) { return evaluationMap[entry.entryId] && evaluationMap[entry.entryId].evaluated === true; }).length;
+    if (payload.evaluationOnly === true) return { success:true, gameId:gameId, categoryId:categoryId, evaluationSaved:true, evaluatedCount:evaluatedCount };
+    let eligibleEntries = votingCompetitionEligibleEntries_(categoryEntries, evaluationMap, settings);
     const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
     const judgingMode = votingCompetitionNormalizeJudgingMode_(settings.judgingMode);
-    if (judgingMode !== "criteria") votingCompetitionValidateBallot_(rankings, eligibleEntries, settings);
-    const coverageWeight = votingCompetitionCoverageWeight_(evaluatedCount, publishedEntries.length, settings.ballotWeighting);
-    const limit = votingCompetitionBallotLimit_(settings, eligibleEntries.length);
+    if (settings.contestantSelfRank && judgingMode !== "criteria") {
+      eligibleEntries = votingCompetitionSelfRankEntries_(eligibleEntries, rankings, username, payload.draftOnly === true);
+    }
+    if (payload.draftOnly === true) {
+      if (!(settings.entryCategories || []).length) throw new Error("Draft saving is not enabled for this competition.");
+      votingCompetitionValidateDraft_(rankings, eligibleEntries, settings);
+      votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,false);
+      return {success:true,gameId:gameId,categoryId:categoryId,draftSaved:true,saved:rankings.length};
+    }
+    votingCompetitionAssertMinimumEvaluated_(settings, evaluatedCount);
+    let validationSettings = settings;
+    if (internalAuto && settings.allowPartialAutoFinalize === true && judgingMode !== "criteria" && rankings.length > 0) {
+      const fullLimit = votingCompetitionBallotLimit_(settings,eligibleEntries.length);
+      if (rankings.length > fullLimit) throw new Error("Draft contains too many ranks.");
+      validationSettings = Object.assign({},settings,{votingMethod:"top-n",rankLimit:rankings.length});
+    }
+    if (judgingMode !== "criteria") votingCompetitionValidateBallot_(rankings, eligibleEntries, validationSettings);
+    const coverageWeight = votingCompetitionCoverageWeight_(evaluatedCount, categoryEntries.length, settings.ballotWeighting);
+    const limit = votingCompetitionBallotLimit_(validationSettings, eligibleEntries.length);
     const maxRankPoints = limit ? votingCompetitionPointsForRank_(1, settings, limit) : 0;
     const specs = [];
     if (judgingMode === "criteria") {
       if (!settings.criteria.length) throw new Error("No judging criteria are configured.");
-      const candidates = publishedEntries.filter(function(entry) {
+      const candidates = categoryEntries.filter(function(entry) {
         const evaluation = evaluationMap[entry.entryId];
         if (settings.evaluatedOnly && !(evaluation && evaluation.evaluated)) return false;
         return evaluation && evaluation.criteriaScores && Object.keys(evaluation.criteriaScores).length > 0;
       });
       if (!candidates.length) throw new Error("Score at least one evaluated entry before submitting.");
-      candidates.forEach(function(entry) { const evaluation = evaluationMap[entry.entryId]; const criteriaScore = votingCompetitionWeightedCriteriaScore_(settings.criteria, evaluation.criteriaScores); specs.push({entryId:entry.entryId,rank:0,rawRankPoints:0,criteriaScore:criteriaScore,finalScore:criteriaScore*coverageWeight,criteriaScores:evaluation.criteriaScores}); });
+      candidates.forEach(function(entry) { const evaluation = evaluationMap[entry.entryId]; const criteriaScore = votingCompetitionWeightedCriteriaScore_(settings.criteria, evaluation.criteriaScores); specs.push({entryId:entry.entryId,rank:0,rawRankPoints:0,criteriaScore:criteriaScore,finalScore:criteriaScore*coverageWeight*voterRole.multiplier,criteriaScores:evaluation.criteriaScores}); });
     } else {
       rankings.slice().sort(function(a,b){return Number(a.rank||0)-Number(b.rank||0);}).forEach(function(item) {
         const entryId = votingCompetitionString_(item.entryId); const rank = votingCompetitionNumber_(item.rank,0); const rawRankPoints = votingCompetitionPointsForRank_(rank,settings,limit);
         let criteriaScore=0, criteriaScores={}, rawScore=rawRankPoints;
         if (judgingMode === "combined") { const evaluation=evaluationMap[entryId]||{}; criteriaScores=evaluation.criteriaScores||{}; criteriaScore=votingCompetitionWeightedCriteriaScore_(settings.criteria,criteriaScores); rawScore=votingCompetitionCombinedScore_(rawRankPoints,maxRankPoints,criteriaScore,settings); }
-        specs.push({entryId:entryId,rank:rank,rawRankPoints:rawRankPoints,criteriaScore:criteriaScore,finalScore:rawScore*coverageWeight,criteriaScores:criteriaScores});
+        specs.push({entryId:entryId,rank:rank,rawRankPoints:rawRankPoints,criteriaScore:criteriaScore,finalScore:rawScore*coverageWeight*voterRole.multiplier,criteriaScores:criteriaScores});
       });
     }
     const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_BALLOTS_SHEET,VOTING_COMPETITION_BALLOT_HEADERS); const data=sh.getDataRange().getValues(); const headers=data[0].map(votingCompetitionString_); const col=votingCompetitionHeaderMap_(headers); const matchingRows=[];
-    for (let i=1;i<data.length;i++) if (votingCompetitionString_(data[i][col.gameid])===gameId && votingCompetitionKey_(data[i][col.username])===votingCompetitionKey_(username)) matchingRows.push(i+1);
-    const now=new Date(); const rows=specs.map(function(spec){ const row=new Array(headers.length).fill(""); const finalScore=Math.round(Number(spec.finalScore||0)*1000000)/1000000; row[col.timestamp]=now; row[col.updatedat]=now; row[col.gameid]=gameId; row[col.username]=username; row[col.entryid]=spec.entryId; row[col.rank]=spec.rank; row[col.points]=finalScore; row[col.rawrankpoints]=spec.rawRankPoints; row[col.criteriascore]=spec.criteriaScore; row[col.coverageweight]=coverageWeight; row[col.finalscore]=finalScore; row[col.criteriajson]=JSON.stringify(spec.criteriaScores||{}); row[col.locked]=false; return row; });
+    for (let i=1;i<data.length;i++) if (votingCompetitionString_(data[i][col.gameid])===gameId && votingCompetitionKey_(data[i][col.username])===votingCompetitionKey_(username) && votingCompetitionString_(data[i][col.categoryid])===categoryId) matchingRows.push(i+1);
+    const now=new Date(); const rows=specs.map(function(spec){ const row=new Array(headers.length).fill(""); const finalScore=Math.round(Number(spec.finalScore||0)*1000000)/1000000; row[col.timestamp]=now; row[col.updatedat]=now; row[col.gameid]=gameId; row[col.username]=username; row[col.entryid]=spec.entryId; row[col.rank]=spec.rank; row[col.points]=finalScore; row[col.rawrankpoints]=spec.rawRankPoints; row[col.criteriascore]=spec.criteriaScore; row[col.coverageweight]=coverageWeight; row[col.finalscore]=finalScore; row[col.criteriajson]=JSON.stringify(spec.criteriaScores||{}); row[col.locked]=false; row[col.categoryid]=categoryId; row[col.voterrole]=voterRole.role; row[col.votermultiplier]=voterRole.multiplier; return row; });
     const reuse=Math.min(matchingRows.length,rows.length); for(let i=0;i<reuse;i++) sh.getRange(matchingRows[i],1,1,headers.length).setValues([rows[i]]); if(rows.length>reuse) sh.getRange(sh.getLastRow()+1,1,rows.length-reuse,headers.length).setValues(rows.slice(reuse)); if(matchingRows.length>rows.length) matchingRows.slice(rows.length).sort(function(a,b){return b-a;}).forEach(function(rowNumber){sh.deleteRow(rowNumber);});
+    if ((settings.entryCategories || []).length) votingCompetitionSaveDraftUnlocked_(gameId,username,categoryId,rankings,true);
     if(typeof clearGameCaches==="function") clearGameCaches(gameId);
-    return {success:true,gameId:gameId,saved:rows.length,evaluatedCount:evaluatedCount,coverageWeight:coverageWeight};
+    return {success:true,gameId:gameId,categoryId:categoryId,saved:rows.length,evaluatedCount:evaluatedCount,coverageWeight:coverageWeight};
   } finally { lock.releaseLock(); }
+}
+
+
+/* Private time-trigger operation; never expose this as a public API route. */
+function votingCompetitionFinalizeDueDrafts_() {
+  const drafts = votingCompetitionReadDrafts_("","");
+  const result = {checked:0,finalized:0,skipped:0,errors:[]};
+  drafts.filter(function(row){return !row.finalized;}).forEach(function(draft) {
+    result.checked++;
+    try {
+      const settings = votingCompetitionGetSettings_(draft.gameId);
+      if (!settings.autoFinalizeDrafts || !votingCompetitionDeadlinePassed_(settings)) {result.skipped++;return;}
+      if (votingCompetitionNormalizeJudgingMode_(settings.judgingMode) !== "criteria" &&
+          (!draft.rankings || !draft.rankings.length)) {result.skipped++;return;}
+      const saved = votingCompetitionSaveBallot_({
+        gameId:draft.gameId,username:draft.username,categoryId:draft.categoryId,
+        rankings:draft.rankings
+      },{serverDeadlineFinalization:true});
+      if (saved && saved.skipped) result.skipped++;
+      else result.finalized++;
+    } catch(err) {
+      result.errors.push({gameId:draft.gameId,categoryId:draft.categoryId,message:String(err && err.message || err)});
+    }
+  });
+  if (result.errors.length && typeof Logger !== "undefined") Logger.log(JSON.stringify(result));
+  return result;
+}
+function votingCompetitionInstallDraftFinalizer_() {
+  const target = "votingCompetitionFinalizeDueDrafts_";
+  if (ScriptApp.getProjectTriggers().some(function(t){return t.getHandlerFunction()===target;})) return {installed:false,alreadyExists:true};
+  ScriptApp.newTrigger(target).timeBased().everyMinutes(1).create();
+  return {installed:true,alreadyExists:false};
 }
 
 function votingCompetitionResults_(gameId, settings, participants, ballots) {
@@ -920,7 +1334,9 @@ function votingCompetitionPublicEntry_(entry, settings) {
     displayColor: entry.displayColor,
     description: settings.showDescription ? entry.description : "",
     ingredients: settings.showIngredients ? entry.ingredients : "",
-    customData: customVisible
+    customData: customVisible,
+    division: votingCompetitionString_(entry.customData && entry.customData.cookoffDivision),
+    categoryIds: entry.customData && Array.isArray(entry.customData.cookoffCategoryIds) ? entry.customData.cookoffCategoryIds : null
   };
 }
 
@@ -931,12 +1347,70 @@ function votingCompetitionResultsVisible_(settings, game) {
 }
 
 function apiGetVotingCompetitionState_(payload) {
-  payload=payload||{}; const username=votingCompetitionString_(payload.username); const gameId=votingCompetitionString_(payload.gameId||(typeof getDefaultGameId==="function"?getDefaultGameId():"")); if(!username||!gameId)throw new Error("Username and GameId are required.");
-  const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId); if(!game||votingCompetitionKey_(game.type)!=="voting")throw new Error("This is not a Voting / Competition game.");
-  const settings=votingCompetitionGetSettings_(gameId); const participants=votingCompetitionReadParticipants_(gameId); const published=participants.filter(function(entry){return entry.status==="approved"&&entry.published===true;}); const evaluations=votingCompetitionReadEvaluations_(gameId,username); const evaluationMap=votingCompetitionEvaluationMap_(evaluations); const eligible=votingCompetitionEligibleEntries_(published,evaluationMap,settings); const ballots=votingCompetitionReadBallots_(gameId);
-  const userBallot=ballots.filter(function(row){return votingCompetitionKey_(row.username)===votingCompetitionKey_(username);}).map(function(row){return{entryId:row.entryId,rank:row.rank,points:row.points,criteriaScore:row.criteriaScore,coverageWeight:row.coverageWeight};}).sort(function(a,b){return a.rank-b.rank;});
-  const ownEntry=participants.find(function(entry){return votingCompetitionKey_(entry.username)===votingCompetitionKey_(username);})||null; const resultBundle=votingCompetitionResults_(gameId,settings,participants,ballots); const resultsVisible=votingCompetitionResultsVisible_(settings,game); const votingOpen=votingCompetitionVotingOpen_(settings,game);
-  return {success:true,gameId:gameId,gameName:game.name||gameId,gameDescription:game.description||"",settings:settings,registrationOpen:settings.registrationEnabled===true&&settings.registrationLocked!==true,votingOpen:votingOpen,votingDeadlinePassed:votingCompetitionDeadlinePassed_(settings),ballotLimit:votingCompetitionBallotLimit_(settings,eligible.length),entries:published.map(function(entry){return votingCompetitionPublicEntry_(entry,settings);}),evaluations:evaluations.map(function(row){return{entryId:row.entryId,evaluated:row.evaluated,criteriaScores:row.criteriaScores||{}};}),ownEntry:ownEntry?{entryId:ownEntry.entryId,participantName:ownEntry.participantName,entryName:ownEntry.entryName,imageUrl:ownEntry.imageUrl,imageFileId:ownEntry.imageFileId,displayNumber:ownEntry.displayNumber,displayColor:ownEntry.displayColor,description:ownEntry.description,ingredients:ownEntry.ingredients,customData:ownEntry.customData||{},status:ownEntry.status,published:ownEntry.published,adminNotes:ownEntry.adminNotes}:null,ballot:userBallot,resultsVisible:resultsVisible,ballotCount:resultBundle.ballotCount,results:resultsVisible?resultBundle.results.map(function(row){return Object.assign({},row,{participantName: settings.showParticipantNames ? row.participantName : "",imageUrl: settings.showPhoto ? row.imageUrl : ""});}):[]};
+  payload = payload || {};
+  const username = votingCompetitionString_(payload.username);
+  const gameId = votingCompetitionString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
+  if (!username || !gameId) throw new Error("Username and GameId are required.");
+  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
+  if (!game || votingCompetitionKey_(game.type) !== "voting") throw new Error("This is not a Voting / Competition game.");
+  const settings = votingCompetitionGetSettings_(gameId);
+  const participants = votingCompetitionReadParticipants_(gameId);
+  const published = participants.filter(function(e){return e.status === "approved" && e.published === true;});
+  const evaluations = votingCompetitionReadEvaluations_(gameId, username);
+  const evaluationMap = votingCompetitionEvaluationMap_(evaluations);
+  const ballots = votingCompetitionReadBallots_(gameId);
+  const drafts = (settings.entryCategories || []).length ? votingCompetitionReadDrafts_(gameId,username) : [];
+  const draftsByCategory = {};
+  drafts.forEach(function(d){draftsByCategory[d.categoryId]=d.rankings;});
+  const ownEntries = participants.filter(function(e){return votingCompetitionKey_(e.username) === votingCompetitionKey_(username);});
+  const ownEntry = ownEntries[0] || null;
+  const resultsVisible = votingCompetitionResultsVisible_(settings, game);
+  const votingOpen = votingCompetitionVotingOpen_(settings, game);
+  const categories = settings.entryCategories || [];
+  const activeCategory = categories.length ? categories[0].id : "";
+  const ballotByCategory = {};
+  const resultsByCategory = {};
+  const resultCountByCategory = {};
+  const categoryIds = categories.length ? categories.map(function(c){return c.id;}) : [""];
+  categoryIds.forEach(function(categoryId) {
+    const categoryEntries = votingCompetitionEntriesForCategory_(published, categoryId);
+    const categoryBallots = ballots.filter(function(row){return votingCompetitionString_(row.categoryId)===categoryId;});
+    ballotByCategory[categoryId] = categoryBallots.filter(function(row) {
+      return votingCompetitionKey_(row.username)===votingCompetitionKey_(username);
+    }).map(function(row) {
+      return {entryId:row.entryId,rank:row.rank,points:row.points,criteriaScore:row.criteriaScore,coverageWeight:row.coverageWeight};
+    }).sort(function(a,b){return a.rank-b.rank;});
+    const result = votingCompetitionResults_(gameId, settings, categoryEntries, categoryBallots);
+    resultCountByCategory[categoryId] = result.ballotCount;
+    resultsByCategory[categoryId] = resultsVisible ? result.results.map(function(row){
+      return Object.assign({},row,{
+        participantName:settings.showParticipantNames ? row.participantName : "",
+        imageUrl:settings.showPhoto ? row.imageUrl : ""
+      });
+    }) : [];
+  });
+  function ownPublic(e) {
+    return {entryId:e.entryId,participantName:e.participantName,entryName:e.entryName,
+      imageUrl:e.imageUrl,imageFileId:e.imageFileId,displayNumber:e.displayNumber,
+      displayColor:e.displayColor,description:e.description,ingredients:e.ingredients,
+      customData:e.customData||{},status:e.status,published:e.published,adminNotes:e.adminNotes};
+  }
+  const currentEntries = votingCompetitionEntriesForCategory_(published,activeCategory);
+  const eligible = votingCompetitionEligibleEntries_(currentEntries,evaluationMap,settings);
+  return {
+    success:true,gameId:gameId,gameName:game.name||gameId,gameDescription:game.description||"",
+    settings:settings,serverNow:Date.now(),votingDeadlineEpoch:votingCompetitionDeadlineTime_(settings),isOfficialJudge:(settings.officialJudges||[]).indexOf(votingCompetitionKey_(username))>=0,registrationOpen:votingCompetitionRegistrationOpen_(settings),
+    votingOpen:votingOpen,votingDeadlinePassed:votingCompetitionDeadlinePassed_(settings),
+    ballotLimit:votingCompetitionBallotLimit_(settings,eligible.length),
+    categoryId:activeCategory,categories:categories,
+    entries:published.map(function(entry){return votingCompetitionPublicEntry_(entry,settings);}),
+    evaluations:evaluations.map(function(row){return {entryId:row.entryId,evaluated:row.evaluated,criteriaScores:row.criteriaScores||{}};}),
+    ownEntries:ownEntries.map(ownPublic),ownEntry:ownEntry?ownPublic(ownEntry):null,
+    ballot:ballotByCategory[activeCategory]||[],ballotsByCategory:ballotByCategory,draftsByCategory:draftsByCategory,
+    resultsVisible:resultsVisible,ballotCount:resultCountByCategory[activeCategory]||0,
+    ballotCountByCategory:resultCountByCategory,
+    results:resultsVisible?(resultsByCategory[activeCategory]||[]):[],resultsByCategory:resultsByCategory
+  };
 }
 
 function adminGetVotingCompetitionDashboard_(payload) {
