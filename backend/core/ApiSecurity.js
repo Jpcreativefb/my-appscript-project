@@ -10,6 +10,8 @@ var API_PUBLIC_ACTIONS_ = {
   getGameAppearance: true, // Public Published only; private Draft/Version rows stripped by AppearanceEngine.
   login: true,
   signup: true,
+  guestSignup: true,
+  guestLogin: true,
   requestPinReset: true,
   resetPin: true,
   validateSession: true
@@ -38,7 +40,7 @@ function apiSecurityIsAdminAction_(action) {
 // already-open old frontend tab, but the current frontend sends authenticated
 // reads through POST so bearer tokens are not placed in URLs in steady state.
 var API_EXPLICIT_POST_ACTIONS_ = {
-  login: true, logout: true, signup: true, requestPinReset: true, resetPin: true, validateSession: true,
+  login: true, logout: true, signup: true, guestSignup: true, guestLogin: true, getAccountContacts: true, saveAccountContacts: true, requestPinReset: true, resetPin: true, validateSession: true,
   saveEditableProfile: true, saveUserProfile: true, uploadProfileAvatar: true,
   setGameProfilePromptChoice: true, setNotificationPreference: true,
   saveNotificationPreferences: true, markNotificationRead: true, markAllNotificationsRead: true,

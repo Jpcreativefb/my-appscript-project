@@ -93,6 +93,19 @@ function doPost(e) {
       ));
     }
 
+    if (action === "guestSignup") {
+      return json(createGuestUser_(body.name,body.pin));
+    }
+    if (action === "guestLogin") {
+      return json(loginGuestUser_(body.name,body.pin,body.rememberMe,body.deviceId,body.deviceLabel));
+    }
+    if (action === "getAccountContacts") {
+      return json(getAccountContacts_(body.username));
+    }
+    if (action === "saveAccountContacts") {
+      return json(saveAccountContacts_(body.username,body.email,body.phone,body.contactMethod));
+    }
+
     if (action === "logout") {
       return json(logoutSessionToken(body.token));
     }

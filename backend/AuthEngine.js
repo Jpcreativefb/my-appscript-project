@@ -261,6 +261,7 @@ function loginUser(
     email: record.user["Email"] || "",
     phone: record.user["Phone"] || "",
     isAdmin: isAdminUser,
+    accountType: String(record.user["AccountType"] || "member") === "guest" ? "guest" : "member",
     avatar: record.user["Avatar"] || "default",
     themeColor: record.user["ThemeColor"] || "#000000",
     preferredContactMethod:
