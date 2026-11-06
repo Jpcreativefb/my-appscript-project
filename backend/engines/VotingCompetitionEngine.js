@@ -1319,7 +1319,7 @@ function apiGetVotingCompetitionState_(payload) {
     ballot:ballotByCategory[activeCategory]||[],ballotsByCategory:ballotByCategory,draftsByCategory:draftsByCategory,
     resultsVisible:resultsVisible,ballotCount:resultCountByCategory[activeCategory]||0,
     ballotCountByCategory:resultCountByCategory,
-    results:resultsByCategory[activeCategory]||[],resultsByCategory:resultsByCategory
+    results:resultsVisible?(resultsByCategory[activeCategory]||[]):[],resultsByCategory:resultsByCategory
   };
 }
 
