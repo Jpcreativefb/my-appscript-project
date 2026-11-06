@@ -493,7 +493,7 @@ function votingCompetitionColorPalette_(value) {
   const seen = {};
   return rows.map(votingCompetitionString_).filter(function(color) {
     const key = color.toLowerCase();
-    if (!color || seen[key] || !VOTING_COMPETITION_COLOR_PALETTE.some(function(c){return c.toLowerCase()===key;})) return false;
+    if (!color || seen[key] || !( /^#[0-9a-f]{6}$/i.test(color) || VOTING_COMPETITION_COLOR_PALETTE.some(function(c){return c.toLowerCase()===key;}) )) return false;
     seen[key] = true; return true;
   });
 }
@@ -535,7 +535,7 @@ function votingCompetitionEntryCategories_(value) {
     if (!id || !label || seen[id]) return null;
     seen[id] = true;
     const audience = ["public","judges","both"].indexOf(votingCompetitionKey_(row.audience)) >= 0 ? votingCompetitionKey_(row.audience) : "both";
-    return {id:id,label:label,defaultSelected:row.defaultSelected !== false,audience:audience};
+    return {id:id,label:label.slice(0,100),description:votingCompetitionString_(row.description).slice(0,600),defaultSelected:row.defaultSelected !== false,audience:audience};
   }).filter(Boolean).slice(0,30);
 }
 function votingCompetitionRegistrationOpen_(settings, nowMs) {

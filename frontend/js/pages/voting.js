@@ -311,7 +311,8 @@ function votingPageCategorySelector_(payload) {
   }
   return '<nav class="cookoff-category-nav" aria-label="Award categories"><strong aria-current="step">' +
     votingPageEscape_(categories[index].label) + ' · ' + (index + 1) + ' of ' + categories.length + '</strong>' +
-    (categories.length > 1 ? button('Previous Category', -1) + button('Next Category', 1) : '') + '</nav>';
+    (categories.length > 1 ? button('Previous Category', -1) + button('Next Category', 1) : '') + '</nav>' +
+    (categories[index].description ? '<p class="cookoff-category-description" style="margin:12px 0 18px;line-height:1.5;white-space:pre-wrap">' + votingPageEscape_(categories[index].description) + '</p>' : '');
 }
 
 /* Auto-save drafts. Each category has its own timer and server-side row. */

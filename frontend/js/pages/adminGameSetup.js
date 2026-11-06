@@ -1296,9 +1296,7 @@ async function adminVotingSaveSettings_(gameId) {
       allowMultipleEntries: adminVotingChecked_("adminVotingMultipleEntries"),
       maxEntriesPerParticipant: Number(adminVotingValue_("adminVotingMaxEntries") || 0),
       entryDivisions: adminVotingValue_("adminVotingEntryDivisions").split(/\r?\n/),
-      entryCategories: adminVotingValue_("adminVotingEntryCategories").split(/\r?\n/).map(function(line){
-        var parts=line.split("|");return {label:String(parts[0]||"").trim(),defaultSelected:String(parts[1]||"").trim().toLowerCase()!=="off",audience:["public","judges","both"].includes(String(parts[2]||"").trim().toLowerCase())?String(parts[2]).trim().toLowerCase():"both"};
-      }).filter(function(c){return c.label;}),
+      entryCategories: adminVotingCollectAwardCategories_(),
       officialJudges: adminVotingValue_("adminVotingOfficialJudges").split(/\r?\n|,/).map(function(u){return u.trim();}).filter(Boolean),
       judgeMultiplier: Number(adminVotingValue_("adminVotingJudgeMultiplier") || 3),
       autoFinalizeDrafts: adminVotingChecked_("adminVotingAutoFinalize"),
@@ -1418,6 +1416,86 @@ function adminVotingResultsHtml_(dashboard) {
   }).join("") + '</div>';
 }
 
+
+/* Color Picker + Category Description UI: additive to the existing Cookoff settings. */
+var ADMIN_COOOKOFF_NAMED_COLORS_ = {red:"#ff0000",blue:"#0000ff",green:"#008000",orange:"#ffa500",yellow:"#ffff00",purple:"#800080",pink:"#ffc0cb",teal:"#008080",black:"#000000",white:"#ffffff",silver:"#c0c0c0",gold:"#ffd700"};
+function adminVotingColorHex_(value) {
+  var text = String(value || "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(text) ? text : (ADMIN_COOOKOFF_NAMED_COLORS_[text.toLowerCase()] || "#888888");
+}
+function adminVotingPaletteEditor_(palette) {
+  var colors = Array.isArray(palette) ? palette : [];
+  return '<div class="admin-field" style="grid-column:1/-1"><strong>Available Colors</strong><p class="admin-field-note">Match your paper with the color picker or an exact HEX code. Existing color assignments do not change.</p>' +
+    '<input type="hidden" id="adminVotingColorPalette" value="' + adminSetupEscapeHtml(colors.join(", ")) + '">' +
+    '<div id="adminVotingPaletteRows">' + colors.map(adminVotingPaletteRow_).join("") + '</div>' +
+    '<button type="button" class="admin-small-button secondary" onclick="adminVotingAddPaletteColor_()">+ Add Color</button></div>';
+}
+function adminVotingPaletteRow_(value) {
+  var safe = adminSetupEscapeHtml(value);
+  return '<div class="admin-voting-palette-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0">' +
+    '<input type="color" aria-label="Choose paper color" value="' + adminVotingColorHex_(value) + '" oninput="adminVotingPalettePick_(this)">' +
+    '<input class="admin-voting-palette-value" aria-label="Color name or HEX" value="' + safe + '" maxlength="40" style="width:150px" oninput="adminVotingSyncPalette_()">' +
+    '<button type="button" class="admin-small-button secondary" onclick="adminVotingMovePalette_(this,-1)">↑</button>' +
+    '<button type="button" class="admin-small-button secondary" onclick="adminVotingMovePalette_(this,1)">↓</button>' +
+    '<button type="button" class="admin-small-button secondary" onclick="this.parentElement.remove();adminVotingSyncPalette_()">Remove</button></div>';
+}
+function adminVotingSyncPalette_() {
+  var el = document.getElementById("adminVotingColorPalette");
+  if (!el) return;
+  el.value = Array.from(document.querySelectorAll("#adminVotingPaletteRows .admin-voting-palette-value")).map(function(x){return x.value.trim();}).filter(Boolean).join(", ");
+}
+function adminVotingPalettePick_(input) {
+  var value = input.parentElement.querySelector(".admin-voting-palette-value");
+  value.value = input.value.toUpperCase(); adminVotingSyncPalette_();
+}
+function adminVotingAddPaletteColor_() {
+  var parent = document.getElementById("adminVotingPaletteRows");
+  if (!parent || parent.children.length >= 100) return;
+  parent.insertAdjacentHTML("beforeend", adminVotingPaletteRow_("#808080"));
+  adminVotingSyncPalette_();
+}
+function adminVotingMovePalette_(button, direction) {
+  var row=button.parentElement, parent=row.parentElement, other=direction<0?row.previousElementSibling:row.nextElementSibling;
+  if (!other) return;
+  if (direction<0) parent.insertBefore(row,other); else parent.insertBefore(other,row);
+  adminVotingSyncPalette_();
+}
+function adminVotingAwardEditor_(categories) {
+  return '<div class="admin-field" style="grid-column:1/-1"><strong>Award Categories and Voter Instructions</strong><p class="admin-field-note">Describe what voters should judge for each award. These descriptions do not change points or ranking.</p>' +
+    '<div id="adminVotingAwardRows">' + categories.map(adminVotingAwardRow_).join("") + '</div>' +
+    '<button type="button" class="admin-small-button secondary" onclick="adminVotingAddAwardCategory_()">+ Add Award Category</button></div>';
+}
+function adminVotingAwardRow_(c) {
+  c=c||{};
+  var audience=c.audience||"both";
+  return '<div class="admin-voting-award-row" style="border:1px solid #8885;border-radius:8px;padding:12px;margin:10px 0">' +
+    '<input class="award-id" type="hidden" value="' + adminSetupEscapeHtml(c.id||"") + '">' +
+    '<label class="admin-field"><span>Category name</span><input class="award-name" maxlength="100" value="' + adminSetupEscapeHtml(c.label||"") + '" placeholder="Best Overall"></label>' +
+    '<label class="admin-field"><span>What should voters judge?</span><textarea class="award-description" maxlength="600" rows="2" placeholder="Explain what makes a winning entry in this category.">' + adminSetupEscapeHtml(c.description||"") + '</textarea></label>' +
+    '<label class="admin-checkbox"><input class="award-selected" type="checkbox" ' + (c.defaultSelected!==false?"checked":"") + '><span>Selected by default</span></label>' +
+    '<label class="admin-field"><span>Voting audience</span><select class="award-audience">' +
+      ["both","public","judges"].map(function(opt){return '<option value="'+opt+'" '+(audience===opt?"selected":"")+'>'+opt+'</option>';}).join("") + '</select></label>' +
+    '<div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="admin-small-button secondary" onclick="adminVotingMoveAward_(this,-1)">↑</button>' +
+    '<button type="button" class="admin-small-button secondary" onclick="adminVotingMoveAward_(this,1)">↓</button>' +
+    '<button type="button" class="admin-small-button secondary" onclick="this.closest(\'.admin-voting-award-row\').remove()">Remove</button></div></div>';
+}
+function adminVotingAddAwardCategory_() {
+  var parent=document.getElementById("adminVotingAwardRows");
+  if (parent && parent.children.length < 30) parent.insertAdjacentHTML("beforeend",adminVotingAwardRow_({label:"",defaultSelected:true,audience:"both"}));
+}
+function adminVotingMoveAward_(button,direction) {
+  var row=button.closest(".admin-voting-award-row"),parent=row.parentElement,other=direction<0?row.previousElementSibling:row.nextElementSibling;
+  if (!other) return;
+  if (direction<0) parent.insertBefore(row,other); else parent.insertBefore(other,row);
+}
+function adminVotingCollectAwardCategories_() {
+  return Array.from(document.querySelectorAll("#adminVotingAwardRows .admin-voting-award-row")).map(function(row) {
+    function field(sel){return row.querySelector(sel);}
+    return {id:field(".award-id").value,label:field(".award-name").value.trim(),description:field(".award-description").value.trim(),
+      defaultSelected:field(".award-selected").checked,audience:field(".award-audience").value};
+  }).filter(function(c){return c.label;});
+}
+
 function adminSetupRenderVotingCompetition_(gameId, dashboard) {
   if (!dashboard || dashboard.success === false) {
     return `<div class="card admin-card error-card"><h2>Voting / Competition Setup</h2><p>${adminSetupEscapeHtml(dashboard && (dashboard.error || dashboard.message) || "Could not load competition settings.")}</p></div>`;
@@ -1455,9 +1533,9 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
             <option value="number" ${settings.entryIdentifierMode === "number" ? "selected" : ""}>Numbers Only — one unique number per dish</option>
             <option value="combo" ${settings.entryIdentifierMode === "combo" ? "selected" : ""}>Color + Number — unique combination</option>
           </select></label>
-          <label class="admin-field"><span>Available Colors (comma separated)</span><input id="adminVotingColorPalette" value="${adminSetupEscapeHtml((settings.entryColorPalette || ["Red","Blue","Green","Orange","Yellow","Purple","Pink","Teal","Black","White","Silver","Gold"]).join(", "))}"></label>
+          ${adminVotingPaletteEditor_(settings.entryColorPalette || ["Red","Blue","Green","Orange","Yellow","Purple","Pink","Teal","Black","White","Silver","Gold"])}
           <label class="admin-field"><span>Entry divisions (one per line)</span><textarea id="adminVotingEntryDivisions" rows="3">${adminSetupEscapeHtml((settings.entryDivisions || []).join("\n"))}</textarea></label>
-          <label class="admin-field"><span>Award Categories — Name | on/off | both/public/judges</span><textarea id="adminVotingEntryCategories" rows="4" placeholder="Best Overall&#10;Most Creative&#10;Bring the HEAT!">${adminSetupEscapeHtml((settings.entryCategories || []).map(function(c){return c.label + "|" + (c.defaultSelected === false ? "off" : "on") + "|" + (c.audience || "both");}).join("\n"))}</textarea></label>
+          ${adminVotingAwardEditor_(settings.entryCategories || [])}
           <label class="admin-field"><span>Official Judge Usernames (one per line)</span><textarea id="adminVotingOfficialJudges" rows="3">${adminSetupEscapeHtml((settings.officialJudges || []).join("\n"))}</textarea></label>
           <label class="admin-field"><span>Official Judge Multiplier</span><input type="number" id="adminVotingJudgeMultiplier" min="1" max="100" step="0.5" value="${adminSetupEscapeHtml(settings.judgeMultiplier == null ? 3 : settings.judgeMultiplier)}"></label>
           <label class="admin-field"><span>Entry Rules</span><textarea id="adminVotingEntryRules" rows="3">${adminSetupEscapeHtml(settings.entryRules || "")}</textarea></label>
