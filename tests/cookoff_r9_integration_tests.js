@@ -38,6 +38,25 @@ assert.strictEqual(ctx.votingCompetitionEntryCategories_([
  {label:'Best Overall',audience:'both',defaultSelected:true},
  {label:'Bring the HEAT!',audience:'judges',defaultSelected:true}
 ]).length,2);
+// Palette editor R1: custom paper-matching HEX colors and legacy labels coexist.
+assert.deepStrictEqual(Array.from(ctx.votingCompetitionColorPalette_(['Red','#E87924','#e87924','NotAColor'])), ['Red','#E87924']);
+const customized = Object.assign({},settings,{entryIdentifierMode:'color',entryColorPalette:['#E87924','#1D72B8']});
+const customFirst = ctx.votingCompetitionAssignIdentity_(customized,[]);
+assert(/^#[0-9a-f]{6}$/i.test(customFirst.displayColor),'A custom paper color is assigned');
+assert.strictEqual(ctx.votingCompetitionAssignIdentity_(customized,[customFirst]).displayColor.toLowerCase(),
+  (customFirst.displayColor.toLowerCase()==='#e87924'?'#1d72b8':'#e87924'));
+const legacyCustom = Object.assign({},settings,{entryIdentifierMode:'legacy',entryColorPalette:['#E87924']});
+assert.strictEqual(ctx.votingCompetitionAssignIdentity_(legacyCustom,[]).displayColor,'#E87924');
+const categoriesWithHelp = ctx.votingCompetitionEntryCategories_([
+  {id:'overall',label:'Best Overall',description:'Consider flavor and texture.',defaultSelected:true,audience:'public'},
+  {id:'heat',label:'Bring the HEAT!',description:'Choose the most balanced heat.',defaultSelected:false,audience:'both'}
+]);
+assert.strictEqual(categoriesWithHelp[0].description,'Consider flavor and texture.');
+assert.strictEqual(categoriesWithHelp[1].id,'heat');
+assert.strictEqual(categoriesWithHelp[1].defaultSelected,false);
+assert(page.includes('cookoff-category-description'),'Voter page displays the active category description');
+assert(admin.includes('adminVotingPaletteEditor_')&&admin.includes('adminVotingAwardEditor_'),'Admin palette and award editors render');
+assert(admin.includes('adminVotingCollectAwardCategories_()'),'Admin saves descriptions with category identities');
 const dishes=[
  {entryId:'a',customData:{cookoffCategoryIds:['overall']}},
  {entryId:'b',customData:{cookoffCategoryIds:['overall','heat']}},
