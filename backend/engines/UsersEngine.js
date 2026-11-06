@@ -1092,7 +1092,9 @@ function loginGuestUser_(name, pin, rememberMe, deviceId, deviceLabel) {
   if (!record || String(record.user["AccountType"] || "") !== "guest") {
     return {success:false,message:"Invalid guest name or PIN"};
   }
-  return loginUser(username,pin,rememberMe,deviceId,deviceLabel);
+  const result = loginUser(username,pin,rememberMe,deviceId,deviceLabel);
+  if (result && result.success) result.accountType = "guest";
+  return result;
 }
 
 // Contact details are always bound to the authenticated session.
