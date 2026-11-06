@@ -38,6 +38,8 @@ const API_NO_SESSION_ACTIONS_ = new Set([
   "health",
   "login",
   "signup",
+  "guestSignup",
+  "guestLogin",
   "requestPinReset",
   "resetPin"
 ]);
