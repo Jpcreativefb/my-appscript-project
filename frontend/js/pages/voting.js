@@ -516,7 +516,8 @@ function votingPageColorHex_(color) {
   var colors = {red:'#d64b42',blue:'#357cce',green:'#25835b',yellow:'#e5b929',
     orange:'#dc8030',purple:'#8754c2',pink:'#cc5d97',teal:'#168b92',
     black:'#292d35',white:'#e2e5e9',silver:'#a7adb8',gold:'#c69e24'};
-  return colors[String(color || '').trim().toLowerCase()] || '#65748b';
+  var chosen = String(color || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(chosen) ? chosen : (colors[chosen.toLowerCase()] || '#65748b');
 }
 
 function votingPageUsesPhoneBallot_(payload) {

@@ -549,7 +549,7 @@ function votingCompetitionAssignIdentity_(settings, participants) {
   const mode = votingCompetitionIdentifierMode_(settings.entryIdentifierMode);
   if (mode === "legacy") return {
     displayNumber: settings.numberAssignment === "auto-sequential" ? votingCompetitionNextDisplayNumber_(participants) : "",
-    displayColor: settings.colorAssignment === "auto-palette" ? votingCompetitionNextDisplayColor_(participants) : ""
+    displayColor: settings.colorAssignment === "auto-palette" ? votingCompetitionNextDisplayColor_(participants, settings.entryColorPalette) : ""
   };
   const palette = votingCompetitionColorPalette_(settings.entryColorPalette);
   const used = {};
@@ -769,8 +769,10 @@ function votingCompetitionNextDisplayNumber_(participants) {
   return String(max + 1);
 }
 
-function votingCompetitionNextDisplayColor_(participants) {
-  return VOTING_COMPETITION_COLOR_PALETTE[(participants || []).length % VOTING_COMPETITION_COLOR_PALETTE.length];
+function votingCompetitionNextDisplayColor_(participants, configuredPalette) {
+  const palette = votingCompetitionColorPalette_(configuredPalette);
+  const colors = palette.length ? palette : VOTING_COMPETITION_COLOR_PALETTE;
+  return colors[(participants || []).length % colors.length];
 }
 
 function votingCompetitionValidateCustomData_(settings, customData) {
