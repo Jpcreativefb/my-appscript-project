@@ -112,6 +112,7 @@
       <button class="auth-tab active" type="button" data-auth-view="login" aria-selected="true">Login</button>
       <button class="auth-tab" type="button" data-auth-view="signup" aria-selected="false">Sign Up</button>
       <button class="auth-tab" type="button" data-auth-view="guest" aria-selected="false">Guest</button>
+      <button class="auth-tab" type="button" data-auth-view="reset" aria-selected="false">Reset PIN</button>
     </div>
 
     <form id="loginForm" class="auth-view" novalidate>
@@ -162,7 +163,6 @@
         <span class="auth-button-text">Sign In</span>
       </button>
 
-      <button class="auth-reset-link" type="button" onclick="showAuthView('reset')">Forgot PIN?</button>
     </form>
 
     <div id="signupView" class="auth-view hidden">
@@ -247,7 +247,6 @@
         type="password"
       >
 
-      <button type="button" class="auth-reset-link" onclick="showAuthView('login')">Back to Login</button>
       <button
         class="button"
         onclick="resetPin()"
