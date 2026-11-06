@@ -111,7 +111,7 @@
     <div class="auth-tabs">
       <button class="auth-tab active" type="button" data-auth-view="login" aria-selected="true">Login</button>
       <button class="auth-tab" type="button" data-auth-view="signup" aria-selected="false">Sign Up</button>
-      <button class="auth-tab" type="button" data-auth-view="reset" aria-selected="false">Reset PIN</button>
+      <button class="auth-tab" type="button" data-auth-view="guest" aria-selected="false">Guest</button>
     </div>
 
     <form id="loginForm" class="auth-view" novalidate>
@@ -162,6 +162,7 @@
         <span class="auth-button-text">Sign In</span>
       </button>
 
+      <button class="auth-reset-link" type="button" onclick="showAuthView('reset')">Forgot PIN?</button>
     </form>
 
     <div id="signupView" class="auth-view hidden">
@@ -181,23 +182,6 @@
       >
 
       <input
-        id="signupEmail"
-        class="input"
-        placeholder="Email optional — only needed for reset codes and updates"
-        autocomplete="email"
-        type="email"
-      >
-
-      <input
-        id="signupPhone"
-        class="input"
-        placeholder="Phone optional — saved only, no automatic texts"
-        autocomplete="tel"
-        inputmode="tel"
-        type="tel"
-      >
-
-      <input
         id="signupPin"
         class="input"
         placeholder="Choose a 4-digit PIN"
@@ -206,28 +190,7 @@
         type="password"
       >
 
-      <div class="preference-card">
-        <div class="preference-title">Contact Preference</div>
-
-        <label class="radio-row">
-          <input name="signupContactMethod" type="radio" value="none" checked>
-          <span>Play only — no email, phone, or notifications required</span>
-        </label>
-
-        <label class="radio-row">
-          <input name="signupContactMethod" type="radio" value="email">
-          <span>Email me game updates and allow PIN reset by email</span>
-        </label>
-
-        <label class="radio-row">
-          <input name="signupContactMethod" type="radio" value="phone">
-          <span>Save my phone on profile only — no automatic texts</span>
-        </label>
-      </div>
-
-      <div class="auth-note">
-        Email and phone are optional. Without email, forgotten PINs must be reset by an admin.
-      </div>
+      <div class="auth-note">Email, phone, and contact preferences are available later under My Profile. Without email, PIN recovery requires Admin assistance.</div>
 
       <button
         class="button"
@@ -236,6 +199,15 @@
         Create Account
       </button>
 
+    </div>
+
+    <div id="guestView" class="auth-view hidden">
+      <div class="auth-note">Join with your name and 4-digit PIN. No email or phone required. Use the same information to return.</div>
+      <label class="auth-field"><span>Guest name</span><input id="guestName" class="input" placeholder="Your guest name" maxlength="60"></label>
+      <label class="auth-field"><span>4-digit PIN</span><input id="guestPin" class="input" placeholder="Choose or enter PIN" type="password" inputmode="numeric" maxlength="4"></label>
+      <button class="button" type="button" onclick="joinAsGuest()">Join as Guest</button>
+      <button class="button secondary-button" type="button" onclick="returnAsGuest()">Returning Guest — Sign In</button>
+      <div class="auth-note">Guest names must be unique. Your saved progress is tied to your guest name and PIN.</div>
     </div>
 
     <div id="resetView" class="auth-view hidden">
@@ -275,6 +247,7 @@
         type="password"
       >
 
+      <button type="button" class="auth-reset-link" onclick="showAuthView('login')">Back to Login</button>
       <button
         class="button"
         onclick="resetPin()"

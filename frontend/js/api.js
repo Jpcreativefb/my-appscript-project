@@ -692,6 +692,15 @@ async function apiSignup(username, realName, pin, email, phone, contactMethod) {
 
 }
 
+async function apiGuestSignup(name,pin) {return apiPost("guestSignup",{name,pin});}
+async function apiGuestLogin(name,pin) {
+  return apiPost("guestLogin",{name,pin,rememberMe:"true",deviceId:apiGetOrCreateDeviceId_(),deviceLabel:apiGetDeviceLabel_()});
+}
+async function apiGetAccountContacts() {return apiPost("getAccountContacts",{});}
+async function apiSaveAccountContacts(email,phone,contactMethod) {
+  return apiPost("saveAccountContacts",{email,phone,contactMethod});
+}
+
 async function apiRequestPinReset(identifier) {
 
   return apiPost("requestPinReset", {
