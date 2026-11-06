@@ -303,6 +303,13 @@
   .preference-title{font-weight:800;margin-bottom:8px}
   .radio-row{display:flex;gap:8px;padding:6px 0;color:#cbd5e1;font-size:12px;line-height:1.35}
   .secondary-button{background:#334155;color:#f8fafc}
+  .auth-reset-link{
+    width:100%;border:0;background:transparent;color:#cbd5e1;
+    text-align:center;padding:8px;font-size:13px;font-weight:700;cursor:pointer;
+    text-decoration:underline;text-underline-offset:3px;
+  }
+  .auth-reset-link:focus-visible{outline:2px solid #facc15;border-radius:8px}
+
 
   .hidden{display:none !important}
 
