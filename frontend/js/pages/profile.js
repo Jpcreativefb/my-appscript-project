@@ -38,7 +38,10 @@ async function renderProfilePage() {
       ? apiGetNotificationPreferences().catch(function() {
           return { success: true, preferences: null };
         })
-      : Promise.resolve({ success: true, preferences: null })
+      : Promise.resolve({ success: true, preferences: null }),
+    typeof apiGetAccountContacts === "function"
+      ? apiGetAccountContacts().catch(() => ({success:false}))
+      : Promise.resolve({success:false})
   ]);
 
   const res = profileRequests[0];
@@ -47,6 +50,7 @@ async function renderProfilePage() {
     summary: { archivedGames: 0 },
     games: []
   };
+  const contactRes = profileRequests[3] || {success:false};
   const notificationRes = profileRequests[2] || {
     success: true,
     preferences: null
@@ -468,6 +472,7 @@ async function renderProfilePage() {
 
       </div>
 
+      ${renderProfileAccountContacts_(contactRes)}
       ${renderProfileNotificationPreferences_(APP_STATE.notificationPreferences)}
 
       ${renderProfileHistorySection_(historyRes, username)}
@@ -2712,4 +2717,46 @@ function formatProfileHistorySigned_(value) {
     ? "+" + formatted
     : formatted;
 
+}
+
+
+// Account contact settings are separate from public game profiles.
+function renderProfileAccountContacts_(contacts) {
+  contacts = contacts && contacts.success ? contacts : {};
+  const email = escapeProfileAttr_(String(contacts.email || ""));
+  const phone = escapeProfileAttr_(String(contacts.phone || ""));
+  const method = String(contacts.contactMethod || "none");
+  return `
+    <section class="card profile-notification-card">
+      <h2>Account &amp; Contact Preferences</h2>
+      <p>Optional. Add an email for PIN recovery or keep playing without contact details.</p>
+      <label class="profile-label" for="accountContactEmail">Email (optional)</label>
+      <input class="input profile-input" id="accountContactEmail" type="email" autocomplete="email" value="${email}" placeholder="Email for PIN recovery">
+      <label class="profile-label" for="accountContactPhone">Phone (optional)</label>
+      <input class="input profile-input" id="accountContactPhone" type="tel" autocomplete="tel" value="${phone}" placeholder="Phone saved to profile only">
+      <div class="preference-card">
+        <div class="preference-title">Contact Preference</div>
+        <label class="radio-row"><input name="profileContactMethod" type="radio" value="none" ${method === "none" ? "checked" : ""}> Play only — no email updates</label>
+        <label class="radio-row"><input name="profileContactMethod" type="radio" value="email" ${method === "email" ? "checked" : ""}> Email me updates and allow email PIN recovery</label>
+        <label class="radio-row"><input name="profileContactMethod" type="radio" value="phone" ${method === "phone" ? "checked" : ""}> Save phone to profile — no automatic texts</label>
+      </div>
+      <button type="button" class="button secondary" onclick="saveProfileAccountContacts_()">Save Contact Preferences</button>
+      <div id="profileAccountContactsMessage" role="status"></div>
+    </section>`;
+}
+async function saveProfileAccountContacts_() {
+  const message = document.getElementById("profileAccountContactsMessage");
+  const email = String(document.getElementById("accountContactEmail")?.value || "").trim();
+  const phone = String(document.getElementById("accountContactPhone")?.value || "").trim();
+  const selected = document.querySelector('input[name="profileContactMethod"]:checked');
+  const method = selected ? selected.value : "none";
+  if (message) message.textContent = "Saving…";
+  try {
+    const res = await apiSaveAccountContacts(email,phone,method);
+    if (message) message.textContent = res && res.success
+      ? "Contact preferences saved."
+      : ((res && (res.message || res.error)) || "Unable to save. Please try again.");
+  } catch (err) {
+    if (message) message.textContent = "Unable to save. Please try again.";
+  }
 }
