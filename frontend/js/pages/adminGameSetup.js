@@ -1243,6 +1243,20 @@ function adminVotingParseCriteria_() {
   }).filter(function(item) { return item.id || item.label; });
 }
 
+async function adminVotingSaveGuestAccess_(gameId) {
+  const message = document.getElementById("adminVotingGuestMessage");
+  const input = document.getElementById("adminVotingGuestVotingEnabled");
+  if (!input || input.disabled) return;
+  if (message) message.textContent = "Saving Guest Voting access…";
+  try {
+    const result = await apiAdminSetGuestVotingAccess(gameId, input.checked);
+    if (!result || result.success === false) throw new Error(result && (result.error || result.message) || "Could not save Guest Access");
+    if (message) message.textContent = result.guestVotingEnabled ? "Guest voting enabled ✓" : "Guest voting disabled ✓";
+  } catch(err) {
+    if (message) message.textContent = err && err.message ? err.message : "Could not save Guest Access";
+  }
+}
+
 async function adminVotingSaveSettings_(gameId) {
   var message = document.getElementById("adminVotingMessage");
   var points = adminVotingValue_("adminVotingPointValues").split(",").map(function(value) { return Number(String(value || "").trim()); }).filter(function(value) { return Number.isFinite(value) && value >= 0; });
@@ -1526,6 +1540,21 @@ function adminSetupRenderVotingCompetition_(gameId, dashboard) {
           <label class="admin-checkbox"><input id="adminVotingVotingLocked" type="checkbox" ${settings.votingLocked ? "checked" : ""}><span>Voting closed / locked</span></label>
         </div>
         <label class="admin-field"><span>Voting Instructions</span><textarea id="adminVotingInstructions" rows="3">${adminSetupEscapeHtml(settings.instructions || "")}</textarea></label>
+
+        <h3>Guest Voting</h3>
+        <div class="admin-control-grid">
+          <label class="admin-checkbox">
+            <input id="adminVotingGuestVotingEnabled" type="checkbox"
+              ${dashboard.guestVotingEnabled ? "checked" : ""}
+              ${dashboard.guestAccessReady ? "" : "disabled"}>
+            <span>Allow guest accounts to vote in this competition</span>
+          </label>
+        </div>
+        <p class="admin-field-note">OFF by default. Guests sign in with a unique name and 4-digit PIN. Only this competition is enabled; other PATTC games remain restricted.</p>
+        <div class="admin-card-actions">
+          <button type="button" class="admin-small-button" onclick="adminVotingSaveGuestAccess_('${adminSetupEscapeHtml(gameId)}')" ${dashboard.guestAccessReady ? "" : "disabled"}>Save Guest Access</button>
+          <span id="adminVotingGuestMessage" class="admin-message">${dashboard.guestAccessReady ? "" : "Could not verify current Guest settings. Refresh before changing."}</span>
+        </div>
         <div class="admin-card-actions"><button type="button" class="admin-small-button" onclick="adminVotingSaveSettings_('${adminSetupEscapeHtml(gameId)}')">Save Voting / Competition Setup</button><span id="adminVotingMessage" class="admin-message"></span></div>
 
         <hr>
@@ -1611,6 +1640,18 @@ async function renderAdminGameSetupPage(gameId) {
   if (String(game.type || "").trim().toLowerCase() === "voting") {
     try {
       votingCompetitionDashboard = await apiAdminGetVotingCompetitionDashboard(safeGameId);
+      if (votingCompetitionDashboard && votingCompetitionDashboard.success !== false) {
+        votingCompetitionDashboard.guestAccessReady = false;
+        try {
+          const guest = await apiAdminGetGuestVotingAccess(safeGameId);
+          if (guest && guest.success) {
+            votingCompetitionDashboard.guestAccessReady = true;
+            votingCompetitionDashboard.guestVotingEnabled = guest.guestVotingEnabled === true;
+          }
+        } catch (guestError) {
+          console.warn("Guest settings unavailable", guestError);
+        }
+      }
     } catch (err) {
       votingCompetitionDashboard = { success: false, error: err && err.message ? err.message : "Could not load Voting / Competition setup." };
     }

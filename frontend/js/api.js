@@ -38,6 +38,8 @@ const API_NO_SESSION_ACTIONS_ = new Set([
   "health",
   "login",
   "signup",
+  "guestSignup",
+  "guestLogin",
   "requestPinReset",
   "resetPin"
 ]);
@@ -690,6 +692,21 @@ async function apiSignup(username, realName, pin, email, phone, contactMethod) {
     contactMethod
   });
 
+}
+
+async function apiGuestSignup(name,pin) {return apiPost("guestSignup",{name,pin});}
+async function apiGuestLogin(name,pin) {
+  return apiPost("guestLogin",{name,pin,rememberMe:"true",deviceId:apiGetOrCreateDeviceId_(),deviceLabel:apiGetDeviceLabel_()});
+}
+async function apiAdminGetGuestVotingAccess(gameId) {
+  return apiPost("adminGetGuestVotingAccess",{gameId});
+}
+async function apiAdminSetGuestVotingAccess(gameId,enabled) {
+  return apiPost("adminSetGuestVotingAccess",{gameId,enabled});
+}
+async function apiGetAccountContacts() {return apiPost("getAccountContacts",{});}
+async function apiSaveAccountContacts(email,phone,contactMethod) {
+  return apiPost("saveAccountContacts",{email,phone,contactMethod});
 }
 
 async function apiRequestPinReset(identifier) {

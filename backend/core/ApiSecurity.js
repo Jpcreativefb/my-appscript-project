@@ -10,6 +10,8 @@ var API_PUBLIC_ACTIONS_ = {
   getGameAppearance: true, // Public Published only; private Draft/Version rows stripped by AppearanceEngine.
   login: true,
   signup: true,
+  guestSignup: true,
+  guestLogin: true,
   requestPinReset: true,
   resetPin: true,
   validateSession: true
@@ -38,7 +40,7 @@ function apiSecurityIsAdminAction_(action) {
 // already-open old frontend tab, but the current frontend sends authenticated
 // reads through POST so bearer tokens are not placed in URLs in steady state.
 var API_EXPLICIT_POST_ACTIONS_ = {
-  login: true, logout: true, signup: true, requestPinReset: true, resetPin: true, validateSession: true,
+  login: true, logout: true, signup: true, guestSignup: true, guestLogin: true, getAccountContacts: true, saveAccountContacts: true, requestPinReset: true, resetPin: true, validateSession: true,
   saveEditableProfile: true, saveUserProfile: true, uploadProfileAvatar: true,
   setGameProfilePromptChoice: true, setNotificationPreference: true,
   saveNotificationPreferences: true, markNotificationRead: true, markAllNotificationsRead: true,
@@ -100,6 +102,11 @@ function apiSecurityRequireSession_(payload) {
     record.user && record.user["Username"] || ""
   ).trim();
 
+  // This value comes from the persisted session owner, not from the client.
+  payload.__sessionAccountType = String(
+    record.user && record.user["AccountType"] || "member"
+  ).trim().toLowerCase();
+
   if (!username) {
     throw new Error("Invalid or expired session");
   }
@@ -150,6 +157,33 @@ function apiSecurityAuthorizeRequest_(action, payload) {
     }
   } else if (!usernamesMatch) {
     throw new Error("Session user does not match request user");
+  }
+
+  // Guests are not full PATTC members. Allow read-only browsing, their own
+  // profile/contact operations, and the existing secured Voting Competition
+  // ballot endpoint. Never permit Admin or unrelated game writes.
+  const isGuest = payload.__sessionAccountType === "guest";
+  if (isGuest) {
+    const guestExplicitActions = {
+      logout:true, getAccountContacts:true, saveAccountContacts:true,
+      getEditableProfile:true, saveEditableProfile:true,
+      getNotificationPreferences:true, saveNotificationPreferences:true,
+      getUserProfile:true, getUserProfileHistory:true,
+      getArchivedGameHistory:true, validateSession:true,
+      saveVotingCompetitionBallot:true
+    };
+    const readOnly = /^(get|list|search|find|load|check|browse)/i.test(action) &&
+      !apiSecurityRequiresPost_(action);
+    if (action === "saveVotingCompetitionBallot") {
+      const gameId = String(payload.gameId || "").trim();
+      if (!gameId || typeof guestVotingEnabledForGame_ !== "function" ||
+          !guestVotingEnabledForGame_(gameId)) {
+        throw new Error("Guest voting is not enabled for this competition");
+      }
+    }
+    if (!guestExplicitActions[action] && !readOnly) {
+      throw new Error("This action requires a full PATTC account");
+    }
   }
 
   // Default-safe rule: on every authenticated non-admin route, `username`

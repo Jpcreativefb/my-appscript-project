@@ -47,6 +47,7 @@ function getUsersColumnMap_(headers){
     displayName: idx(["DisplayName"]),
     realName: idx(["RealName", "Real Name", "Name"]),
     accountStatus: idx(["AccountStatus"]),
+    accountType: idx(["AccountType"]),
     active: idx(["Active"]),
 
     preferredContactMethod: idx(["PreferredContactMethod"]),
@@ -89,6 +90,7 @@ function getUsersFieldIndex_(col, field){
     displayName: col.displayName,
     realName: col.realName,
     accountStatus: col.accountStatus,
+    accountType: col.accountType,
     active: col.active,
     preferredContactMethod: col.preferredContactMethod,
     notificationOptIn: col.notificationOptIn,
@@ -600,7 +602,8 @@ function createUser(
   pin,
   email,
   phone,
-  contactMethod
+  contactMethod,
+  accountType
 ){
 
   username =
@@ -805,6 +808,7 @@ function createUser(
     set("displayName", realName || username);
     set("realName", realName);
     set("accountStatus", "active");
+    set("accountType", accountType === "guest" ? "guest" : "member");
     set("active", true);
     set("preferredContactMethod", preferredContactMethod);
     set("notificationOptIn", wantsNotifications);
@@ -832,6 +836,7 @@ function createUser(
         email: email,
         phone: phone,
         isAdmin: false,
+        accountType: accountType === "guest" ? "guest" : "member",
         preferredContactMethod: preferredContactMethod,
         notificationOptIn: wantsNotifications
       }
@@ -1064,4 +1069,78 @@ function resetPin(identifier, resetCode, newPin){
     lock.releaseLock();
   }
 
+}
+
+
+// Namespace guest identities separately from member usernames.
+// Display-name collisions are rejected instead of taking over another guest.
+function guestUsernameForName_(name) {
+  const clean = normalizeRealName_(name);
+  const key = buildUsernameKey_(clean);
+  if (clean.length < 3 || clean.length > 60 || key.length < 3 || key.length > 19) return "";
+  return "guest" + key;
+}
+function createGuestUser_(name, pin) {
+  const username = guestUsernameForName_(name);
+  if (!username) return {success:false,message:"Choose a guest name with 3–19 letters or numbers."};
+  return createUser(username, normalizeRealName_(name), pin, "", "", "none", "guest");
+}
+function loginGuestUser_(name, pin, rememberMe, deviceId, deviceLabel) {
+  const username = guestUsernameForName_(name);
+  if (!username) return {success:false,message:"Invalid guest name or PIN"};
+  const record = findUserRecordByUsername_(username);
+  if (!record || String(record.user["AccountType"] || "") !== "guest") {
+    return {success:false,message:"Invalid guest name or PIN"};
+  }
+  const result = loginUser(username,pin,rememberMe,deviceId,deviceLabel);
+  if (result && result.success) result.accountType = "guest";
+  return result;
+}
+
+// Contact details are always bound to the authenticated session.
+function getAccountContacts_(username) {
+  const record = findUserRecordByUsername_(username);
+  if (!record) return {success:false,message:"Account not found"};
+  return {
+    success:true,
+    email:String(record.user["Email"] || ""),
+    phone:String(record.user["Phone"] || ""),
+    contactMethod:normalizeContactMethod_(record.user["PreferredContactMethod"] || "none")
+  };
+}
+function saveAccountContacts_(username,email,phone,contactMethod) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const record = findUserRecordByUsername_(username);
+    if (!record) return {success:false,message:"Account not found"};
+    email = normalizeEmail_(email);
+    phone = normalizePhone_(phone);
+    const method = normalizeContactMethod_(contactMethod);
+    const phoneKey = buildPhoneKey_(phone);
+    if (email && !validateEmail_(email)) return {success:false,message:"Enter a valid email"};
+    if (!validatePhoneOptional_(phone)) return {success:false,message:"Enter a valid 10-digit phone number"};
+    if (method === "email" && !email) return {success:false,message:"Email required for email updates"};
+    if (method === "phone" && !phoneKey) return {success:false,message:"Phone required for this selection"};
+    const emailMatch = email ? findUserRecordByEmail_(email) : null;
+    const phoneMatch = phoneKey ? findUserRecordByPhone_(phone) : null;
+    if ((emailMatch && emailMatch.rowNumber !== record.rowNumber) ||
+        (phoneMatch && phoneMatch.rowNumber !== record.rowNumber)) {
+      return {success:false,message:"This email or phone is already associated with another account"};
+    }
+    const now = new Date().toISOString();
+    const enabled = method !== "none";
+    updateUserFields_(record.rowNumber,{
+      email,emailKey:email,phone,phoneKey,
+      preferredContactMethod:method,
+      notificationOptIn:enabled,
+      notificationChannel:method,
+      notificationEmail:method === "email" ? email : "",
+      notificationPhone:method === "phone" ? phone : "",
+      notificationOptInAt:enabled ? now : "",
+      notificationOptOutAt:enabled ? "" : now,
+      lastUpdated:now
+    });
+    return {success:true,email,phone,contactMethod:method};
+  } finally {lock.releaseLock();}
 }

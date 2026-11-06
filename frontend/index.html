@@ -16,7 +16,7 @@
 
 <title>PATTC Predicts</title>
 
-<meta name="pattc-release" content="v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1">
+<meta name="pattc-release" content="v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1">
 <!-- RC23 compatibility lineage only: <meta name="pattc-release" content="v1219rc23-appearance-transport-cache-r2"> -->
 <script>window.PATTC_FRONTEND_RELEASE = document.querySelector('meta[name="pattc-release"]').content;</script>
 
@@ -80,7 +80,7 @@
 
 <link
   rel="stylesheet"
-  href="./css/styles.css?v=v1218a-device-login-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"
+  href="./css/styles.css?v=v1218a-device-login-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1&guestAccess=r1"
 >
 
 </head>
@@ -111,6 +111,7 @@
     <div class="auth-tabs">
       <button class="auth-tab active" type="button" data-auth-view="login" aria-selected="true">Login</button>
       <button class="auth-tab" type="button" data-auth-view="signup" aria-selected="false">Sign Up</button>
+      <button class="auth-tab" type="button" data-auth-view="guest" aria-selected="false">Guest</button>
       <button class="auth-tab" type="button" data-auth-view="reset" aria-selected="false">Reset PIN</button>
     </div>
 
@@ -180,23 +181,10 @@
         autocomplete="name"
       >
 
-      <input
-        id="signupEmail"
-        class="input"
-        placeholder="Email optional — only needed for reset codes and updates"
-        autocomplete="email"
-        type="email"
-      >
-
-      <input
-        id="signupPhone"
-        class="input"
-        placeholder="Phone optional — saved only, no automatic texts"
-        autocomplete="tel"
-        inputmode="tel"
-        type="tel"
-      >
-
+      <!-- Compatibility-only fields: contact details are edited in My Profile. -->
+      <input id="signupEmail" type="hidden" value="">
+      <input id="signupPhone" type="hidden" value="">
+      <input name="signupContactMethod" type="radio" value="none" checked hidden>
       <input
         id="signupPin"
         class="input"
@@ -206,28 +194,7 @@
         type="password"
       >
 
-      <div class="preference-card">
-        <div class="preference-title">Contact Preference</div>
-
-        <label class="radio-row">
-          <input name="signupContactMethod" type="radio" value="none" checked>
-          <span>Play only — no email, phone, or notifications required</span>
-        </label>
-
-        <label class="radio-row">
-          <input name="signupContactMethod" type="radio" value="email">
-          <span>Email me game updates and allow PIN reset by email</span>
-        </label>
-
-        <label class="radio-row">
-          <input name="signupContactMethod" type="radio" value="phone">
-          <span>Save my phone on profile only — no automatic texts</span>
-        </label>
-      </div>
-
-      <div class="auth-note">
-        Email and phone are optional. Without email, forgotten PINs must be reset by an admin.
-      </div>
+      <div class="auth-note">Email, phone, and contact preferences are available later under My Profile. Without email, PIN recovery requires Admin assistance.</div>
 
       <button
         class="button"
@@ -236,6 +203,15 @@
         Create Account
       </button>
 
+    </div>
+
+    <div id="guestView" class="auth-view hidden">
+      <div class="auth-note">Join with your name and 4-digit PIN. No email or phone required. Use the same information to return.</div>
+      <label class="auth-field"><span>Guest name</span><input id="guestName" class="input" placeholder="Your guest name" maxlength="60"></label>
+      <label class="auth-field"><span>4-digit PIN</span><input id="guestPin" class="input" placeholder="Choose or enter PIN" type="password" inputmode="numeric" maxlength="4"></label>
+      <button class="button" type="button" onclick="joinAsGuest()">Join as Guest</button>
+      <button class="button secondary-button" type="button" onclick="returnAsGuest()">Returning Guest — Sign In</button>
+      <div class="auth-note">Guest names must be unique. Your saved progress is tied to your guest name and PIN.</div>
     </div>
 
     <div id="resetView" class="auth-view hidden">
@@ -293,17 +269,18 @@
 
 </div>
 
-<script src="./js/config.js?brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"></script>
+<script src="./js/config.js?brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1"></script>
 <script src="./assets/images/image-manifest.js?v=311-external-results-inbox&brand=v1218f6-pattc-predicts"></script>
-<script src="./js/imageEngine.js?v=311-external-results-inbox&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"></script>
-<script src="./js/api.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility-v1218a-device-login-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"></script>
-<script src="./js/state.js?v=v1218a-device-login&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"></script>
-<script src="./js/auth.js?v=v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"></script>
+<script src="./js/imageEngine.js?v=311-external-results-inbox&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1"></script>
+<script src="./js/api.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility-v1218a-device-login-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1&guestAccess=r1"></script>
+<script src="./js/state.js?v=v1218a-device-login&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1"></script>
+<script src="./js/auth.js?v=v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1"></script>
+<script src="./js/guest-auth-r1.js?v=guest-access-r1"></script>
 
 <!-- =========================
      PWA SERVICE WORKER
 ========================= -->
-<script src="./js/pwa.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1"></script>
+<script src="./js/pwa.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts&brand=v1218f6-pattc-predicts&release=v1219rc24e-studio-live-admin-cleanup-r1-digit-clock-r1-shared-r2-personal-r1-guest-access-r1"></script>
 
 </body>
 </html>

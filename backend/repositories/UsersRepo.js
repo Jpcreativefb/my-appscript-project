@@ -65,6 +65,7 @@ function ensureUsersColumns_(){
     "DisplayName",
     "RealName",
     "AccountStatus",
+    "AccountType",
     "Active",
     "PreferredContactMethod",
     "NotificationOptIn",
