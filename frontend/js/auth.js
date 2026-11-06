@@ -28,14 +28,12 @@ function showAuthView(view){
   const views = [
     "login",
     "signup",
-    "guest",
     "reset"
   ];
 
   const viewIds = {
     login: "loginForm",
     signup: "signupView",
-    guest: "guestView",
     reset: "resetView"
   };
 
@@ -74,7 +72,6 @@ function showAuthView(view){
   const subtitles = {
     login: "Sign in to continue",
     signup: "Create your account",
-    guest: "Join or return as a guest",
     reset: "Reset your PIN"
   };
 
@@ -192,13 +189,26 @@ async function signup(){
       .value
       .trim();
 
+  const email =
+    document
+      .getElementById("signupEmail")
+      .value
+      .trim();
+
+  const phone =
+    document
+      .getElementById("signupPhone")
+      .value
+      .trim();
+
   const pin =
     document
       .getElementById("signupPin")
       .value
       .trim();
 
-  const contactMethod = "none";
+  const contactMethod =
+    getSelectedSignupContactMethod();
 
   setAuthMessage("");
 
@@ -212,9 +222,24 @@ async function signup(){
 
   }
 
-  if (!/^\d{4}$/.test(pin)) {
-    setAuthMessage("Choose a 4-digit PIN");
+  if(contactMethod === "email" && !email){
+
+    setAuthMessage(
+      "Enter an email or choose Play only / Phone only"
+    );
+
     return;
+
+  }
+
+  if(contactMethod === "phone" && !phone){
+
+    setAuthMessage(
+      "Enter a phone number or choose Play only / Email"
+    );
+
+    return;
+
   }
 
   try{
@@ -224,8 +249,8 @@ async function signup(){
         username,
         realName,
         pin,
-        "",
-        "",
+        email,
+        phone,
         contactMethod
       );
 
@@ -483,42 +508,3 @@ document.addEventListener("DOMContentLoaded", function() {
   bindAuthTabs_();
   redirectRememberedSession_();
 });
-
-
-// Guest sign-in uses server-derived usernames and server-owned account roles.
-let AUTH_GUEST_BUSY_ = false;
-async function guestAuth_(returning) {
-  if (AUTH_GUEST_BUSY_) return;
-  const name = String(document.getElementById("guestName")?.value || "").trim();
-  const pin = String(document.getElementById("guestPin")?.value || "").trim();
-  if (name.length < 3 || !/^\d{4}$/.test(pin)) {
-    setAuthMessage("Enter a guest name and 4-digit PIN.");
-    return;
-  }
-  AUTH_GUEST_BUSY_ = true;
-  setAuthMessage("");
-  try {
-    const res = returning ? await apiGuestLogin(name, pin) : await apiGuestSignup(name, pin);
-    if (!res || !res.success) {
-      setAuthMessage((res && (res.message || res.error)) || "Guest sign-in failed.");
-      return;
-    }
-    const loginRes = returning ? res : await apiGuestLogin(name, pin);
-    if (!loginRes || !loginRes.success || loginRes.accountType !== "guest") {
-      setAuthMessage("Guest was created. Please try Returning Guest to sign in.");
-      return;
-    }
-    if (typeof setSession === "function") {
-      setSession({...loginRes, rememberMe:true, validatedAt:Date.now()});
-    } else {
-      localStorage.setItem("session",JSON.stringify({...loginRes,rememberMe:true,validatedAt:Date.now()}));
-    }
-    window.location.href = "./app.html#home";
-  } catch (err) {
-    setAuthMessage("Could not reach PATTC. Please try again.");
-  } finally {
-    AUTH_GUEST_BUSY_ = false;
-  }
-}
-function joinAsGuest(){return guestAuth_(false);}
-function returnAsGuest(){return guestAuth_(true);}
