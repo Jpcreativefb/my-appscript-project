@@ -30,7 +30,16 @@
       window.setAuthMessage("Enter a guest name and 4-digit PIN.");
       return;
     }
+    const signInButton = document.getElementById("guestSignInButton");
+    const createButton = document.getElementById("guestCreateButton");
+    const activeButton = returning ? signInButton : createButton;
+    const originalLabel = activeButton.textContent;
+    signInButton.disabled = createButton.disabled = true;
+    activeButton.classList.add("is-working");
+    activeButton.setAttribute("aria-busy", "true");
+    activeButton.textContent = returning ? "Signing in…" : "Creating account…";
     guestBusy = true;
+    let openingDashboard = false;
     window.setAuthMessage("");
     try {
       const res = returning ? await window.apiGuestLogin(name,pin) : await window.apiGuestSignup(name,pin);
@@ -50,11 +59,19 @@
       } else {
         localStorage.setItem("session",JSON.stringify(saved));
       }
+      openingDashboard = true;
+      activeButton.textContent = "Signed in. Opening PATTC…";
       window.location.href = "./app.html#dashboard";
     } catch(err) {
       window.setAuthMessage("Connection error. Please try again.");
     } finally {
-      guestBusy = false;
+      if (!openingDashboard) {
+        activeButton.textContent = originalLabel;
+        activeButton.classList.remove("is-working");
+        activeButton.removeAttribute("aria-busy");
+        signInButton.disabled = createButton.disabled = false;
+        guestBusy = false;
+      }
     }
   }
   window.joinAsGuest = () => guestAuth(false);
