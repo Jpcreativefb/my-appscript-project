@@ -880,7 +880,7 @@ function votingCompetitionSaveParticipant_(payload) {
         if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
         else if (settings.numberAssignment === "auto-sequential") displayNumber = votingCompetitionNextDisplayNumber_(participants);
         if (settings.colorAssignment === "participant") displayColor = votingCompetitionString_(payload.displayColor);
-        else if (settings.colorAssignment === "auto-palette") displayColor = votingCompetitionNextDisplayColor_(participants);
+        else if (settings.colorAssignment === "auto-palette") displayColor = votingCompetitionNextDisplayColor_(participants, settings.entryColorPalette);
       }
     } else if (settings.entryIdentifierMode === "legacy") {
       if (settings.numberAssignment === "participant") displayNumber = votingCompetitionString_(payload.displayNumber);
