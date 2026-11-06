@@ -26,7 +26,7 @@
     if (guestBusy) return;
     const name = String(document.getElementById("guestName")?.value || "").trim();
     const pin = String(document.getElementById("guestPin")?.value || "").trim();
-    if (name.length < 3 || !/^\\d{4}$/.test(pin)) {
+    if (name.length < 3 || !/^[0-9]{4}$/.test(pin)) {
       window.setAuthMessage("Enter a guest name and 4-digit PIN.");
       return;
     }
