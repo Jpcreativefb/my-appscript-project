@@ -723,7 +723,7 @@ const APP_PAGE_MODULES = {
   "admin": ["admin", "adminUi", "adminTeamFantasy"],
   "admin-games": ["admin", "adminUi", "adminGamesRc24e"],
   "admin-awards": ["admin", "adminUi", "adminAwards"],
-  "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
+  "admin-game-setup": ["admin", "adminUi", "voting", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
   "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],
   "admin-prediction-markets": ["admin", "adminUi", "adminPredictionMarketsR3"],

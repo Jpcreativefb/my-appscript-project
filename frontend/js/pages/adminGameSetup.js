@@ -1305,19 +1305,23 @@ async function adminVotingSaveSettings_(gameId) {
   }
 }
 
-async function adminVotingCropParticipant_(button, gameId, entryId) {
+async function adminVotingCropParticipant_(button, gameId, entryId, file) {
   var card = button.closest('.admin-voting-participant-card');
   var message = document.getElementById('adminVotingParticipantMessage_' + entryId);
   button.disabled = true;
   try {
-    var crop = await votingCropExistingPhoto_(entryId, gameId);
+    var crop = file ? await votingCropPhoto_(file) : await votingCropExistingPhoto_(entryId, gameId);
     if (!crop) return;
     card.dataset.pendingCrop = crop;
-    var image = card.querySelector('.admin-voting-participant-image');
-    if (image) image.src = crop;
+    var preview = card.querySelector('.cookoff-r9-photo');
+    var image = document.createElement('img');
+    image.src = crop;
+    image.className = 'cookoff-r9-photo-image';
+    image.alt = 'Cropped dish photo';
+    preview.replaceChildren(image);
     message.textContent = 'Crop ready to save';
   } catch (error) { message.textContent = error.message; }
-  finally { button.disabled = false; }
+  finally { button.disabled = false; if (file) button.value = ""; }
 }
 
 async function adminVotingSaveParticipant_(gameId, entryId) {
@@ -1332,7 +1336,8 @@ async function adminVotingSaveParticipant_(gameId, entryId) {
     var res = await apiAdminUpdateVotingParticipant({
       gameId: gameId,
       entryId: entryId,
-      participantName: field("participantName") ? field("participantName").value : "",
+      description: field("description").value,
+      ingredients: field("ingredients").value,
       entryName: field("entryName") ? field("entryName").value : "",
       displayNumber: field("displayNumber") ? field("displayNumber").value : "",
       displayColor: field("displayColor") ? field("displayColor").value : "",
@@ -1360,15 +1365,17 @@ function adminVotingParticipantsHtml_(dashboard) {
         <summary>
           <div>
             <strong>${adminSetupEscapeHtml(entry.entryName || "Unnamed Entry")}</strong>
-            <span>${adminSetupEscapeHtml(entry.displayNumber ? "#" + entry.displayNumber : "No number")} · ${adminSetupEscapeHtml(entry.displayColor || "No color")} · ${adminSetupEscapeHtml(entry.username || "")}</span>
+            <span>${adminSetupEscapeHtml(entry.displayNumber ? "#" + entry.displayNumber : "No number")} · ${adminSetupEscapeHtml(entry.displayColor || "No color")}</span>
           </div>
           <span class="admin-voting-status ${adminSetupEscapeHtml(entry.status || "submitted")}">${adminSetupEscapeHtml(entry.status || "submitted")}</span>
         </summary>
         <div class="admin-voting-participant-body">
-          ${entry.imageUrl ? platformImgHtml(entry.imageUrl, { className: "admin-voting-participant-image", variant: "thumb", alt: entry.entryName || "Participant entry" }) : ""}
+          ${votingPageCompactRow_(Object.assign({},entry,{imageUrl:dashboard.settings.showPhoto === false ? "" : entry.imageUrl,
+            description:dashboard.settings.showDescription === false ? "" : entry.description,
+            ingredients:dashboard.settings.showIngredients === false ? "" : entry.ingredients}),0,dashboard.settings,true)}
+          <label class="admin-field"><span>Replace dish photo</span><input type="file" accept="image/*" onchange="if(this.files.length) adminVotingCropParticipant_(this,'${adminSetupEscapeHtml(dashboard.gameId)}','${safeId}',this.files[0])"></label>
           ${entry.imageFileId ? `<button type="button" class="admin-small-button secondary" onclick="adminVotingCropParticipant_(this,'${adminSetupEscapeHtml(dashboard.gameId)}','${safeId}')">Adjust Crop</button>` : ""}
           <div class="admin-control-grid">
-            <label class="admin-field"><span>Participant / Team</span><input id="adminVotingParticipant_participantName_${safeId}" value="${adminSetupEscapeHtml(entry.participantName || "")}"></label>
             <label class="admin-field"><span>Entry Name</span><input id="adminVotingParticipant_entryName_${safeId}" value="${adminSetupEscapeHtml(entry.entryName || "")}"></label>
             <label class="admin-field"><span>Display Number</span><input id="adminVotingParticipant_displayNumber_${safeId}" value="${adminSetupEscapeHtml(entry.displayNumber || "")}"></label>
             <label class="admin-field"><span>Display Color</span><input id="adminVotingParticipant_displayColor_${safeId}" value="${adminSetupEscapeHtml(entry.displayColor || "")}"></label>
@@ -1380,10 +1387,8 @@ function adminVotingParticipantsHtml_(dashboard) {
             <label class="admin-checkbox"><input id="adminVotingParticipant_published_${safeId}" type="checkbox" ${entry.published ? "checked" : ""}><span>Published to ballot</span></label>
           </div>
           <label class="admin-field"><span>Admin Note to Participant</span><textarea id="adminVotingParticipant_adminNotes_${safeId}" rows="2">${adminSetupEscapeHtml(entry.adminNotes || "")}</textarea></label>
-          <div class="admin-voting-participant-preview">
-            ${entry.description ? `<p><strong>Description:</strong> ${adminSetupEscapeHtml(entry.description)}</p>` : ""}
-            ${entry.ingredients ? `<p><strong>Ingredients / Info:</strong> ${adminSetupEscapeHtml(entry.ingredients)}</p>` : ""}
-          </div>
+          <label class="admin-field"><span>Description</span><textarea id="adminVotingParticipant_description_${safeId}" rows="3">${adminSetupEscapeHtml(entry.description || "")}</textarea></label>
+          <label class="admin-field"><span>Ingredients / Info</span><textarea id="adminVotingParticipant_ingredients_${safeId}" rows="3">${adminSetupEscapeHtml(entry.ingredients || "")}</textarea></label>
           <div class="admin-card-actions"><button type="button" class="admin-small-button" onclick="adminVotingSaveParticipant_('${adminSetupEscapeHtml(dashboard.gameId)}','${safeId}')">Save Participant</button><span id="adminVotingParticipantMessage_${safeId}" class="admin-message"></span></div>
         </div>
       </details>

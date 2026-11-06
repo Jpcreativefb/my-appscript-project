@@ -970,7 +970,7 @@ function votingCompetitionUploadParticipantImage_(payload) {
 
   const folder = votingCompetitionImageFolder_();
   const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmmss");
-  const safeFile = ["competition", votingCompetitionSlug_(gameId), votingCompetitionSlug_(username), stamp].join("-") + "." + extensions[mimeType];
+  const safeFile = ["competition", votingCompetitionSlug_(gameId), Utilities.getUuid(), stamp].join("-") + "." + extensions[mimeType];
   const file = folder.createFile(Utilities.newBlob(bytes, mimeType, safeFile));
   try {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -1010,6 +1010,8 @@ function votingCompetitionAdminUpdateParticipant_(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, "entryName")) row[col.entryname] = votingCompetitionString_(payload.entryName);
   if (Object.prototype.hasOwnProperty.call(payload, "displayNumber")) row[col.displaynumber] = votingCompetitionString_(payload.displayNumber);
   if (Object.prototype.hasOwnProperty.call(payload, "displayColor")) row[col.displaycolor] = votingCompetitionString_(payload.displayColor);
+  if (Object.prototype.hasOwnProperty.call(payload, "description")) row[col.description] = votingCompetitionString_(payload.description);
+  if (Object.prototype.hasOwnProperty.call(payload, "ingredients")) row[col.ingredients] = votingCompetitionString_(payload.ingredients);
   if (Object.prototype.hasOwnProperty.call(payload, "adminNotes")) row[col.adminnotes] = votingCompetitionString_(payload.adminNotes);
   if (payload.imageFileId && payload.imageUrl) {
     row[col.imagefileid] = votingCompetitionString_(payload.imageFileId);
@@ -1427,9 +1429,18 @@ function adminGetVotingCompetitionDashboard_(payload) {
     success: true,
     gameId: gameId,
     settings: settings,
-    participants: participants,
+    participants: participants.map(function(entry) {
+      return {
+        entryId:entry.entryId,entryName:entry.entryName,imageUrl:entry.imageUrl,imageFileId:entry.imageFileId,
+        displayNumber:entry.displayNumber,displayColor:entry.displayColor,description:entry.description,
+        ingredients:entry.ingredients,status:entry.status,published:entry.published,adminNotes:entry.adminNotes
+      };
+    }),
     ballotCount: resultBundle.ballotCount,
-    results: resultBundle.results
+    results: resultBundle.results.map(function(row) {
+      const {participantName, ...anonymousResult} = row;
+      return anonymousResult;
+    })
   };
 }
 

@@ -85,4 +85,15 @@ const finalization = ctx.votingCompetitionFinalizeDueDrafts_();
 assert.deepStrictEqual(finalizedDrafts, ['criteria']);
 assert.strictEqual(finalization.finalized, 1);
 assert.strictEqual(finalization.skipped, 1);
+ctx.getGameRuntimeConfig = () => ({type:'voting'});
+ctx.votingCompetitionReadParticipants_ = () => [{
+  entryId:'dish', entryName:'Sample chili', description:'Mild', ingredients:'Beans',
+  username:'private-account', participantName:'Private Person', rowNumber:2,
+  status:'approved', published:true, customData:{_cookoffSubmissionId:'private-token'}
+}];
+ctx.votingCompetitionReadBallots_ = () => [];
+const dashboard = ctx.adminGetVotingCompetitionDashboard_({gameId:'cookoff'});
+assert.strictEqual(dashboard.participants[0].description, 'Mild');
+assert.strictEqual(dashboard.results[0].entryName, 'Sample chili');
+assert(!/private-account|Private Person|private-token|rowNumber/.test(JSON.stringify(dashboard)));
 console.log('cookoff-r9-integration-tests: PASS');
