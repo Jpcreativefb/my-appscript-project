@@ -57,6 +57,7 @@ const APP_SHELL = [
   "./js/imageEngine.js",
   "./js/api.js",
   "./js/auth.js",
+  "./js/guest-auth-r1.js",
   "./js/state.js",
   "./js/appearanceThemeRuntime.js",
   "./js/ownerVisualStudio.js",
