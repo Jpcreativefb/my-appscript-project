@@ -488,12 +488,19 @@ function votingCompetitionIdentifierMode_(value) {
   const mode = votingCompetitionKey_(value);
   return ["legacy","color","number","combo"].indexOf(mode) >= 0 ? mode : "legacy";
 }
+function votingCompetitionColorKey_(value) {
+  const key = votingCompetitionKey_(value);
+  const named = {red:"#d64b42",blue:"#357cce",green:"#25835b",yellow:"#e5b929",
+    orange:"#dc8030",purple:"#8754c2",pink:"#cc5d97",teal:"#168b92",
+    black:"#292d35",white:"#e2e5e9",silver:"#a7adb8",gold:"#c69e24"};
+  return Object.prototype.hasOwnProperty.call(named,key) ? named[key] : key;
+}
 function votingCompetitionColorPalette_(value) {
   const rows = Array.isArray(value) ? value : votingCompetitionJson_(value, VOTING_COMPETITION_COLOR_PALETTE);
-  const seen = {};
-  return rows.map(votingCompetitionString_).filter(function(color) {
-    const key = color.toLowerCase();
-    if (!color || seen[key] || !( /^#[0-9a-f]{6}$/i.test(color) || VOTING_COMPETITION_COLOR_PALETTE.some(function(c){return c.toLowerCase()===key;}) )) return false;
+  const seen = Object.create(null);
+  return (Array.isArray(rows) ? rows : VOTING_COMPETITION_COLOR_PALETTE).slice(0,100).map(votingCompetitionString_).filter(function(color) {
+    const key = votingCompetitionColorKey_(color);
+    if (!color || seen[key] || !( /^#[0-9a-f]{6}$/i.test(color) || VOTING_COMPETITION_COLOR_PALETTE.some(function(c){return c.toLowerCase()===color.toLowerCase();}) )) return false;
     seen[key] = true; return true;
   });
 }
@@ -555,11 +562,11 @@ function votingCompetitionAssignIdentity_(settings, participants) {
   const used = {};
   (participants || []).forEach(function(p) {
     const number = votingCompetitionString_(p.displayNumber);
-    const color = votingCompetitionKey_(p.displayColor);
+    const color = votingCompetitionColorKey_(p.displayColor);
     used[(mode === "color" ? color : mode === "number" ? number : color + "|" + number)] = true;
   });
   if (mode === "color") {
-    const colors = palette.filter(function(c){return !used[c.toLowerCase()];});
+    const colors = palette.filter(function(c){return !used[votingCompetitionColorKey_(c)];});
     if (!colors.length) throw new Error("All Cookoff colors are assigned. Ask the host to add colors or switch to Color + Number.");
     return {displayColor:colors[Math.floor(Math.random()*colors.length)],displayNumber:""};
   }
@@ -571,7 +578,7 @@ function votingCompetitionAssignIdentity_(settings, participants) {
     for (let i=1;i<=maxNumber;i++) if (!used[String(i)]) choices.push({displayNumber:String(i),displayColor:""});
   } else {
     palette.forEach(function(color){for (let i=1;i<=maxNumber;i++) {
-      if (!used[color.toLowerCase()+"|"+i]) choices.push({displayNumber:String(i),displayColor:color});
+      if (!used[votingCompetitionColorKey_(color)+"|"+i]) choices.push({displayNumber:String(i),displayColor:color});
     }});
   }
   if (!choices.length) throw new Error("No unique Cookoff identifiers remain. Contact the host.");

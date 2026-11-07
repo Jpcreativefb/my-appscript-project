@@ -115,4 +115,7 @@ const dashboard = ctx.adminGetVotingCompetitionDashboard_({gameId:'cookoff'});
 assert.strictEqual(dashboard.participants[0].description, 'Mild');
 assert.strictEqual(dashboard.results[0].entryName, 'Sample chili');
 assert(!/private-account|Private Person|private-token|rowNumber/.test(JSON.stringify(dashboard)));
+assert.deepStrictEqual(Array.from(ctx.votingCompetitionColorPalette_(['Red','#D64B42','#AB1234'])), ['Red','#AB1234']);
+const paper = {entryIdentifierMode:'color',entryColorPalette:['#D64B42','#AB1234']};
+assert.strictEqual(ctx.votingCompetitionAssignIdentity_(paper,[{displayColor:'Red'}]).displayColor,'#AB1234');
 console.log('cookoff-r9-integration-tests: PASS');

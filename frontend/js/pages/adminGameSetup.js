@@ -1418,11 +1418,6 @@ function adminVotingResultsHtml_(dashboard) {
 
 
 /* Color Picker + Category Description UI: additive to the existing Cookoff settings. */
-var ADMIN_COOOKOFF_NAMED_COLORS_ = {red:"#ff0000",blue:"#0000ff",green:"#008000",orange:"#ffa500",yellow:"#ffff00",purple:"#800080",pink:"#ffc0cb",teal:"#008080",black:"#000000",white:"#ffffff",silver:"#c0c0c0",gold:"#ffd700"};
-function adminVotingColorHex_(value) {
-  var text = String(value || "").trim();
-  return /^#[0-9a-fA-F]{6}$/.test(text) ? text : (ADMIN_COOOKOFF_NAMED_COLORS_[text.toLowerCase()] || "#888888");
-}
 function adminVotingPaletteEditor_(palette) {
   var colors = Array.isArray(palette) ? palette : [];
   return '<div class="admin-field" style="grid-column:1/-1"><strong>Available Colors</strong><p class="admin-field-note">Match your paper with the color picker or an exact HEX code. Existing color assignments do not change.</p>' +
@@ -1433,16 +1428,20 @@ function adminVotingPaletteEditor_(palette) {
 function adminVotingPaletteRow_(value) {
   var safe = adminSetupEscapeHtml(value);
   return '<div class="admin-voting-palette-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0">' +
-    '<input type="color" aria-label="Choose paper color" value="' + adminVotingColorHex_(value) + '" oninput="adminVotingPalettePick_(this)">' +
-    '<input class="admin-voting-palette-value" aria-label="Color name or HEX" value="' + safe + '" maxlength="40" style="width:150px" oninput="adminVotingSyncPalette_()">' +
-    '<button type="button" class="admin-small-button secondary" onclick="adminVotingMovePalette_(this,-1)">↑</button>' +
-    '<button type="button" class="admin-small-button secondary" onclick="adminVotingMovePalette_(this,1)">↓</button>' +
+    '<input type="color" aria-label="Choose paper color" style="min-width:44px;min-height:44px" value="' + votingPageColorHex_(value) + '" oninput="adminVotingPalettePick_(this)">' +
+    '<input class="admin-voting-palette-value" aria-label="Color name or HEX" value="' + safe + '" maxlength="40" style="width:150px" oninput="adminVotingPaletteText_(this)">' +
+    '<button type="button" class="admin-small-button secondary" aria-label="Move color up" onclick="adminVotingMovePalette_(this,-1)">↑</button>' +
+    '<button type="button" class="admin-small-button secondary" aria-label="Move color down" onclick="adminVotingMovePalette_(this,1)">↓</button>' +
     '<button type="button" class="admin-small-button secondary" onclick="this.parentElement.remove();adminVotingSyncPalette_()">Remove</button></div>';
 }
 function adminVotingSyncPalette_() {
   var el = document.getElementById("adminVotingColorPalette");
   if (!el) return;
   el.value = Array.from(document.querySelectorAll("#adminVotingPaletteRows .admin-voting-palette-value")).map(function(x){return x.value.trim();}).filter(Boolean).join(", ");
+}
+function adminVotingPaletteText_(input) {
+  input.parentElement.querySelector('input[type="color"]').value = votingPageColorHex_(input.value);
+  adminVotingSyncPalette_();
 }
 function adminVotingPalettePick_(input) {
   var value = input.parentElement.querySelector(".admin-voting-palette-value");
@@ -1475,8 +1474,8 @@ function adminVotingAwardRow_(c) {
     '<label class="admin-checkbox"><input class="award-selected" type="checkbox" ' + (c.defaultSelected!==false?"checked":"") + '><span>Selected by default</span></label>' +
     '<label class="admin-field"><span>Voting audience</span><select class="award-audience">' +
       ["both","public","judges"].map(function(opt){return '<option value="'+opt+'" '+(audience===opt?"selected":"")+'>'+opt+'</option>';}).join("") + '</select></label>' +
-    '<div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="admin-small-button secondary" onclick="adminVotingMoveAward_(this,-1)">↑</button>' +
-    '<button type="button" class="admin-small-button secondary" onclick="adminVotingMoveAward_(this,1)">↓</button>' +
+    '<div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="admin-small-button secondary" aria-label="Move category up" onclick="adminVotingMoveAward_(this,-1)">↑</button>' +
+    '<button type="button" class="admin-small-button secondary" aria-label="Move category down" onclick="adminVotingMoveAward_(this,1)">↓</button>' +
     '<button type="button" class="admin-small-button secondary" onclick="this.closest(\'.admin-voting-award-row\').remove()">Remove</button></div></div>';
 }
 function adminVotingAddAwardCategory_() {
