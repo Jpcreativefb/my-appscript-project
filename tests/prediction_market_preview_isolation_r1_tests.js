@@ -9,7 +9,8 @@ const engine = require('../backend/engines/PredictionMarketEngineR2.js');
 const store = require('../backend/engines/PredictionMarketStoreR2.js');
 const source = name => fs.readFileSync(path.join(root,name),'utf8');
 const PROD_SCRIPT='production-script-fixture', PREVIEW_SCRIPT='preview-script-fixture';
-const PROD_SHEET='production-sheet-fixture', PREVIEW_SHEET='preview-sheet-fixture';
+const PROD_SHEET='1py9-zQIAp2aSl9oK6oyH8UQ6151m2mSE2TmwoyXWveY',
+      PREVIEW_SHEET='1CHu2uCLU0DUk7Q31NI343-ehCFJ5HY2GNV440JExlYw';
 const settings = {
   PATTC_PM_ENV:'PREVIEW',
   PATTC_PM_PRODUCTION_SCRIPT_ID:PROD_SCRIPT,
@@ -59,6 +60,10 @@ async function main(){
     reject('wrong Apps Script ID fails closed',()=>{properties={...settings};scriptId='wrong-project';store.predictionMarketR2SelectSpreadsheet_()});
     reject('same Apps Script project rejected',()=>{properties={...settings,PATTC_PM_PREVIEW_SCRIPT_ID:PROD_SCRIPT};scriptId=PROD_SCRIPT;store.predictionMarketR2SelectSpreadsheet_()});
     reject('Preview and production spreadsheet collision rejected',()=>{properties={...settings,PATTC_PM_PREVIEW_SPREADSHEET_ID:PROD_SHEET};scriptId=PREVIEW_SCRIPT;store.predictionMarketR2SelectSpreadsheet_()});
+    reject('unapproved third Preview workbook rejected',()=>{
+      properties={...settings,PATTC_PM_PREVIEW_SPREADSHEET_ID:'unapproved-workbook'};scriptId=PREVIEW_SCRIPT;
+      store.predictionMarketR2SelectSpreadsheet_();
+    });
     reject('openById returning production spreadsheet rejected',()=>{properties={...settings};openTarget=production;store.predictionMarketR2SelectSpreadsheet_();});
     reject('missing Preview store rejected',()=>{openTarget=preview;const key='PredictionMarketSettlements',prior=preview.sheets[key];delete preview.sheets[key];try{store.predictionMarketR2SelectSpreadsheet_()}finally{preview.sheets[key]=prior}});
     reject('wrong Preview store schema rejected',()=>{const sheet=preview.sheets.PredictionMarketWallets, prior=sheet.rows[0];sheet.rows[0]=['INVALID'];try{store.predictionMarketR2SelectSpreadsheet_()}finally{sheet.rows[0]=prior}});
