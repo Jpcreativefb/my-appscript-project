@@ -3,9 +3,68 @@
    Explicit setup only. Read paths never create sheets or headers.
 ===================================================== */
 
+/*
+ * Financial-store environment authority. Production and Preview must be
+ * distinct Apps Script projects with distinct spreadsheets. No implicit
+ * SpreadsheetApp.getActive() selection is permitted for Preview.
+ *
+ * The explicit options.spreadsheet dependency is reserved for in-memory/
+ * failure-injection repository tests; HTTP services never accept it.
+ */
+function predictionMarketR2SelectSpreadsheet_() {
+  if (typeof PropertiesService === "undefined" || !PropertiesService ||
+      typeof PropertiesService.getScriptProperties !== "function" ||
+      typeof ScriptApp === "undefined" || !ScriptApp ||
+      typeof ScriptApp.getScriptId !== "function" ||
+      typeof SpreadsheetApp === "undefined" || !SpreadsheetApp) {
+    throw new Error("Prediction Market environment identity services are unavailable");
+  }
+  var props = PropertiesService.getScriptProperties();
+  if (!props || typeof props.getProperty !== "function") throw new Error("Prediction Market environment properties are unavailable");
+  function property(name) { return String(props.getProperty(name) || "").trim(); }
+  var env = property("PATTC_PM_ENV").toUpperCase();
+  var productionScriptId = property("PATTC_PM_PRODUCTION_SCRIPT_ID");
+  var previewScriptId = property("PATTC_PM_PREVIEW_SCRIPT_ID");
+  var productionSheetId = property("PATTC_PM_PRODUCTION_SPREADSHEET_ID");
+  var previewSheetId = property("PATTC_PM_PREVIEW_SPREADSHEET_ID");
+  if ((env !== "PRODUCTION" && env !== "PREVIEW") ||
+      !productionScriptId || !previewScriptId || !productionSheetId || !previewSheetId ||
+      productionScriptId === previewScriptId || productionSheetId === previewSheetId) {
+    throw new Error("Prediction Market environment is not safely configured");
+  }
+  var actualScriptId = String(ScriptApp.getScriptId() || "").trim();
+  var expectedScriptId = env === "PREVIEW" ? previewScriptId : productionScriptId;
+  if (!actualScriptId || actualScriptId !== expectedScriptId) throw new Error("Prediction Market Apps Script identity mismatch");
+  var expectedSheetId = env === "PREVIEW" ? previewSheetId : productionSheetId;
+  var spreadsheet;
+  if (env === "PREVIEW") {
+    if (typeof SpreadsheetApp.openById !== "function") throw new Error("Preview spreadsheet selection is unavailable");
+    spreadsheet = SpreadsheetApp.openById(previewSheetId);
+  } else {
+    if (typeof SpreadsheetApp.getActive !== "function") throw new Error("Production spreadsheet selection is unavailable");
+    spreadsheet = SpreadsheetApp.getActive();
+  }
+  if (!spreadsheet || typeof spreadsheet.getId !== "function" ||
+      String(spreadsheet.getId() || "").trim() !== expectedSheetId) {
+    throw new Error("Prediction Market spreadsheet identity mismatch");
+  }
+  if (env === "PREVIEW") {
+    Object.keys(PREDICTION_MARKET_R2_SHEETS).forEach(function(key) {
+      var sheet = spreadsheet.getSheetByName(PREDICTION_MARKET_R2_SHEETS[key]);
+      var headers = PREDICTION_MARKET_R2_HEADERS[key];
+      if (!sheet || sheet.getLastColumn() !== headers.length) throw new Error("Prediction Market Preview store schema mismatch: " + key);
+      var actualHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+      if (actualHeaders.length !== headers.length || headers.some(function(value, index) {
+        return String(actualHeaders[index] || "").trim() !== value;
+      })) throw new Error("Prediction Market Preview store schema mismatch: " + key);
+    });
+  }
+  return spreadsheet;
+}
+
 function predictionMarketR2CreateAppsScriptRepository(options) {
   var opts = options || {};
-  var spreadsheet = opts.spreadsheet || (typeof SpreadsheetApp !== "undefined" ? SpreadsheetApp.getActive() : null);
+  var spreadsheet = opts.spreadsheet || predictionMarketR2SelectSpreadsheet_();
   if (!spreadsheet) throw new Error("SpreadsheetApp is unavailable");
 
   function getSheet(storeName) {
@@ -201,9 +260,9 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
     }
   }
 
-  return {kind:"APPS_SCRIPT_SHEETS",setup:setup,setupStore:setupStore,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,listTransactions:listTransactions,saveTransaction:saveTransaction,getPosition:getPosition,listPositions:listPositions,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
+  return {kind:"APPS_SCRIPT_SHEETS",spreadsheet:spreadsheet,setup:setup,setupStore:setupStore,criticalSection:criticalSection,getMarket:getMarket,listMarkets:listMarkets,saveMarket:saveMarket,getWallet:getWallet,listWallets:listWallets,saveWallet:saveWallet,getTransaction:getTransaction,listTransactions:listTransactions,saveTransaction:saveTransaction,getPosition:getPosition,listPositions:listPositions,listPositionsByPlayer:listPositionsByPlayer,listPositionsByPlayerMarket:listPositionsByPlayerMarket,savePosition:savePosition,deletePosition:deletePosition,getSettlement:getSettlement,saveSettlement:saveSettlement,recoverPendingTrade:recoverPendingTrade,recoverPendingSettlement:recoverPendingSettlement,commitTrade:commitTrade,commitSettlement:commitSettlement};
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { predictionMarketR2CreateAppsScriptRepository: predictionMarketR2CreateAppsScriptRepository };
+  module.exports = { predictionMarketR2CreateAppsScriptRepository: predictionMarketR2CreateAppsScriptRepository, predictionMarketR2SelectSpreadsheet_: predictionMarketR2SelectSpreadsheet_ };
 }
