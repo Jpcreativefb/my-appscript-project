@@ -62,6 +62,20 @@ function predictionMarketR2SelectSpreadsheet_() {
   return spreadsheet;
 }
 
+function predictionMarketR2AssertRequestEnvironment_(expected) {
+  var requested=String(expected||"").trim().toUpperCase();
+  if (!requested) return; // Existing production/direct Apps Script requests.
+  if (requested!=="PREVIEW"&&requested!=="PRODUCTION") throw new Error("Invalid Prediction Market request environment");
+  // The complete selector also proves script and spreadsheet identities.
+  // A Preview-marked request reaching a production project must fail before
+  // market, wallet, position, transaction or settlement access.
+  var spreadsheet=predictionMarketR2SelectSpreadsheet_();
+  var props=PropertiesService.getScriptProperties();
+  if(String(props.getProperty("PATTC_PM_ENV")||"").trim().toUpperCase()!==requested)
+    throw new Error("Prediction Market request environment does not match backend");
+  return spreadsheet;
+}
+
 function predictionMarketR2CreateAppsScriptRepository(options) {
   var opts = options || {};
   var spreadsheet = opts.spreadsheet || predictionMarketR2SelectSpreadsheet_();
@@ -264,5 +278,5 @@ function predictionMarketR2CreateAppsScriptRepository(options) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { predictionMarketR2CreateAppsScriptRepository: predictionMarketR2CreateAppsScriptRepository, predictionMarketR2SelectSpreadsheet_: predictionMarketR2SelectSpreadsheet_ };
+  module.exports = { predictionMarketR2CreateAppsScriptRepository: predictionMarketR2CreateAppsScriptRepository, predictionMarketR2SelectSpreadsheet_: predictionMarketR2SelectSpreadsheet_, predictionMarketR2AssertRequestEnvironment_: predictionMarketR2AssertRequestEnvironment_ };
 }
