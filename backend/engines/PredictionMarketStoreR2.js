@@ -66,14 +66,16 @@ function predictionMarketR2AssertRequestEnvironment_(expected) {
   var requested=String(expected||"").trim().toUpperCase();
   if (!requested) return; // Existing production/direct Apps Script requests.
   if (requested!=="PREVIEW"&&requested!=="PRODUCTION") throw new Error("Invalid Prediction Market request environment");
-  // The complete selector also proves script and spreadsheet identities.
-  // A Preview-marked request reaching a production project must fail before
-  // market, wallet, position, transaction or settlement access.
-  var spreadsheet=predictionMarketR2SelectSpreadsheet_();
+  // Check route intent before even opening a workbook. The selector then
+  // proves script and spreadsheet identities for the matched environment.
+  if(typeof PropertiesService==="undefined"||!PropertiesService||
+     typeof PropertiesService.getScriptProperties!=="function")
+    throw new Error("Prediction Market request environment properties are unavailable");
   var props=PropertiesService.getScriptProperties();
-  if(String(props.getProperty("PATTC_PM_ENV")||"").trim().toUpperCase()!==requested)
+  if(!props||typeof props.getProperty!=="function"||
+     String(props.getProperty("PATTC_PM_ENV")||"").trim().toUpperCase()!==requested)
     throw new Error("Prediction Market request environment does not match backend");
-  return spreadsheet;
+  return predictionMarketR2SelectSpreadsheet_();
 }
 
 function predictionMarketR2CreateAppsScriptRepository(options) {
