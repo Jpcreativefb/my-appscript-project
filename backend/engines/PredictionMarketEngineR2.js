@@ -454,6 +454,17 @@ function predictionMarketR2CreateEngine(options) {
       market.referenceNoPrice = no;
       market.referencePriceAsOf = predictionMarketR2Iso_(asOf || nowIso());
       market.referencePriceTrusted = true;
+      var previousKind = predictionMarketR2String_(market.providerKind || "MANUAL").toUpperCase();
+      var priorMetadata = market.providerMetadata && typeof market.providerMetadata === "object" ? market.providerMetadata : {};
+      market.providerMetadata = Object.assign({}, priorMetadata, {
+        priceOverrideSource: "PATTC_ADMIN_MANUAL",
+        priceOverrideAt: nowIso(),
+        priceOverrideBy: predictionMarketR2String_((context || {}).playerId || (context || {}).username || "SYSTEM"),
+        originalProviderKind: predictionMarketR2String_(priorMetadata.originalProviderKind || previousKind),
+        originalProviderId: predictionMarketR2String_(priorMetadata.originalProviderId || market.providerId),
+        originalExternalMarketId: predictionMarketR2String_(priorMetadata.originalExternalMarketId || market.externalMarketId),
+        originalSourceUrl: predictionMarketR2String_(priorMetadata.originalSourceUrl || market.sourceUrl)
+      });
       market.providerKind = "MANUAL";
       market.updatedAt = nowIso();
       market.updatedBy = predictionMarketR2String_((context || {}).playerId || (context || {}).username || "SYSTEM");
