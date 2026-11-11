@@ -36,7 +36,11 @@ class Workbook {
 }
 const preview=new Workbook(PREVIEW_SHEET),production=new Workbook(PROD_SHEET);
 let openTarget=preview;
-const saved={PropertiesService:global.PropertiesService,ScriptApp:global.ScriptApp,SpreadsheetApp:global.SpreadsheetApp};
+const saved={PropertiesService:global.PropertiesService,ScriptApp:global.ScriptApp,SpreadsheetApp:global.SpreadsheetApp,
+  PREDICTION_MARKET_R2_SHEETS:global.PREDICTION_MARKET_R2_SHEETS,
+  PREDICTION_MARKET_R2_HEADERS:global.PREDICTION_MARKET_R2_HEADERS};
+global.PREDICTION_MARKET_R2_SHEETS=engine.PREDICTION_MARKET_R2_SHEETS;
+global.PREDICTION_MARKET_R2_HEADERS=engine.PREDICTION_MARKET_R2_HEADERS;
 global.PropertiesService={getScriptProperties:()=>({getProperty:name=>properties[name]||null})};
 global.ScriptApp={getScriptId:()=>scriptId};
 global.SpreadsheetApp={
