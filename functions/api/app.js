@@ -7,6 +7,23 @@ const APPS_SCRIPT_PREVIEW_API_URL =
 // Preview Prediction Markets financial mutations are OFF until the Director
 // validates an isolated Apps Script project, spreadsheet and backend gate.
 // No missing/mismatched environment setting can enable a Preview write.
+const PREDICTION_MARKET_ACTIONS = new Set([
+  "adminGetPredictionMarkets",
+  "adminCreatePredictionMarket",
+  "adminEditPredictionMarket",
+  "adminSetPredictionMarketPrice",
+  "adminRefreshPredictionMarketReference",
+  "adminOpenPredictionMarket",
+  "adminLockPredictionMarket",
+  "adminResolvePredictionMarket",
+  "adminVoidPredictionMarket",
+  "getPredictionMarketPlayerState",
+  "getPredictionMarketPlayerDetail",
+  "getPredictionMarketLeaderboard",
+  "bootstrapPredictionMarketWallet",
+  "executePredictionMarketTrade"
+]);
+
 const PREDICTION_MARKET_PREVIEW_WRITE_ACTIONS = new Set([
   "adminCreatePredictionMarket",
   "adminEditPredictionMarket",
@@ -206,11 +223,16 @@ export async function onRequestPost(context) {
   const upstreamUrl = productionRequest
     ? APPS_SCRIPT_API_URL
     : APPS_SCRIPT_PREVIEW_API_URL;
+  // The proxy controls this marker; a client-provided value is overwritten.
+  // A Preview request accidentally routed to production is rejected server-side.
+  const upstreamBody = !productionRequest && PREDICTION_MARKET_ACTIONS.has(action)
+    ? JSON.stringify({...body, __pattcPmExpectedEnv: "PREVIEW"})
+    : raw;
 
   try {
     const upstream = await fetchAppsScriptWithAdminReadRetry_(
       upstreamUrl,
-      raw,
+      upstreamBody,
       action
     );
 
