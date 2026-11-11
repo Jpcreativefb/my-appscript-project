@@ -4,6 +4,34 @@ const APPS_SCRIPT_API_URL =
 const APPS_SCRIPT_PREVIEW_API_URL =
   "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
 
+// Preview Prediction Markets financial mutations are OFF until the Director
+// validates an isolated Apps Script project, spreadsheet and backend gate.
+// No missing/mismatched environment setting can enable a Preview write.
+const PREDICTION_MARKET_PREVIEW_WRITE_ACTIONS = new Set([
+  "adminCreatePredictionMarket",
+  "adminEditPredictionMarket",
+  "adminSetPredictionMarketPrice",
+  "adminRefreshPredictionMarketReference",
+  "adminOpenPredictionMarket",
+  "adminLockPredictionMarket",
+  "adminResolvePredictionMarket",
+  "adminVoidPredictionMarket",
+  "bootstrapPredictionMarketWallet",
+  "executePredictionMarketTrade"
+]);
+
+function predictionMarketPreviewWriteAllowed_(context) {
+  const env = context && context.env || {};
+  const id = value => String(value || "").trim();
+  const previewSheet = id(env.PATTC_PM_PREVIEW_SPREADSHEET_ID);
+  const productionSheet = id(env.PATTC_PM_PRODUCTION_SPREADSHEET_ID);
+  const previewScript = id(env.PATTC_PM_PREVIEW_SCRIPT_ID);
+  const productionScript = id(env.PATTC_PM_PRODUCTION_SCRIPT_ID);
+  return id(env.PATTC_PM_PREVIEW_FINANCIAL_WRITES_ENABLED) === "true" &&
+    !!previewSheet && !!productionSheet && previewSheet !== productionSheet &&
+    !!previewScript && !!productionScript && previewScript !== productionScript;
+}
+
 const SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS = new Set([
   "saveSurvivorPick",
   "saveSportsSurvivorAutoPickPreference"
@@ -125,6 +153,14 @@ export async function onRequestPost(context) {
 
   const productionRequest = pattcCupProductionRequest_(context);
   const gameId = String(body && body.gameId || "").trim();
+  if (!productionRequest && PREDICTION_MARKET_PREVIEW_WRITE_ACTIONS.has(action) &&
+      !predictionMarketPreviewWriteAllowed_(context)) {
+    return jsonResponse({
+      success: false,
+      previewOnly: true,
+      message: "Prediction Markets Preview writes are disabled pending verified storage isolation."
+    }, 403);
+  }
   if (!productionRequest && new Set([
     "adminPrepareNflCupFuturesR1",
     "adminBuildNflSeasonPack",
