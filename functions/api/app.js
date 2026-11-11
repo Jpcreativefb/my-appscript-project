@@ -44,6 +44,9 @@ const SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS = new Set([
 function pattcCupProductionRequest_(context) {
   let host = "";
   try { host = new URL(context.request.url).hostname.toLowerCase(); } catch (_) { return false; }
+  // A branch/immutable Pages hostname can never be promoted to production
+  // by a misconfigured custom-host environment variable.
+  if (host.endsWith(".my-appscript-project.pages.dev")) return false;
   const configured = String(context.env && context.env.PATTC_PRODUCTION_HOSTNAME || "").trim().toLowerCase();
   return host === "my-appscript-project.pages.dev" || !!(configured && host === configured);
 }
