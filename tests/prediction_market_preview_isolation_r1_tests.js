@@ -95,7 +95,7 @@ async function main(){
     });
     const cloudflare=source('functions/api/app.js').replace(/^export /gm,'');
     let networkCalls=[];
-    const gateway={URL,Response,Set,Promise,fetch:async(url)=>{networkCalls.push(String(url));return{ok:true,status:200,text:async()=>JSON.stringify({success:true})}}};
+    const gateway={URL,Response,Set,Promise,fetch:async(url,options)=>{networkCalls.push({url:String(url),body:JSON.parse(options.body)});return{ok:true,status:200,text:async()=>JSON.stringify({success:true})}}};
     vm.createContext(gateway);vm.runInContext(cloudflare,gateway);
     const post=(action,env={})=>gateway.onRequestPost({request:new Request('https://feature-r1.my-appscript-project.pages.dev/api/app',{method:'POST',body:JSON.stringify({action})}),env});
     for(const action of ['adminCreatePredictionMarket','adminOpenPredictionMarket','adminRefreshPredictionMarketReference','bootstrapPredictionMarketWallet','executePredictionMarketTrade','adminVoidPredictionMarket']){
@@ -107,7 +107,23 @@ async function main(){
     const response=await post('adminOpenPredictionMarket',{PATTC_PM_PREVIEW_FINANCIAL_WRITES_ENABLED:'true',PATTC_PM_PREVIEW_SCRIPT_ID:'same',PATTC_PM_PRODUCTION_SCRIPT_ID:'same',PATTC_PM_PREVIEW_SPREADSHEET_ID:'sheet1',PATTC_PM_PRODUCTION_SPREADSHEET_ID:'sheet2'});
     check('gateway rejects enabled flag with script collision',()=>{assert.equal(response.status,403);assert.equal(networkCalls.length,0)});
     const enabledResponse=await post('adminOpenPredictionMarket',{PATTC_PM_PREVIEW_FINANCIAL_WRITES_ENABLED:'true',PATTC_PM_PREVIEW_SCRIPT_ID:PREVIEW_SCRIPT,PATTC_PM_PRODUCTION_SCRIPT_ID:PROD_SCRIPT,PATTC_PM_PREVIEW_SPREADSHEET_ID:PREVIEW_SHEET,PATTC_PM_PRODUCTION_SPREADSHEET_ID:PROD_SHEET});
-    check('verified opt-in routes to Preview backend, never production',()=>{assert.equal(enabledResponse.status,200);assert.equal(networkCalls.length,1);assert(networkCalls[0].includes('AKfycbywlPw_'));assert(!networkCalls[0].includes('AKfycbyDdfv-'))});
+    check('verified opt-in routes to Preview backend, never production',()=>{assert.equal(enabledResponse.status,200);assert.equal(networkCalls.length,1);assert(networkCalls[0].url.includes('AKfycbywlPw_'));assert(!networkCalls[0].url.includes('AKfycbyDdfv-'));assert.equal(networkCalls[0].body.__pattcPmExpectedEnv,'PREVIEW')});
+    check('Preview-marked request rejected before production sheet access',()=>{
+      properties={...settings,PATTC_PM_ENV:'PRODUCTION'};scriptId=PROD_SCRIPT;
+      const before=activeCalls;
+      assert.throws(()=>store.predictionMarketR2AssertRequestEnvironment_(networkCalls[0].body.__pattcPmExpectedEnv),/request environment does not match/);
+      assert.equal(activeCalls,before);
+      properties={...settings};scriptId=PREVIEW_SCRIPT;
+    });
+    check('matched Preview request marker selects only Preview spreadsheet',()=>{
+      assert.equal(store.predictionMarketR2AssertRequestEnvironment_('PREVIEW'),preview);
+    });
+    const readResult=await post('getPredictionMarketPlayerState');
+    check('Preview read requests carry server-enforced environment marker',()=>{
+      assert.equal(readResult.status,200);assert.equal(networkCalls.length,2);
+      assert.equal(networkCalls[1].body.__pattcPmExpectedEnv,'PREVIEW');
+      assert(networkCalls[1].url.includes('AKfycbywlPw_'));
+    });
     check('no test wrote to any sheet',()=>assert.equal(writes,0));
     console.log('PASS prediction_market_preview_isolation_r1_tests ('+count+' checks)');
   }finally{for(const [name,value]of Object.entries(saved)){if(value===undefined)delete global[name];else global[name]=value}}
