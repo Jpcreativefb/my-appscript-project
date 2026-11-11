@@ -11,6 +11,11 @@
  * The explicit options.spreadsheet dependency is reserved for in-memory/
  * failure-injection repository tests; HTTP services never accept it.
  */
+// Director-inspected existing Preview workbook. This code-side pin is
+// independent of mutable Script Properties; changing the Preview workbook
+// requires a reviewed source change instead of an accidental property edit.
+var PREDICTION_MARKET_R2_APPROVED_PREVIEW_SPREADSHEET_ID = "1CHu2uCLU0DUk7Q31NI343-ehCFJ5HY2GNV440JExlYw";
+
 function predictionMarketR2SelectSpreadsheet_() {
   if (typeof PropertiesService === "undefined" || !PropertiesService ||
       typeof PropertiesService.getScriptProperties !== "function" ||
@@ -32,6 +37,8 @@ function predictionMarketR2SelectSpreadsheet_() {
       productionScriptId === previewScriptId || productionSheetId === previewSheetId) {
     throw new Error("Prediction Market environment is not safely configured");
   }
+  if (env === "PREVIEW" && previewSheetId !== PREDICTION_MARKET_R2_APPROVED_PREVIEW_SPREADSHEET_ID)
+    throw new Error("Prediction Market Preview spreadsheet is not source-approved");
   var actualScriptId = String(ScriptApp.getScriptId() || "").trim();
   var expectedScriptId = env === "PREVIEW" ? previewScriptId : productionScriptId;
   if (!actualScriptId || actualScriptId !== expectedScriptId) throw new Error("Prediction Market Apps Script identity mismatch");
