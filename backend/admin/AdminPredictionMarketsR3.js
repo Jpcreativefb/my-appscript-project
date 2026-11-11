@@ -86,7 +86,7 @@ function predictionMarketAdminR3ProductionService_() {
 }
 
 function apiAdminPredictionMarketR3Dispatch(action,payload) {
-  payload=payload||{};var service=predictionMarketAdminR3ProductionService_(),username=predictionMarketAdminR3String_(payload.username);
+  payload=payload||{};if(typeof predictionMarketR2AssertRequestEnvironment_==="function")predictionMarketR2AssertRequestEnvironment_(payload.__pattcPmExpectedEnv);var service=predictionMarketAdminR3ProductionService_(),username=predictionMarketAdminR3String_(payload.username);
   switch(String(action||"")){
     case "adminGetPredictionMarkets":var externalAction=predictionMarketAdminR3String_(payload.externalAction).toLowerCase();if(externalAction==="search")return service.searchExternal(username,payload);if(externalAction==="detail")return service.getExternalDetail(username,payload);if(externalAction==="resolve")return service.resolveExternal(username,payload);return service.list(username);
     case "adminCreatePredictionMarket":if(payload.externalImportGroup||payload.externalGroup)return service.importExternalGroup(username,payload);if(payload.externalImportItems||payload.externalImportItemsJSON)return service.importExternalDrafts(username,payload);return service.create(username,payload);
