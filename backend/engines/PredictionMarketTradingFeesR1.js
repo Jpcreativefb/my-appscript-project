@@ -36,19 +36,25 @@ function predictionMarketTradingFeesR1ApplyMarketConfig_(metadata,mode,customBps
 }
 function predictionMarketTradingFeesR1Fee_(gross,bps) { return predictionMarketTradingFeesR1Round_(Number(gross||0)*predictionMarketTradingFeesR1Bps_(bps)/10000); }
 
-function predictionMarketTradingFeesR1RowsFromSheet_(storeKey) {
-  if(typeof SpreadsheetApp==="undefined"||!SpreadsheetApp||typeof SpreadsheetApp.getActiveSpreadsheet!=="function"||typeof PREDICTION_MARKET_R2_SHEETS==="undefined")return [];
-  var name=PREDICTION_MARKET_R2_SHEETS[storeKey],sheet=name?SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name):null;if(!sheet||sheet.getLastRow()<2)return [];
+function predictionMarketTradingFeesR1RowsFromSheet_(storeKey,repository) {
+  // Never use getActiveSpreadsheet(): fees must read the exact validated
+  // repository spreadsheet that owns the transaction/settlement writes.
+  var spreadsheet=repository&&repository.spreadsheet;
+  if(!spreadsheet||typeof spreadsheet.getSheetByName!=="function")throw new Error("Prediction Market fee repository spreadsheet is unavailable");
+  if(typeof PREDICTION_MARKET_R2_SHEETS==="undefined")throw new Error("Prediction Market fee store mapping is unavailable");
+  var name=PREDICTION_MARKET_R2_SHEETS[storeKey],sheet=name?spreadsheet.getSheetByName(name):null;
+  if(!sheet)throw new Error("Prediction Market fee store is missing: "+name);
+  if(sheet.getLastRow()<2)return [];
   var values=sheet.getDataRange().getValues(),headers=values[0].map(function(v){return String(v||"").trim();});
   return values.slice(1).filter(function(row){return row.some(function(v){return String(v||"")!=="";});}).map(function(row){var o={};headers.forEach(function(h,i){o[h]=row[i];});return o;});
 }
 function predictionMarketTradingFeesR1Transactions_(repository) {
   if(repository&&typeof repository.dump==="function"){var dump=repository.dump()||{};return Object.keys(dump.transactions||{}).map(function(k){return dump.transactions[k];});}
-  return predictionMarketTradingFeesR1RowsFromSheet_("transactions").map(function(row){var committed={};try{committed=row.CommittedResultJson?JSON.parse(String(row.CommittedResultJson)):{};}catch(ignore){}return{transactionId:row.TransactionId,playerId:row.PlayerId,marketId:row.MarketId,outcome:row.Outcome,status:row.Status,committedResult:committed};});
+  return predictionMarketTradingFeesR1RowsFromSheet_("transactions",repository).map(function(row){var committed={};try{committed=row.CommittedResultJson?JSON.parse(String(row.CommittedResultJson)):{};}catch(ignore){}return{transactionId:row.TransactionId,playerId:row.PlayerId,marketId:row.MarketId,outcome:row.Outcome,status:row.Status,committedResult:committed};});
 }
 function predictionMarketTradingFeesR1Settlements_(repository) {
   if(repository&&typeof repository.dump==="function"){var dump=repository.dump()||{};return Object.keys(dump.settlements||{}).map(function(k){return dump.settlements[k];});}
-  return predictionMarketTradingFeesR1RowsFromSheet_("settlements").map(function(row){var committed={};try{committed=row.CommittedResultJson?JSON.parse(String(row.CommittedResultJson)):{};}catch(ignore){}return{status:row.Status,committedResult:committed};});
+  return predictionMarketTradingFeesR1RowsFromSheet_("settlements",repository).map(function(row){var committed={};try{committed=row.CommittedResultJson?JSON.parse(String(row.CommittedResultJson)):{};}catch(ignore){}return{status:row.Status,committedResult:committed};});
 }
 function predictionMarketTradingFeesR1FeeCharges_(repository,playerId,marketId) {
   return predictionMarketTradingFeesR1Transactions_(repository).filter(function(tx){return String(tx.status||"COMMITTED").toUpperCase()==="COMMITTED"&&(!playerId||String(tx.playerId)===String(playerId))&&(!marketId||String(tx.marketId)===String(marketId));}).map(function(tx){var r=tx.committedResult||{};return{playerId:tx.playerId,marketId:tx.marketId,outcome:String(tx.outcome||r.outcome||"").toUpperCase(),feeCredits:predictionMarketTradingFeesR1Round_(Number(r.feeCredits||0))};}).filter(function(row){return row.feeCredits>0;});
