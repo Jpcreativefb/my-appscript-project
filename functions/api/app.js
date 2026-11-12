@@ -1,7 +1,12 @@
 const APPS_SCRIPT_API_URL =
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
+// Main-project Preview remains the backend for all non-Prediction Markets features.
 const APPS_SCRIPT_PREVIEW_API_URL =
+  "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
+
+// Prediction Markets alone use the separately isolated Apps Script project.
+const APPS_SCRIPT_PREDICTION_MARKET_PREVIEW_API_URL =
   "https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec";
 
 // Preview Prediction Markets financial mutations are OFF until the Director
@@ -218,11 +223,13 @@ export async function onRequestPost(context) {
     }, 200);
   }
 
-  // Every Preview action uses the RC backend. Shared-sheet write guards above
-  // remain independent of deployment selection.
+  // Only Prediction Markets Preview requests reach the isolated project.
+  // All other Preview features retain the existing main-project RC backend.
   const upstreamUrl = productionRequest
     ? APPS_SCRIPT_API_URL
-    : APPS_SCRIPT_PREVIEW_API_URL;
+    : PREDICTION_MARKET_ACTIONS.has(action)
+      ? APPS_SCRIPT_PREDICTION_MARKET_PREVIEW_API_URL
+      : APPS_SCRIPT_PREVIEW_API_URL;
   // The proxy controls this marker; a client-provided value is overwritten.
   // A Preview request accidentally routed to production is rejected server-side.
   const upstreamBody = !productionRequest && PREDICTION_MARKET_ACTIONS.has(action)
@@ -276,6 +283,7 @@ export async function onRequestGet(context) {
     success: true,
     studioProductionBridge: pattcCupProductionRequest_(context),
     apiUrl: pattcCupProductionRequest_(context) ? APPS_SCRIPT_API_URL : APPS_SCRIPT_PREVIEW_API_URL,
+    predictionMarketPreviewApiUrl: APPS_SCRIPT_PREDICTION_MARKET_PREVIEW_API_URL,
     service: "Awards App POST Bridge",
     method: "POST required"
   });
