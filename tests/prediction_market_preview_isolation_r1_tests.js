@@ -112,7 +112,7 @@ async function main(){
     const response=await post('adminOpenPredictionMarket',{PATTC_PM_PREVIEW_FINANCIAL_WRITES_ENABLED:'true',PATTC_PM_PREVIEW_SCRIPT_ID:'same',PATTC_PM_PRODUCTION_SCRIPT_ID:'same',PATTC_PM_PREVIEW_SPREADSHEET_ID:'sheet1',PATTC_PM_PRODUCTION_SPREADSHEET_ID:'sheet2'});
     check('gateway rejects enabled flag with script collision',()=>{assert.equal(response.status,403);assert.equal(networkCalls.length,0)});
     const enabledResponse=await post('adminOpenPredictionMarket',{PATTC_PM_PREVIEW_FINANCIAL_WRITES_ENABLED:'true',PATTC_PM_PREVIEW_SCRIPT_ID:PREVIEW_SCRIPT,PATTC_PM_PRODUCTION_SCRIPT_ID:PROD_SCRIPT,PATTC_PM_PREVIEW_SPREADSHEET_ID:PREVIEW_SHEET,PATTC_PM_PRODUCTION_SPREADSHEET_ID:PROD_SHEET});
-    check('verified opt-in routes to Preview backend, never production',()=>{assert.equal(enabledResponse.status,200);assert.equal(networkCalls.length,1);assert(networkCalls[0].url.includes('AKfycbywlPw_'));assert(!networkCalls[0].url.includes('AKfycbyDdfv-'));assert.equal(networkCalls[0].body.__pattcPmExpectedEnv,'PREVIEW')});
+    check('verified opt-in routes to Preview backend, never production',()=>{assert.equal(enabledResponse.status,200);assert.equal(networkCalls.length,1);assert(networkCalls[0].url.includes('AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ'));assert(!networkCalls[0].url.includes('AKfycbyDdfv-'));assert.equal(networkCalls[0].body.__pattcPmExpectedEnv,'PREVIEW')});
     check('Preview-marked request rejected before production sheet access',()=>{
       properties={...settings,PATTC_PM_ENV:'PRODUCTION'};scriptId=PROD_SCRIPT;
       const before=activeCalls;
@@ -127,7 +127,18 @@ async function main(){
     check('Preview read requests carry server-enforced environment marker',()=>{
       assert.equal(readResult.status,200);assert.equal(networkCalls.length,2);
       assert.equal(networkCalls[1].body.__pattcPmExpectedEnv,'PREVIEW');
-      assert(networkCalls[1].url.includes('AKfycbywlPw_'));
+      assert(networkCalls[1].url.includes('AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ'));
+    });
+    check('source gateway targets the isolated Preview URL',()=>{
+      const expected='https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec';
+      assert.equal(gateway.APPS_SCRIPT_PREVIEW_API_URL,expected);
+      assert.equal(networkCalls[0].url,expected);
+    });
+    check('frontend directs Preview reads only to isolated Apps Script',()=>{
+      const code=source('frontend/js/api.js');
+      const expected='https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec';
+      assert(code.includes(expected));
+      assert(!code.includes('AKfycbywlPw_MsMCz'));
     });
     check('no test wrote to any sheet',()=>assert.equal(writes,0));
     console.log('PASS prediction_market_preview_isolation_r1_tests ('+count+' checks)');
