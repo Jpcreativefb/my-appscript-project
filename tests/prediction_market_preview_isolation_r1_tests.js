@@ -51,6 +51,7 @@ global.SpreadsheetApp={
 };
 let count=0;
 function check(name,fn){fn();count++;console.log('PASS '+name)}
+async function checkAsync(name,fn){await fn();count++;console.log('PASS '+name)}
 function reject(name,fn){check(name,()=>assert.throws(fn,/Prediction Market|Preview/))}
 async function main(){
   try{
@@ -129,16 +130,29 @@ async function main(){
       assert.equal(networkCalls[1].body.__pattcPmExpectedEnv,'PREVIEW');
       assert(networkCalls[1].url.includes('AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ'));
     });
-    check('source gateway targets the isolated Preview URL',()=>{
+    check('source gateway targets the isolated Preview URL for PM only',()=>{
       const expected='https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec';
-      assert.equal(vm.runInContext('APPS_SCRIPT_PREVIEW_API_URL',gateway),expected);
+      assert.equal(vm.runInContext('APPS_SCRIPT_PREDICTION_MARKET_PREVIEW_API_URL',gateway),expected);
       assert.equal(networkCalls[0].url,expected);
     });
-    check('frontend directs Preview reads only to isolated Apps Script',()=>{
+    const otherResponse=await post('getDashboardGamesHub');
+    check('unrelated Preview actions retain historical RC backend',()=>{
+      assert.equal(otherResponse.status,200);
+      assert.equal(networkCalls.length,3);
+      assert(networkCalls[2].url.includes('AKfycbywlPw_MsMCz'));
+      assert.equal(networkCalls[2].body.__pattcPmExpectedEnv,undefined);
+    });
+    check('frontend shared health API retains existing Preview endpoint',()=>{
       const code=source('frontend/js/api.js');
-      const expected='https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec';
-      assert(code.includes(expected));
-      assert(!code.includes('AKfycbywlPw_MsMCz'));
+      assert(code.includes('AKfycbywlPw_MsMCz'));
+      assert(code.includes('const API_GET_SAFE_ACTIONS_ = new Set([\\n  "health"\\n]);'.replace(/\\n/g,'\n')));
+    });
+    const diagnostic=await gateway.onRequestGet({request:{url:'https://feature-r1.my-appscript-project.pages.dev/api/app'},env:{}});
+    await checkAsync('read-only gateway diagnostic distinguishes Preview and PM routes',async()=>{
+      assert.equal(diagnostic.status,200);
+      const details=JSON.parse(await diagnostic.text());
+      assert(details.apiUrl.includes('AKfycbywlPw_MsMCz'));
+      assert(details.predictionMarketPreviewApiUrl.includes('AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ'));
     });
     check('no test wrote to any sheet',()=>assert.equal(writes,0));
     console.log('PASS prediction_market_preview_isolation_r1_tests ('+count+' checks)');
