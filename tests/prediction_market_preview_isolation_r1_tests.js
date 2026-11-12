@@ -131,7 +131,7 @@ async function main(){
     });
     check('source gateway targets the isolated Preview URL',()=>{
       const expected='https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec';
-      assert.equal(gateway.APPS_SCRIPT_PREVIEW_API_URL,expected);
+      assert.equal(vm.runInContext('APPS_SCRIPT_PREVIEW_API_URL',gateway),expected);
       assert.equal(networkCalls[0].url,expected);
     });
     check('frontend directs Preview reads only to isolated Apps Script',()=>{
