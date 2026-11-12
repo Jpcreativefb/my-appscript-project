@@ -2,7 +2,7 @@ const APPS_SCRIPT_API_URL =
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
 const APPS_SCRIPT_PREVIEW_API_URL =
-  "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
+  "https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec";
 
 // Preview Prediction Markets financial mutations are OFF until the Director
 // validates an isolated Apps Script project, spreadsheet and backend gate.
