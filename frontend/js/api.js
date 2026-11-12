@@ -4,7 +4,7 @@ const API_IS_CLOUDFLARE_PREVIEW = typeof location !== "undefined" &&
   String(location.hostname || "").toLowerCase().endsWith(".my-appscript-project.pages.dev");
 
 const API_BASE = API_IS_CLOUDFLARE_PREVIEW
-  ? "https://script.google.com/macros/s/AKfycbxFyc0vV5vkg4cRuK6M_qC7jutcv4eUqRVK3t3gltHsEBN9QVCLNWY2PqqPlZgwAFyHdQ/exec"
+  ? "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec"
   :
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
